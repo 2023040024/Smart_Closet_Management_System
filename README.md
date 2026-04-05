@@ -54,4 +54,3 @@ Contributors
 
 License
 MIT License
-https://github.com/2023040024/Smart_Closet_Management_System
