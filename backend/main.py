@@ -31,8 +31,8 @@ app.include_router(clothes.router)
 app.include_router(recommend.router)
 
 # C 담당자가 추가할 라우터
-# from routers import history, stats
-# app.include_router(history.router)
+from routers import history, stats
+app.include_router(history.router)
 # app.include_router(stats.router)
 
 @app.get("/")
