@@ -33,9 +33,10 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const [search, setSearch] = useState('');
+  const [selectedType, setSelectedType] = useState('');
 
-  // ⭐ 카테고리 선택 상태
-  const [selectedType, setSelectedType] = useState<string>('');
+  // ⭐ 필터 UI 토글
+  const [showFilter, setShowFilter] = useState(false);
 
   const [filter, setFilter] = useState<FilterType>({
     style: '',
@@ -77,9 +78,8 @@ export default function HomeScreen() {
     setSelectedType((prev) => (prev === type ? '' : type));
   };
 
-  // ⭐ 핵심 로직
   const filteredClothes = (clothes as Clothes[]).filter((item) => {
-    if (!selectedType) return false; // 선택 안 하면 안 보이게
+    if (!selectedType) return false;
 
     const matchType = item.tags.type === selectedType;
 
@@ -145,7 +145,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>내 옷장</Text>
 
-      {/* ⭐ 카테고리 버튼 */}
+      {/* ⭐ 카테고리 */}
       <View style={styles.typeContainer}>
         {['상의','하의','아우터','신발'].map((type) => {
           const isSelected = selectedType === type;
@@ -164,26 +164,39 @@ export default function HomeScreen() {
       </View>
 
       {!selectedType && (
-        <Text style={styles.emptyText}>
-          카테고리를 선택하세요
-        </Text>
+        <Text style={styles.emptyText}>카테고리를 선택하세요</Text>
       )}
 
-      <TextInput
-        style={styles.searchInput}
-        placeholder="검색 (예: 캐주얼, 니트)"
-        value={search}
-        onChangeText={setSearch}
-      />
+      {/* 🔍 검색 + 필터 버튼 */}
+      <View style={styles.topBar}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="검색"
+          value={search}
+          onChangeText={setSearch}
+        />
 
-      {renderSection('색상', 'color', ['블랙','화이트','그레이','베이지','브라운','블루','그린','레드','기타'])}
-      {renderSection('계절', 'season', ['봄','여름','가을','겨울'])}
-      {renderSection('스타일', 'style', ['캐주얼','세미캐주얼','포멀','미니멀','스트릿','댄디','스포티','빈티지','아메카지'])}
-      {renderSection('분위기', 'mood', ['활동적인','세련된','귀여운','힙한','차분한','고급스러운'])}
-      {renderSection('핏', 'fit', ['오버핏','슬림핏','와이드핏','크롭','롱기장'])}
-      {renderSection('소재', 'material', ['니트','데님','코튼','패딩'])}
-      {renderSection('두께', 'thickness', ['얇음','보통','두꺼움'])}
-      {renderSection('포인트', 'point', ['프린팅','로고','레이어드','컬러포인트','무지','패턴','스트라이프','체크'])}
+        <TouchableOpacity
+          style={styles.filterBtn}
+          onPress={() => setShowFilter((prev) => !prev)}
+        >
+          <Text style={{ color: '#fff' }}>필터</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ⭐ 필터 UI (토글됨) */}
+      {showFilter && (
+        <>
+          {renderSection('색상', 'color', ['블랙','화이트','그레이','베이지','브라운','블루','그린','레드','기타'])}
+          {renderSection('계절', 'season', ['봄','여름','가을','겨울'])}
+          {renderSection('스타일', 'style', ['캐주얼','세미캐주얼','포멀','미니멀','스트릿','댄디','스포티','빈티지','아메카지'])}
+          {renderSection('분위기', 'mood', ['활동적인','세련된','귀여운','힙한','차분한','고급스러운'])}
+          {renderSection('핏', 'fit', ['오버핏','슬림핏','와이드핏','크롭','롱기장'])}
+          {renderSection('소재', 'material', ['니트','데님','코튼','패딩'])}
+          {renderSection('두께', 'thickness', ['얇음','보통','두꺼움'])}
+          {renderSection('포인트', 'point', ['프린팅','로고','레이어드','컬러포인트','무지','패턴','스트라이프','체크'])}
+        </>
+      )}
 
       <TouchableOpacity style={styles.recommendBtn} onPress={goRecommend}>
         <Text style={styles.recommendText}>코디 추천 받기</Text>
@@ -194,10 +207,7 @@ export default function HomeScreen() {
         keyExtractor={(item) => item.id}
         numColumns={2}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => router.push(`/detail?id=${item.id}`)}
-          >
+          <TouchableOpacity style={styles.card}>
             <Image source={{ uri: item.image }} style={styles.image} />
 
             <TouchableOpacity
@@ -232,12 +242,24 @@ const styles = StyleSheet.create({
   selected: { backgroundColor: '#000' },
   selectedText: { color: '#fff' },
 
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
   searchInput: {
+    flex: 1,
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 10,
     padding: 10,
-    marginVertical: 10,
+  },
+
+  filterBtn: {
+    backgroundColor: '#000',
+    padding: 10,
+    borderRadius: 10,
   },
 
   sectionHeader: {
@@ -246,7 +268,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
-  label: { fontSize: 14, fontWeight: '600' },
+  label: { fontWeight: '600' },
 
   filterContainer: {
     flexDirection: 'row',
@@ -264,11 +286,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     padding: 12,
     borderRadius: 10,
-    marginVertical: 15,
+    marginVertical: 10,
     alignItems: 'center',
   },
 
-  recommendText: { color: '#fff', fontWeight: 'bold' },
+  recommendText: { color: '#fff' },
 
   card: { flex: 1, margin: 8, alignItems: 'center' },
 
@@ -285,7 +307,7 @@ const styles = StyleSheet.create({
 
   emptyText: {
     textAlign: 'center',
-    marginTop: 10,
+    marginVertical: 10,
     color: '#666',
   },
 });
