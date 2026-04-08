@@ -13,14 +13,15 @@ import {
 import { useCloset } from '../_closetStore';
 
 type Tags = {
+  type: string;   // ⭐ 추가
   style: string;
   mood: string;
   fit: string;
   material: string;
   thickness: string;
   point: string;
-  color: string;    // ⭐ 추가
-  season: string;   // ⭐ 추가
+  color: string;
+  season: string;
 };
 
 export default function RegisterScreen() {
@@ -29,14 +30,15 @@ export default function RegisterScreen() {
   const [image, setImage] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<Tags>({
+    type: '',   // ⭐ 추가
     style: '',
     mood: '',
     fit: '',
     material: '',
     thickness: '',
     point: '',
-    color: '',      // ⭐ 추가
-    season: '',     // ⭐ 추가
+    color: '',
+    season: '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -98,7 +100,15 @@ export default function RegisterScreen() {
         )}
       </TouchableOpacity>
 
-      {/* 🔥 색상 */}
+      {/* ⭐ 카테고리 */}
+      <Text style={styles.label}>
+        카테고리 {selected.type ? '(선택됨)' : ''}
+      </Text>
+      <View style={styles.tagContainer}>
+        {renderTags(['상의','하의','아우터','신발'], 'type')}
+      </View>
+
+      {/* 색상 */}
       <Text style={styles.label}>
         색상 {selected.color ? '(선택됨)' : ''}
       </Text>
@@ -109,7 +119,7 @@ export default function RegisterScreen() {
         )}
       </View>
 
-      {/* 🔥 계절 */}
+      {/* 계절 */}
       <Text style={styles.label}>
         계절 {selected.season ? '(선택됨)' : ''}
       </Text>
@@ -179,6 +189,7 @@ export default function RegisterScreen() {
         style={styles.resetButton}
         onPress={() =>
           setSelected({
+            type: '',   // ⭐ 추가
             style: '',
             mood: '',
             fit: '',
