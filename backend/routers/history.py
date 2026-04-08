@@ -1,6 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException 
 from sqlalchemy.orm import Session
+from typing import List
 from database import get_db
+from models import Clothes, WearHistory
+from schemas import WearHistoryCreate, WearHistoryResponse
 
 router = APIRouter(prefix="/history", tags=["착용 기록"])
 
