@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { useCloset } from '../_closetStore';
 
-// 타입
 type FilterType = {
   style: string;
   mood: string;
@@ -19,8 +18,8 @@ type FilterType = {
   fit: string;
   material: string;
   point: string;
-  color: string;   // ⭐ 추가
-  season: string;  // ⭐ 추가
+  color: string;
+  season: string;
 };
 
 type Clothes = {
@@ -42,8 +41,8 @@ export default function HomeScreen() {
     fit: '',
     material: '',
     point: '',
-    color: '',    // ⭐ 추가
-    season: '',   // ⭐ 추가
+    color: '',
+    season: '',
   });
 
   const [expanded, setExpanded] = useState({
@@ -53,8 +52,8 @@ export default function HomeScreen() {
     fit: false,
     material: false,
     point: false,
-    color: false,   // ⭐ 추가
-    season: false,  // ⭐ 추가
+    color: false,
+    season: false,
   });
 
   const toggleFilter = (category: keyof FilterType, value: string) => {
@@ -79,8 +78,8 @@ export default function HomeScreen() {
       (!filter.fit || item.tags.fit === filter.fit) &&
       (!filter.material || item.tags.material === filter.material) &&
       (!filter.point || item.tags.point === filter.point) &&
-      (!filter.color || item.tags.color === filter.color) &&     // ⭐ 추가
-      (!filter.season || item.tags.season === filter.season);    // ⭐ 추가
+      (!filter.color || item.tags.color === filter.color) &&
+      (!filter.season || item.tags.season === filter.season);
 
     const matchSearch =
       !search ||
@@ -139,16 +138,24 @@ export default function HomeScreen() {
         onChangeText={setSearch}
       />
 
-      {/* ⭐ 추가된 부분 */}
+      {/* ⭐ register.tsx 순서 완전 일치 */}
+
       {renderSection('색상', 'color', ['블랙','화이트','그레이','베이지','브라운','블루','그린','레드','기타'])}
+
       {renderSection('계절', 'season', ['봄','여름','가을','겨울'])}
 
-      {renderSection('스타일', 'style', ['캐주얼','세미캐주얼','포멀','미니멀','스트릿'])}
-      {renderSection('분위기', 'mood', ['활동적인','세련된','귀여운','힙한','차분한'])}
+      {renderSection('스타일', 'style', ['캐주얼','세미캐주얼','포멀','미니멀','스트릿','댄디','스포티','빈티지','아메카지'])}
+
+      {renderSection('분위기', 'mood', ['활동적인','세련된','귀여운','힙한','차분한','고급스러운'])}
+
+      {renderSection('핏', 'fit', ['오버핏','슬림핏','와이드핏','크롭','롱기장'])}
+
+      {renderSection('소재', 'material', ['니트','데님','코튼','패딩'])}
+
       {renderSection('두께', 'thickness', ['얇음','보통','두꺼움'])}
-      {renderSection('핏', 'fit', ['슬림','레귤러','루즈','오버핏'])}
-      {renderSection('소재', 'material', ['면','니트','데님','가죽'])}
-      {renderSection('포인트', 'point', ['무지','로고','프린팅','패턴'])}
+
+      {/* ⭐ 빠졌던 포인트 복구 */}
+      {renderSection('포인트', 'point', ['프린팅','로고','레이어드','컬러포인트','무지','패턴','스트라이프','체크'])}
 
       <TouchableOpacity style={styles.recommendBtn} onPress={goRecommend}>
         <Text style={styles.recommendText}>코디 추천 받기</Text>
