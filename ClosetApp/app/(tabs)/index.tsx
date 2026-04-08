@@ -19,6 +19,8 @@ type FilterType = {
   fit: string;
   material: string;
   point: string;
+  color: string;   // ⭐ 추가
+  season: string;  // ⭐ 추가
 };
 
 type Clothes = {
@@ -40,6 +42,8 @@ export default function HomeScreen() {
     fit: '',
     material: '',
     point: '',
+    color: '',    // ⭐ 추가
+    season: '',   // ⭐ 추가
   });
 
   const [expanded, setExpanded] = useState({
@@ -49,6 +53,8 @@ export default function HomeScreen() {
     fit: false,
     material: false,
     point: false,
+    color: false,   // ⭐ 추가
+    season: false,  // ⭐ 추가
   });
 
   const toggleFilter = (category: keyof FilterType, value: string) => {
@@ -72,7 +78,9 @@ export default function HomeScreen() {
       (!filter.thickness || item.tags.thickness === filter.thickness) &&
       (!filter.fit || item.tags.fit === filter.fit) &&
       (!filter.material || item.tags.material === filter.material) &&
-      (!filter.point || item.tags.point === filter.point);
+      (!filter.point || item.tags.point === filter.point) &&
+      (!filter.color || item.tags.color === filter.color) &&     // ⭐ 추가
+      (!filter.season || item.tags.season === filter.season);    // ⭐ 추가
 
     const matchSearch =
       !search ||
@@ -81,7 +89,6 @@ export default function HomeScreen() {
     return matchFilter && matchSearch;
   });
 
-  // 🔥 추천 페이지 이동
   const goRecommend = () => {
     router.push({
       pathname: '/(tabs)/recommend',
@@ -89,7 +96,6 @@ export default function HomeScreen() {
     });
   };
 
-  // 🔥 공통 렌더 함수
   const renderSection = (
     label: string,
     key: keyof FilterType,
@@ -133,6 +139,10 @@ export default function HomeScreen() {
         onChangeText={setSearch}
       />
 
+      {/* ⭐ 추가된 부분 */}
+      {renderSection('색상', 'color', ['블랙','화이트','그레이','베이지','브라운','블루','그린','레드','기타'])}
+      {renderSection('계절', 'season', ['봄','여름','가을','겨울'])}
+
       {renderSection('스타일', 'style', ['캐주얼','세미캐주얼','포멀','미니멀','스트릿'])}
       {renderSection('분위기', 'mood', ['활동적인','세련된','귀여운','힙한','차분한'])}
       {renderSection('두께', 'thickness', ['얇음','보통','두꺼움'])}
@@ -140,7 +150,6 @@ export default function HomeScreen() {
       {renderSection('소재', 'material', ['면','니트','데님','가죽'])}
       {renderSection('포인트', 'point', ['무지','로고','프린팅','패턴'])}
 
-      {/* 🔥 추천 버튼 */}
       <TouchableOpacity style={styles.recommendBtn} onPress={goRecommend}>
         <Text style={styles.recommendText}>코디 추천 받기</Text>
       </TouchableOpacity>
