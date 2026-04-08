@@ -9,6 +9,9 @@ router = APIRouter(prefix="/history", tags=["착용 기록"])
 
 @router.post("", response_model=List[WearHistoryResponse])
 def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session = Depends(get_db)):
+    if not history_data_list:
+        raise HTTPException(status_code=400, detail="기록할 옷 데이터가 비어있습니다.")
+    
     created_histories = []
     
     for history_data in history_data_list:
