@@ -1,6 +1,21 @@
 from datetime import datetime, timedelta
 import math
+import requests
 
+# 1. 주소 -> 위경도 변환 (OpenStreetMap Nominatim 사용)
+def get_coords_from_address(address: str):
+    url = f"https://nominatim.openstreetmap.org/search?q={address}&format=json"
+    headers = {"User-Agent": "SmartClosetApp"} # 필수 헤더
+    
+    try:
+        response = requests.get(url, headers=headers)
+        data = response.json()
+        if data:
+            return float(data[0]['lat']), float(data[0]['lon'])
+        return None, None
+    except:
+        return None, None
+    
 def convert_grid(lat, lon):
     # 기상청 격자 변환 상수
     RE = 6371.00877  # 지구 반경(km)
