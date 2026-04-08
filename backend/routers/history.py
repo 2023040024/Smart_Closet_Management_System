@@ -32,6 +32,7 @@ def create_wear_history(history_data: WearHistoryCreate, db: Session = Depends(g
     db.refresh(new_history)
     return new_history
 
-@router.get("")
-def get_history(db: Session = Depends(get_db)):
-    return {"message": "착용 이력 조회 - 구현 예정"}
+@router.get("", response_model=List[WearHistoryResponse])
+def get_wear_histories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    histories = db.query(WearHistory).order_by(WearHistory.worn_date.desc()).offset(skip).limit(limit).all()
+    return histories
