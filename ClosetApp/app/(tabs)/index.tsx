@@ -73,14 +73,15 @@ export default function HomeScreen() {
     }));
   };
 
-  // ⭐ 카테고리 클릭
   const toggleType = (type: string) => {
     setSelectedType((prev) => (prev === type ? '' : type));
   };
 
+  // ⭐ 핵심 로직
   const filteredClothes = (clothes as Clothes[]).filter((item) => {
-    const matchType =
-      !selectedType || item.tags.type === selectedType;
+    if (!selectedType) return false; // 선택 안 하면 안 보이게
+
+    const matchType = item.tags.type === selectedType;
 
     const matchFilter =
       (!filter.style || item.tags.style === filter.style) &&
@@ -129,7 +130,9 @@ export default function HomeScreen() {
                 style={[styles.tag, isSelected && styles.selected]}
                 onPress={() => toggleFilter(key, item)}
               >
-                <Text style={isSelected && styles.selectedText}>{item}</Text>
+                <Text style={isSelected && styles.selectedText}>
+                  {item}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -142,7 +145,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>내 옷장</Text>
 
-      {/* ⭐ 카테고리 탭 */}
+      {/* ⭐ 카테고리 버튼 */}
       <View style={styles.typeContainer}>
         {['상의','하의','아우터','신발'].map((type) => {
           const isSelected = selectedType === type;
@@ -159,6 +162,12 @@ export default function HomeScreen() {
           );
         })}
       </View>
+
+      {!selectedType && (
+        <Text style={styles.emptyText}>
+          카테고리를 선택하세요
+        </Text>
+      )}
 
       <TextInput
         style={styles.searchInput}
@@ -208,7 +217,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
   title: { fontSize: 24, fontWeight: 'bold' },
 
-  // ⭐ 카테고리 스타일
   typeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -220,6 +228,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#eee',
     borderRadius: 10,
   },
+
+  selected: { backgroundColor: '#000' },
+  selectedText: { color: '#fff' },
 
   searchInput: {
     borderWidth: 1,
@@ -249,9 +260,6 @@ const styles = StyleSheet.create({
     margin: 4,
   },
 
-  selected: { backgroundColor: '#000' },
-  selectedText: { color: '#fff' },
-
   recommendBtn: {
     backgroundColor: '#000',
     padding: 12,
@@ -274,4 +282,10 @@ const styles = StyleSheet.create({
   },
 
   deleteText: { color: '#fff' },
+
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 10,
+    color: '#666',
+  },
 });
