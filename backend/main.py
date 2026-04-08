@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()  # .env 파일 자동 로드
 
 from database import engine, Base
-from routers import auth, clothes, recommend, vision
+from routers import auth, clothes, recommend, weather, vision
 
 Base.metadata.create_all(bind=engine)
 
@@ -29,10 +29,11 @@ app.mount("/images", StaticFiles(directory="uploaded_images"), name="images")
 app.include_router(auth.router)
 app.include_router(clothes.router)
 app.include_router(recommend.router)
+app.include_router(weather.router)
 app.include_router(vision.router)
 
 # C 담당자가 추가할 라우터
-from routers import history, stats
+from routers import history
 app.include_router(history.router)
 # app.include_router(stats.router)
 
