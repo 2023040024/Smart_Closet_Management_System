@@ -70,6 +70,14 @@ export default function HomeScreen() {
     }));
   };
 
+  // ⭐ 추천 이동
+  const goRecommend = () => {
+    router.push({
+      pathname: '/(tabs)/recommend',
+      params: filter,
+    });
+  };
+
   const filteredClothes = (clothes as Clothes[]).filter((item) => {
     const matchType =
       selectedType === '전체' || item.tags.type === selectedType;
@@ -86,13 +94,6 @@ export default function HomeScreen() {
 
     return matchType && matchFilter;
   });
-
-  const goRecommend = () => {
-    router.push({
-      pathname: '/(tabs)/recommend',
-      params: filter,
-    });
-  };
 
   const renderSection = (
     label: string,
@@ -132,13 +133,32 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>내 옷장</Text>
 
-      {/* ⭐ 필터 버튼 */}
-      <TouchableOpacity
-        style={styles.filterBtn}
-        onPress={() => setShowFilter((prev) => !prev)}
-      >
-        <Text style={{ color: '#fff' }}>필터</Text>
-      </TouchableOpacity>
+      {/* ⭐ 필터 + 카테고리 한 줄 */}
+      <View style={styles.topRow}>
+        <TouchableOpacity
+          style={styles.filterBtn}
+          onPress={() => setShowFilter((prev) => !prev)}
+        >
+          <Text style={styles.filterText}>필터</Text>
+        </TouchableOpacity>
+
+        <View style={styles.typeContainer}>
+          {['전체','상의','하의','아우터','신발'].map((type) => {
+            const isSelected = selectedType === type;
+            return (
+              <TouchableOpacity
+                key={type}
+                style={[styles.typeBtn, isSelected && styles.selected]}
+                onPress={() => setSelectedType(type)}
+              >
+                <Text style={isSelected && styles.selectedText}>
+                  {type}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
 
       {/* ⭐ 필터 영역 */}
       {showFilter && (
@@ -154,34 +174,21 @@ export default function HomeScreen() {
         </>
       )}
 
-      {/* ⭐ 카테고리 버튼 (필터 아래로 이동) */}
-      <View style={styles.typeContainer}>
-        {['전체','상의','하의','아우터','신발'].map((type) => {
-          const isSelected = selectedType === type;
-          return (
-            <TouchableOpacity
-              key={type}
-              style={[styles.typeBtn, isSelected && styles.selected]}
-              onPress={() => setSelectedType(type)}
-            >
-              <Text style={isSelected && styles.selectedText}>
-                {type}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
+      {/* ⭐ 추천 버튼 */}
       <TouchableOpacity style={styles.recommendBtn} onPress={goRecommend}>
         <Text style={styles.recommendText}>코디 추천 받기</Text>
       </TouchableOpacity>
 
+      {/* 리스트 */}
       <FlatList
         data={filteredClothes}
         keyExtractor={(item) => item.id}
         numColumns={2}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push(`/detail?id=${item.id}`)}
+          >
             <Image source={{ uri: item.image }} style={styles.image} />
 
             <TouchableOpacity
@@ -190,7 +197,7 @@ export default function HomeScreen() {
             >
               <Text style={styles.deleteText}>삭제</Text>
             </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         )}
       />
     </View>
@@ -201,13 +208,40 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
 
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+
   filterBtn: {
     backgroundColor: '#000',
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 10,
-    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginRight: 8,
   },
+
+  filterText: {
+    color: '#fff',
+    fontSize: 12,
+  },
+
+  typeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+
+  typeBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#eee',
+    borderRadius: 10,
+    marginRight: 5,
+  },
+
+  selected: { backgroundColor: '#000' },
+  selectedText: { color: '#fff' },
 
   sectionHeader: {
     flexDirection: 'row',
@@ -229,21 +263,6 @@ const styles = StyleSheet.create({
     margin: 4,
   },
 
-  typeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 10,
-  },
-
-  typeBtn: {
-    padding: 8,
-    backgroundColor: '#eee',
-    borderRadius: 10,
-  },
-
-  selected: { backgroundColor: '#000' },
-  selectedText: { color: '#fff' },
-
   recommendBtn: {
     backgroundColor: '#000',
     padding: 12,
@@ -252,7 +271,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  recommendText: { color: '#fff' },
+  recommendText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
 
   card: { flex: 1, margin: 8, alignItems: 'center' },
 
