@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from database import get_db
 from models import Clothes, CategoryEnum, StatusEnum
+from tpo_rules import get_tpo_prompt_text
 
 router = APIRouter(prefix="/recommend", tags=["코디 추천"])
 
@@ -114,6 +115,10 @@ def build_prompt(
 ) -> str:
     """Gemini에게 전달할 프롬프트 생성"""
 
+    context = get_tpo_prompt_text(
+        situation, temperature, weather_condition
+    )
+    
     situation_map = {
         "school": "학교",
         "date": "데이트",
@@ -143,10 +148,10 @@ def build_prompt(
 당신은 패션 코디 전문가입니다. 아래 정보를 바탕으로 오늘 입기 좋은 코디 3가지를 추천해주세요.
 
 [오늘 상황]
-- 상황: {situation_kr}
-- 기온: {temperature}°C
-- 날씨: {weather_condition}
-- 선호 스타일: {preferred_style}
+{context}
+
+[추가 사용자 정보]
+- 사용자가 선호하는 스타일: {preferred_style}
 
 [보유 옷 목록] (미착용 기간이 긴 옷 위주로 선별됨)
 {clothes_text}
@@ -172,13 +177,13 @@ def build_prompt(
     }},
     {{
       "outfit_number": 2,
-      "items": [...],
-      "reason": "..."
+      "items": [],
+      "reason": "이유"
     }},
     {{
       "outfit_number": 3,
-      "items": [...],
-      "reason": "..."
+      "items": [],
+      "reason": "이유"
     }}
   ],
   "ai_message": "오늘 {situation_kr}에 잘 어울리는 코디를 준비했어요! 한 줄 멘트"
@@ -347,10 +352,10 @@ def recommend_weekly(
       "items": [{{"clothes_id": 1, "name": "옷이름", "category": "카테고리", "color": "색상"}}],
       "reason": "이유"
     }},
-    {{"day": "화요일", "items": [...], "reason": "..."}},
-    {{"day": "수요일", "items": [...], "reason": "..."}},
-    {{"day": "목요일", "items": [...], "reason": "..."}},
-    {{"day": "금요일", "items": [...], "reason": "..."}}
+    {{"day": "화요일", "items": [], "reason": "이유"}},
+    {{"day": "수요일", "items": [], "reason": "이유"}},
+    {{"day": "목요일", "items": [], "reason": "이유"}},
+    {{"day": "금요일", "items": [], "reason": "이유"}}
   ],
   "tip": "이번 주 코디 팁 한 줄"
 }}
