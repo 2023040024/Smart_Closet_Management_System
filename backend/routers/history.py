@@ -24,6 +24,9 @@ def create_wear_history(history_data: WearHistoryCreate, db: Session = Depends(g
     )
     db.add(new_history)
 
+    cloth.wear_count += 1
+    cloth.last_worn_date = history_data.worn_date
+    db.add(cloth)
 
 
 
