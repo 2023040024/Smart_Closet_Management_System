@@ -1,98 +1,229 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import {
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useCloset } from '../_closetStore';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+// 타입
+type FilterType = {
+  style: string;
+  mood: string;
+  thickness: string;
+  fit: string;
+  material: string;
+  point: string;
+};
+
+type Clothes = {
+  id: string;
+  image: string;
+  tags: FilterType;
+};
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const { clothes, deleteClothes } = useCloset();
+  const router = useRouter();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const [search, setSearch] = useState('');
+
+  const [filter, setFilter] = useState<FilterType>({
+    style: '',
+    mood: '',
+    thickness: '',
+    fit: '',
+    material: '',
+    point: '',
+  });
+
+  const [expanded, setExpanded] = useState({
+    style: false,
+    mood: false,
+    thickness: false,
+    fit: false,
+    material: false,
+    point: false,
+  });
+
+  const toggleFilter = (category: keyof FilterType, value: string) => {
+    setFilter((prev) => ({
+      ...prev,
+      [category]: prev[category] === value ? '' : value,
+    }));
+  };
+
+  const toggleExpand = (category: keyof typeof expanded) => {
+    setExpanded((prev) => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
+  };
+
+  const filteredClothes = (clothes as Clothes[]).filter((item) => {
+    const matchFilter =
+      (!filter.style || item.tags.style === filter.style) &&
+      (!filter.mood || item.tags.mood === filter.mood) &&
+      (!filter.thickness || item.tags.thickness === filter.thickness) &&
+      (!filter.fit || item.tags.fit === filter.fit) &&
+      (!filter.material || item.tags.material === filter.material) &&
+      (!filter.point || item.tags.point === filter.point);
+
+    const matchSearch =
+      !search ||
+      Object.values(item.tags).some((tag) => tag.includes(search));
+
+    return matchFilter && matchSearch;
+  });
+
+  // 🔥 추천 페이지 이동
+  const goRecommend = () => {
+    router.push({
+      pathname: '/(tabs)/recommend',
+      params: filter,
+    });
+  };
+
+  // 🔥 공통 렌더 함수
+  const renderSection = (
+    label: string,
+    key: keyof FilterType,
+    options: string[]
+  ) => (
+    <>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.label}>{label}</Text>
+        <TouchableOpacity onPress={() => toggleExpand(key)}>
+          <Text>{expanded[key] ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {expanded[key] && (
+        <View style={styles.filterContainer}>
+          {options.map((item) => {
+            const isSelected = filter[key] === item;
+            return (
+              <TouchableOpacity
+                key={item}
+                style={[styles.tag, isSelected && styles.selected]}
+                onPress={() => toggleFilter(key, item)}
+              >
+                <Text style={isSelected && styles.selectedText}>{item}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+    </>
+  );
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>내 옷장</Text>
+
+      <TextInput
+        style={styles.searchInput}
+        placeholder="검색 (예: 캐주얼, 니트)"
+        value={search}
+        onChangeText={setSearch}
+      />
+
+      {renderSection('스타일', 'style', ['캐주얼','세미캐주얼','포멀','미니멀','스트릿'])}
+      {renderSection('분위기', 'mood', ['활동적인','세련된','귀여운','힙한','차분한'])}
+      {renderSection('두께', 'thickness', ['얇음','보통','두꺼움'])}
+      {renderSection('핏', 'fit', ['슬림','레귤러','루즈','오버핏'])}
+      {renderSection('소재', 'material', ['면','니트','데님','가죽'])}
+      {renderSection('포인트', 'point', ['무지','로고','프린팅','패턴'])}
+
+      {/* 🔥 추천 버튼 */}
+      <TouchableOpacity style={styles.recommendBtn} onPress={goRecommend}>
+        <Text style={styles.recommendText}>코디 추천 받기</Text>
+      </TouchableOpacity>
+
+      <FlatList
+        data={filteredClothes}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push(`/detail?id=${item.id}`)}
+          >
+            <Image source={{ uri: item.image }} style={styles.image} />
+
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => deleteClothes(item.id)}
+            >
+              <Text style={styles.deleteText}>삭제</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+  title: { fontSize: 24, fontWeight: 'bold' },
+
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    padding: 10,
+    marginVertical: 10,
+  },
+
+  sectionHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+
+  label: { fontSize: 14, fontWeight: '600' },
+
+  filterContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+
+  tag: {
+    padding: 6,
+    backgroundColor: '#eee',
+    borderRadius: 20,
+    margin: 4,
+  },
+
+  selected: { backgroundColor: '#000' },
+  selectedText: { color: '#fff' },
+
+  recommendBtn: {
+    backgroundColor: '#000',
+    padding: 12,
+    borderRadius: 10,
+    marginVertical: 15,
     alignItems: 'center',
-    gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+
+  recommendText: { color: '#fff', fontWeight: 'bold' },
+
+  card: { flex: 1, margin: 8, alignItems: 'center' },
+
+  image: { width: 100, height: 100 },
+
+  deleteButton: {
+    marginTop: 6,
+    backgroundColor: 'red',
+    padding: 6,
+    borderRadius: 6,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+
+  deleteText: { color: '#fff' },
 });
