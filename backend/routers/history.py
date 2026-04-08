@@ -15,7 +15,13 @@ def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session 
         cloth = db.query(Clothes).filter(Clothes.clothes_id == history_data.clothes_id).first()
         if not cloth:
             raise HTTPException(status_code=404, detail=f"해당 ID({history_data.clothes_id})의 옷을 찾을 수 없습니다.")
-        
+        existing_record = db.query(WearHistory).filter(
+            WearHistory.clothes_id == history_data.clothes_id,
+            WearHistory.worn_date == history_data.worn_date
+        ).first()
+        if existing_record:
+            raise HTTPException(status_code=400, detail=f"ID({history_data.clothes_id}) 옷은 오늘 이미 기록되었습니다.")
+
         new_history = WearHistory(
             user_id=cloth.user_id,
             clothes_id=history_data.clothes_id,
