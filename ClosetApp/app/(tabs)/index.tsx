@@ -5,7 +5,6 @@ import {
   Image,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -32,10 +31,7 @@ export default function HomeScreen() {
   const { clothes, deleteClothes } = useCloset();
   const router = useRouter();
 
-  const [search, setSearch] = useState('');
-  const [selectedType, setSelectedType] = useState('');
-
-  // ⭐ 필터 UI 토글
+  const [selectedType, setSelectedType] = useState<string>('전체');
   const [showFilter, setShowFilter] = useState(false);
 
   const [filter, setFilter] = useState<FilterType>({
@@ -74,14 +70,9 @@ export default function HomeScreen() {
     }));
   };
 
-  const toggleType = (type: string) => {
-    setSelectedType((prev) => (prev === type ? '' : type));
-  };
-
   const filteredClothes = (clothes as Clothes[]).filter((item) => {
-    if (!selectedType) return false;
-
-    const matchType = item.tags.type === selectedType;
+    const matchType =
+      selectedType === '전체' || item.tags.type === selectedType;
 
     const matchFilter =
       (!filter.style || item.tags.style === filter.style) &&
@@ -93,11 +84,7 @@ export default function HomeScreen() {
       (!filter.color || item.tags.color === filter.color) &&
       (!filter.season || item.tags.season === filter.season);
 
-    const matchSearch =
-      !search ||
-      Object.values(item.tags).some((tag) => tag.includes(search));
-
-    return matchType && matchFilter && matchSearch;
+    return matchType && matchFilter;
   });
 
   const goRecommend = () => {
@@ -145,46 +132,15 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>내 옷장</Text>
 
-      {/* ⭐ 카테고리 */}
-      <View style={styles.typeContainer}>
-        {['상의','하의','아우터','신발'].map((type) => {
-          const isSelected = selectedType === type;
-          return (
-            <TouchableOpacity
-              key={type}
-              style={[styles.typeBtn, isSelected && styles.selected]}
-              onPress={() => toggleType(type)}
-            >
-              <Text style={isSelected && styles.selectedText}>
-                {type}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {/* ⭐ 필터 버튼 */}
+      <TouchableOpacity
+        style={styles.filterBtn}
+        onPress={() => setShowFilter((prev) => !prev)}
+      >
+        <Text style={{ color: '#fff' }}>필터</Text>
+      </TouchableOpacity>
 
-      {!selectedType && (
-        <Text style={styles.emptyText}>카테고리를 선택하세요</Text>
-      )}
-
-      {/* 🔍 검색 + 필터 버튼 */}
-      <View style={styles.topBar}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="검색"
-          value={search}
-          onChangeText={setSearch}
-        />
-
-        <TouchableOpacity
-          style={styles.filterBtn}
-          onPress={() => setShowFilter((prev) => !prev)}
-        >
-          <Text style={{ color: '#fff' }}>필터</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ⭐ 필터 UI (토글됨) */}
+      {/* ⭐ 필터 영역 */}
       {showFilter && (
         <>
           {renderSection('색상', 'color', ['블랙','화이트','그레이','베이지','브라운','블루','그린','레드','기타'])}
@@ -198,6 +154,24 @@ export default function HomeScreen() {
         </>
       )}
 
+      {/* ⭐ 카테고리 버튼 (필터 아래로 이동) */}
+      <View style={styles.typeContainer}>
+        {['전체','상의','하의','아우터','신발'].map((type) => {
+          const isSelected = selectedType === type;
+          return (
+            <TouchableOpacity
+              key={type}
+              style={[styles.typeBtn, isSelected && styles.selected]}
+              onPress={() => setSelectedType(type)}
+            >
+              <Text style={isSelected && styles.selectedText}>
+                {type}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <TouchableOpacity style={styles.recommendBtn} onPress={goRecommend}>
         <Text style={styles.recommendText}>코디 추천 받기</Text>
       </TouchableOpacity>
@@ -207,7 +181,7 @@ export default function HomeScreen() {
         keyExtractor={(item) => item.id}
         numColumns={2}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card}>
+          <View style={styles.card}>
             <Image source={{ uri: item.image }} style={styles.image} />
 
             <TouchableOpacity
@@ -216,7 +190,7 @@ export default function HomeScreen() {
             >
               <Text style={styles.deleteText}>삭제</Text>
             </TouchableOpacity>
-          </TouchableOpacity>
+          </View>
         )}
       />
     </View>
@@ -225,41 +199,14 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  title: { fontSize: 24, fontWeight: 'bold' },
-
-  typeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-
-  typeBtn: {
-    padding: 8,
-    backgroundColor: '#eee',
-    borderRadius: 10,
-  },
-
-  selected: { backgroundColor: '#000' },
-  selectedText: { color: '#fff' },
-
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-
-  searchInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    padding: 10,
-  },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
 
   filterBtn: {
     backgroundColor: '#000',
     padding: 10,
     borderRadius: 10,
+    marginBottom: 10,
+    alignItems: 'center',
   },
 
   sectionHeader: {
@@ -281,6 +228,21 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     margin: 4,
   },
+
+  typeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 10,
+  },
+
+  typeBtn: {
+    padding: 8,
+    backgroundColor: '#eee',
+    borderRadius: 10,
+  },
+
+  selected: { backgroundColor: '#000' },
+  selectedText: { color: '#fff' },
 
   recommendBtn: {
     backgroundColor: '#000',
@@ -304,10 +266,4 @@ const styles = StyleSheet.create({
   },
 
   deleteText: { color: '#fff' },
-
-  emptyText: {
-    textAlign: 'center',
-    marginVertical: 10,
-    color: '#666',
-  },
 });
