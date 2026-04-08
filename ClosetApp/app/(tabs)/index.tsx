@@ -25,7 +25,7 @@ type FilterType = {
 type Clothes = {
   id: string;
   image: string;
-  tags: FilterType;
+  tags: FilterType & { type: string };
 };
 
 export default function HomeScreen() {
@@ -33,6 +33,9 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const [search, setSearch] = useState('');
+
+  // ⭐ 카테고리 선택 상태
+  const [selectedType, setSelectedType] = useState<string>('');
 
   const [filter, setFilter] = useState<FilterType>({
     style: '',
@@ -70,7 +73,15 @@ export default function HomeScreen() {
     }));
   };
 
+  // ⭐ 카테고리 클릭
+  const toggleType = (type: string) => {
+    setSelectedType((prev) => (prev === type ? '' : type));
+  };
+
   const filteredClothes = (clothes as Clothes[]).filter((item) => {
+    const matchType =
+      !selectedType || item.tags.type === selectedType;
+
     const matchFilter =
       (!filter.style || item.tags.style === filter.style) &&
       (!filter.mood || item.tags.mood === filter.mood) &&
@@ -85,7 +96,7 @@ export default function HomeScreen() {
       !search ||
       Object.values(item.tags).some((tag) => tag.includes(search));
 
-    return matchFilter && matchSearch;
+    return matchType && matchFilter && matchSearch;
   });
 
   const goRecommend = () => {
@@ -131,6 +142,24 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>내 옷장</Text>
 
+      {/* ⭐ 카테고리 탭 */}
+      <View style={styles.typeContainer}>
+        {['상의','하의','아우터','신발'].map((type) => {
+          const isSelected = selectedType === type;
+          return (
+            <TouchableOpacity
+              key={type}
+              style={[styles.typeBtn, isSelected && styles.selected]}
+              onPress={() => toggleType(type)}
+            >
+              <Text style={isSelected && styles.selectedText}>
+                {type}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <TextInput
         style={styles.searchInput}
         placeholder="검색 (예: 캐주얼, 니트)"
@@ -138,23 +167,13 @@ export default function HomeScreen() {
         onChangeText={setSearch}
       />
 
-      {/* ⭐ register.tsx 순서 완전 일치 */}
-
       {renderSection('색상', 'color', ['블랙','화이트','그레이','베이지','브라운','블루','그린','레드','기타'])}
-
       {renderSection('계절', 'season', ['봄','여름','가을','겨울'])}
-
       {renderSection('스타일', 'style', ['캐주얼','세미캐주얼','포멀','미니멀','스트릿','댄디','스포티','빈티지','아메카지'])}
-
       {renderSection('분위기', 'mood', ['활동적인','세련된','귀여운','힙한','차분한','고급스러운'])}
-
       {renderSection('핏', 'fit', ['오버핏','슬림핏','와이드핏','크롭','롱기장'])}
-
       {renderSection('소재', 'material', ['니트','데님','코튼','패딩'])}
-
       {renderSection('두께', 'thickness', ['얇음','보통','두꺼움'])}
-
-      {/* ⭐ 빠졌던 포인트 복구 */}
       {renderSection('포인트', 'point', ['프린팅','로고','레이어드','컬러포인트','무지','패턴','스트라이프','체크'])}
 
       <TouchableOpacity style={styles.recommendBtn} onPress={goRecommend}>
@@ -188,6 +207,19 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
   title: { fontSize: 24, fontWeight: 'bold' },
+
+  // ⭐ 카테고리 스타일
+  typeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+
+  typeBtn: {
+    padding: 8,
+    backgroundColor: '#eee',
+    borderRadius: 10,
+  },
 
   searchInput: {
     borderWidth: 1,
