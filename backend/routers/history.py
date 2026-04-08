@@ -36,7 +36,12 @@ def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session 
         db.add(new_history)
         db.add(cloth)
         created_histories.append(new_history)
-
+    
+    db.commit()
+    for h in created_histories:
+        db.refresh(h)
+        
+    return created_histories
 
 @router.get("", response_model=List[WearHistoryResponse])
 def get_wear_histories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
