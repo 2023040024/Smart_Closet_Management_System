@@ -28,7 +28,9 @@ def create_wear_history(history_data: WearHistoryCreate, db: Session = Depends(g
     cloth.last_worn_date = history_data.worn_date
     db.add(cloth)
 
-
+    db.commit()
+    db.refresh(new_history)
+    return new_history
 
 @router.get("")
 def get_history(db: Session = Depends(get_db)):
