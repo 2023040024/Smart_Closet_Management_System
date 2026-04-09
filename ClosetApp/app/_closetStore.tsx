@@ -9,8 +9,8 @@ type Tags = {
   fit: string;
   material: string;
   point: string;
-  color: string;     // ⭐ 추가
-  season: string;    // ⭐ 추가
+  color: string;
+  season: string;
 };
 
 type Clothes = {
