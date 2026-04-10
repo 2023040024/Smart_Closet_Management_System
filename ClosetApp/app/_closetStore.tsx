@@ -19,22 +19,38 @@ type Clothes = {
   tags: Tags;
 };
 
-const ClosetContext = createContext<any>(null);
+type ClosetContextType = {
+  clothes: Clothes[];
+  addClothes: (item: Clothes) => void;
+  deleteClothes: (id: string) => void;
+};
 
-export const ClosetProvider = ({ children }: any) => {
+const ClosetContext = createContext<ClosetContextType | null>(null);
+
+export const ClosetProvider = ({ children }: { children: React.ReactNode }) => {
   const [clothes, setClothes] = useState<Clothes[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     loadClothes();
   }, []);
 
   useEffect(() => {
+    if (!loaded) return;
     AsyncStorage.setItem('clothes', JSON.stringify(clothes));
-  }, [clothes]);
+  }, [clothes, loaded]);
 
   const loadClothes = async () => {
-    const data = await AsyncStorage.getItem('clothes');
-    if (data) setClothes(JSON.parse(data));
+    try {
+      const data = await AsyncStorage.getItem('clothes');
+      if (data) {
+        setClothes(JSON.parse(data));
+      }
+    } catch (error) {
+      console.log('불러오기 오류:', error);
+    } finally {
+      setLoaded(true);
+    }
   };
 
   const addClothes = (item: Clothes) => {
@@ -52,4 +68,10 @@ export const ClosetProvider = ({ children }: any) => {
   );
 };
 
-export const useCloset = () => useContext(ClosetContext);
+export const useCloset = () => {
+  const context = useContext(ClosetContext);
+  if (!context) {
+    throw new Error('useCloset must be used within a ClosetProvider');
+  }
+  return context;
+};
