@@ -9,12 +9,22 @@ export default function EditScreen() {
 
   const item = clothes.find((c: any) => c.id === id);
 
+  const defaultTags = {
+    type: '',
+    style: '',
+    mood: '',
+    fit: '',
+    material: '',
+    thickness: '',
+    point: '',
+    color: '',
+    season: '',
+  };
+
+  const [selected, setSelected] = useState(item?.tags || defaultTags);
+
   if (!item) return <Text>데이터 없음</Text>;
 
-  // 🔥 기존 값으로 초기화
-  const [selected, setSelected] = useState(item.tags);
-
-  // 🔥 태그 선택 (토글 + 1개 선택)
   const selectTag = (category: keyof typeof selected, value: string) => {
     setSelected((prev: any) => ({
       ...prev,
@@ -32,9 +42,7 @@ export default function EditScreen() {
           style={[styles.tag, isSelected && styles.selectedTag]}
           onPress={() => selectTag(category, item)}
         >
-          <Text style={isSelected && styles.selectedText}>
-            {item}
-          </Text>
+          <Text style={isSelected && styles.selectedText}>{item}</Text>
         </TouchableOpacity>
       );
     });
@@ -44,43 +52,36 @@ export default function EditScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>옷 수정</Text>
 
-      {/* 스타일 */}
       <Text style={styles.label}>스타일</Text>
       <View style={styles.tagContainer}>
-        {renderTags(['캐주얼','세미캐주얼','포멀','미니멀','스트릿','댄디','스포티','빈티지','아메카지'], 'style')}
+        {renderTags(['캐주얼', '세미캐주얼', '포멀', '미니멀', '스트릿', '댄디', '스포티', '빈티지', '아메카지'], 'style')}
       </View>
 
-      {/* 분위기 */}
       <Text style={styles.label}>분위기</Text>
       <View style={styles.tagContainer}>
-        {renderTags(['활동적인','세련된','귀여운','힙한','차분한','고급스러운'], 'mood')}
+        {renderTags(['활동적인', '세련된', '귀여운', '힙한', '차분한', '고급스러운'], 'mood')}
       </View>
 
-      {/* 핏 */}
       <Text style={styles.label}>핏</Text>
       <View style={styles.tagContainer}>
-        {renderTags(['오버핏','슬림핏','와이드핏','크롭','롱기장'], 'fit')}
+        {renderTags(['오버핏', '슬림핏', '와이드핏', '크롭', '롱기장'], 'fit')}
       </View>
 
-      {/* 소재 */}
       <Text style={styles.label}>소재</Text>
       <View style={styles.tagContainer}>
-        {renderTags(['니트','데님','코튼','패딩'], 'material')}
+        {renderTags(['니트', '데님', '코튼', '패딩'], 'material')}
       </View>
 
-      {/* 두께 */}
       <Text style={styles.label}>두께</Text>
       <View style={styles.tagContainer}>
-        {renderTags(['얇음','보통','두꺼움'], 'thickness')}
+        {renderTags(['얇음', '보통', '두꺼움'], 'thickness')}
       </View>
 
-      {/* 포인트 */}
       <Text style={styles.label}>포인트</Text>
       <View style={styles.tagContainer}>
-        {renderTags(['프린팅','로고','레이어드','컬러포인트','무지','패턴','스트라이프','체크'], 'point')}
+        {renderTags(['프린팅', '로고', '레이어드', '컬러포인트', '무지', '패턴', '스트라이프', '체크'], 'point')}
       </View>
 
-      {/* 저장 버튼 */}
       <TouchableOpacity
         style={styles.button}
         onPress={() => {
@@ -88,7 +89,7 @@ export default function EditScreen() {
 
           addClothes({
             ...item,
-            id: item.id, // 같은 id 유지
+            id: item.id,
             tags: selected,
           });
 
