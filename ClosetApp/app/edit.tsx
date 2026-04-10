@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useCloset } from '../_closetStore';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCloset } from './_closetStore';
 
 export default function EditScreen() {
   const { id } = useLocalSearchParams();
@@ -23,7 +23,27 @@ export default function EditScreen() {
 
   const [selected, setSelected] = useState(item?.tags || defaultTags);
 
-  if (!item) return <Text>데이터 없음</Text>;
+  if (!item) return <Text style={{ color: 'white' }}>데이터 없음</Text>;
+
+  const styleMap: Record<string, string> = {
+    캐주얼: 'casual',
+    포멀: 'formal',
+    미니멀: 'minimal',
+    스트릿: 'street',
+  };
+
+  const convertTagsForBackend = (tags: typeof selected) => {
+    const convertedStyle = styleMap[tags.style];
+
+    if (!convertedStyle && tags.style) {
+      throw new Error('지원하지 않는 스타일 태그');
+    }
+
+    return {
+      ...tags,
+      style: convertedStyle || '',
+    };
+  };
 
   const selectTag = (category: keyof typeof selected, value: string) => {
     setSelected((prev: any) => ({
@@ -42,7 +62,9 @@ export default function EditScreen() {
           style={[styles.tag, isSelected && styles.selectedTag]}
           onPress={() => selectTag(category, item)}
         >
-          <Text style={isSelected && styles.selectedText}>{item}</Text>
+          <Text style={isSelected && styles.selectedText}>
+            {item}
+          </Text>
         </TouchableOpacity>
       );
     });
@@ -54,7 +76,10 @@ export default function EditScreen() {
 
       <Text style={styles.label}>스타일</Text>
       <View style={styles.tagContainer}>
-        {renderTags(['캐주얼', '세미캐주얼', '포멀', '미니멀', '스트릿', '댄디', '스포티', '빈티지', '아메카지'], 'style')}
+        {renderTags(
+          ['캐주얼', '세미캐주얼', '포멀', '미니멀', '스트릿', '댄디', '스포티', '빈티지', '아메카지'],
+          'style'
+        )}
       </View>
 
       <Text style={styles.label}>분위기</Text>
@@ -85,15 +110,21 @@ export default function EditScreen() {
       <TouchableOpacity
         style={styles.button}
         onPress={() => {
-          deleteClothes(item.id);
+          try {
+            const backendTags = convertTagsForBackend(selected);
 
-          addClothes({
-            ...item,
-            id: item.id,
-            tags: selected,
-          });
+            deleteClothes(item.id);
 
-          router.back();
+            addClothes({
+              ...item,
+              id: item.id,
+              tags: backendTags,
+            });
+
+            router.back();
+          } catch (error) {
+            Alert.alert('저장 불가', '백엔드에서 지원하지 않는 스타일 태그가 포함되어 있습니다.');
+          }
         }}
       >
         <Text style={styles.buttonText}>수정 완료</Text>

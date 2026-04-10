@@ -43,11 +43,16 @@ export default function DetailScreen() {
 
       {/* 수정 버튼 */}
       <TouchableOpacity
-        style={styles.button}
-        onPress={() => router.push(`/edit?id=${item.id}`)}
-      >
-        <Text style={styles.buttonText}>수정하기</Text>
-      </TouchableOpacity>
+  style={styles.button}
+  onPress={() =>
+    router.push({
+      pathname: '/edit',
+      params: { id: item.id },
+    })
+  }
+>
+  <Text style={styles.buttonText}>수정하기</Text>
+     </TouchableOpacity>
 
     </View>
   );
