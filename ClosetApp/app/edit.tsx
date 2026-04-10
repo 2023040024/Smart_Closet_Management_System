@@ -5,7 +5,7 @@ import { useCloset } from './_closetStore';
 
 export default function EditScreen() {
   const { id } = useLocalSearchParams();
-  const { clothes, deleteClothes, addClothes } = useCloset();
+  const { clothes, updateClothes } = useCloset();
 
   const item = clothes.find((c: any) => c.id === id);
 
@@ -113,11 +113,7 @@ export default function EditScreen() {
           try {
             const backendTags = convertTagsForBackend(selected);
 
-            deleteClothes(item.id);
-
-            addClothes({
-              ...item,
-              id: item.id,
+            updateClothes(item.id, {
               tags: backendTags,
             });
 

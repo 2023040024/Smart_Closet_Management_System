@@ -23,6 +23,7 @@ type ClosetContextType = {
   clothes: Clothes[];
   addClothes: (item: Clothes) => void;
   deleteClothes: (id: string) => void;
+  updateClothes: (id: string, updated: Partial<Clothes>) => void;
 };
 
 const ClosetContext = createContext<ClosetContextType | null>(null);
@@ -61,8 +62,18 @@ export const ClosetProvider = ({ children }: { children: React.ReactNode }) => {
     setClothes((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const updateClothes = (id: string, updated: Partial<Clothes>) => {
+    setClothes((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, ...updated } : item
+      )
+    );
+  };
+
   return (
-    <ClosetContext.Provider value={{ clothes, addClothes, deleteClothes }}>
+    <ClosetContext.Provider
+      value={{ clothes, addClothes, deleteClothes, updateClothes }}
+    >
       {children}
     </ClosetContext.Provider>
   );
