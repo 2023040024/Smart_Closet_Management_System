@@ -76,7 +76,7 @@ export default function RegisterScreen() {
     });
   };
 
-  const handleSave = () => {
+    const handleSave = () => {
     if (!image) {
       Alert.alert('입력 확인', '이미지를 먼저 선택해주세요.');
       return;
@@ -84,6 +84,16 @@ export default function RegisterScreen() {
 
     if (!selected.category) {
       Alert.alert('입력 확인', '카테고리를 선택해주세요.');
+      return;
+    }
+
+    if (selected.category === '상의' && !selected.topFit) {
+      Alert.alert('입력 확인', '상의 핏을 선택해주세요.');
+      return;
+    }
+
+    if (selected.category === '하의' && !selected.bottomFit) {
+      Alert.alert('입력 확인', '하의 핏을 선택해주세요.');
       return;
     }
 
