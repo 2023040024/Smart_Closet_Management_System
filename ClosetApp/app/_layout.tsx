@@ -14,6 +14,9 @@ export default function RootLayout() {
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="detail" options={{ title: '옷 상세' }} />
+          <Stack.Screen name="edit" options={{ title: '옷 수정' }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: '안내' }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
