@@ -1,59 +1,57 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import {
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { useCloset } from '../_closetStore';
+import { useMemo, useState } from 'react';
+import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-type Tags = {
-  type: string;   // ⭐ 추가
-  style: string;
-  mood: string;
-  fit: string;
-  material: string;
-  thickness: string;
-  point: string;
-  color: string;
-  season: string;
-};
+import { ClothesItem, ClothesTags, EMPTY_TAGS, TAG_OPTIONS, useCloset } from '../_closetStore';
+
+function Chip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} style={[styles.chip, selected && styles.chipSelected]}>
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
 export default function RegisterScreen() {
   const { addClothes } = useCloset();
-
   const [image, setImage] = useState<string | null>(null);
-
-  const [selected, setSelected] = useState<Tags>({
-    type: '',   // ⭐ 추가
-    style: '',
-    mood: '',
-    fit: '',
-    material: '',
-    thickness: '',
-    point: '',
-    color: '',
-    season: '',
-  });
-
+  const [selected, setSelected] = useState<ClothesTags>(EMPTY_TAGS);
   const [loading, setLoading] = useState(false);
 
-  // 📸 이미지 선택
+  const fitLabel = useMemo(() => {
+    if (selected.category === '상의') return '상의 핏';
+    if (selected.category === '하의') return '하의 핏';
+    return '핏';
+  }, [selected.category]);
+
+  const fitOptions = useMemo(() => {
+    if (selected.category === '상의') return [...TAG_OPTIONS.topFit];
+    if (selected.category === '하의') return [...TAG_OPTIONS.bottomFit];
+    return [];
+  }, [selected.category]);
+
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
     if (!permission.granted) {
       Alert.alert('권한 필요', '갤러리 접근 권한이 필요합니다.');
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 1,
+      allowsEditing: true,
+      aspect: [4, 5],
     });
 
     if (!result.canceled) {
@@ -61,244 +59,172 @@ export default function RegisterScreen() {
     }
   };
 
-  // 태그 선택
-  const selectTag = (category: keyof Tags, value: string) => {
-    setSelected((prev) => ({
-      ...prev,
-      [category]: prev[category] === value ? '' : value,
-    }));
-  };
+  const toggleTag = <K extends keyof ClothesTags>(key: K, value: ClothesTags[K]) => {
+    setSelected((prev) => {
+      const next = prev[key] === value ? '' : value;
 
-  const renderTags = (items: string[], category: keyof Tags) => {
-    return items.map((item) => {
-      const isSelected = selected[category] === item;
+      if (key === 'category') {
+        return {
+          ...prev,
+          category: next as ClothesTags['category'],
+          topFit: '',
+          bottomFit: '',
+        };
+      }
 
-      return (
-        <TouchableOpacity
-          key={item}
-          style={[styles.tag, isSelected && styles.selectedTag]}
-          onPress={() => selectTag(category, item)}
-        >
-          <Text style={isSelected && styles.selectedText}>
-            {item}
-          </Text>
-        </TouchableOpacity>
-      );
+      return { ...prev, [key]: next };
     });
   };
 
+  const handleSave = () => {
+    if (!image) {
+      Alert.alert('입력 확인', '이미지를 먼저 선택해주세요.');
+      return;
+    }
+
+    if (!selected.category) {
+      Alert.alert('입력 확인', '카테고리를 선택해주세요.');
+      return;
+    }
+
+    setLoading(true);
+
+    const newItem: ClothesItem = {
+      id: Date.now().toString(),
+      image,
+      createdAt: new Date().toISOString(),
+      tags: selected,
+    };
+
+    addClothes(newItem);
+
+    setTimeout(() => {
+      setLoading(false);
+      router.replace('/(tabs)');
+    }, 150);
+  };
+
+  const renderChips = <K extends keyof ClothesTags>(items: readonly string[], key: K) => (
+    <View style={styles.chipWrap}>
+      {items.map((item) => (
+        <Chip
+          key={`${String(key)}-${item}`}
+          label={item}
+          selected={selected[key] === item}
+          onPress={() => toggleTag(key, item as ClothesTags[K])}
+        />
+      ))}
+    </View>
+  );
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>옷 등록</Text>
 
-      {/* 이미지 */}
       <TouchableOpacity style={styles.imageBox} onPress={pickImage}>
         {image ? (
           <Image source={{ uri: image }} style={styles.image} />
         ) : (
-          <Text style={styles.imageText}>+ 사진 추가</Text>
+          <Text style={styles.imagePlaceholder}>+ 사진 추가</Text>
         )}
       </TouchableOpacity>
 
-      {/* ⭐ 카테고리 */}
-      <Text style={styles.label}>
-        카테고리 {selected.type ? '(선택됨)' : ''}
-      </Text>
-      <View style={styles.tagContainer}>
-        {renderTags(['상의','하의','아우터','신발'], 'type')}
-      </View>
+      <Text style={styles.sectionTitle}>카테고리</Text>
+      {renderChips(TAG_OPTIONS.category, 'category')}
 
-      {/* 색상 */}
-      <Text style={styles.label}>
-        색상 {selected.color ? '(선택됨)' : ''}
-      </Text>
-      <View style={styles.tagContainer}>
-        {renderTags(
-          ['블랙','화이트','그레이','베이지','브라운','블루','그린','레드','기타'],
-          'color'
-        )}
-      </View>
+      {fitOptions.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>{fitLabel}</Text>
+          {selected.category === '상의' && renderChips(TAG_OPTIONS.topFit, 'topFit')}
+          {selected.category === '하의' && renderChips(TAG_OPTIONS.bottomFit, 'bottomFit')}
+        </>
+      )}
 
-      {/* 계절 */}
-      <Text style={styles.label}>
-        계절 {selected.season ? '(선택됨)' : ''}
-      </Text>
-      <View style={styles.tagContainer}>
-        {renderTags(['봄','여름','가을','겨울'], 'season')}
-      </View>
+      <Text style={styles.sectionTitle}>색</Text>
+      {renderChips(TAG_OPTIONS.color, 'color')}
 
-      {/* 스타일 */}
-      <Text style={styles.label}>
-        스타일 {selected.style ? '(선택됨)' : ''}
-      </Text>
-      <View style={styles.tagContainer}>
-        {renderTags(
-          ['캐주얼','세미캐주얼','포멀','미니멀','스트릿','댄디','스포티','빈티지','아메카지'],
-          'style'
-        )}
-      </View>
+      <Text style={styles.sectionTitle}>계절</Text>
+      {renderChips(TAG_OPTIONS.season, 'season')}
 
-      {/* 분위기 */}
-      <Text style={styles.label}>
-        분위기 {selected.mood ? '(선택됨)' : ''}
-      </Text>
-      <View style={styles.tagContainer}>
-        {renderTags(
-          ['활동적인','세련된','귀여운','힙한','차분한','고급스러운'],
-          'mood'
-        )}
-      </View>
+      <Text style={styles.sectionTitle}>톤</Text>
+      {renderChips(TAG_OPTIONS.tone, 'tone')}
 
-      {/* 핏 */}
-      <Text style={styles.label}>
-        핏 {selected.fit ? '(선택됨)' : ''}
-      </Text>
-      <View style={styles.tagContainer}>
-        {renderTags(['오버핏','슬림핏','와이드핏','크롭','롱기장'], 'fit')}
-      </View>
+      <Text style={styles.sectionTitle}>스타일</Text>
+      {renderChips(TAG_OPTIONS.style, 'style')}
 
-      {/* 소재 */}
-      <Text style={styles.label}>
-        소재 {selected.material ? '(선택됨)' : ''}
-      </Text>
-      <View style={styles.tagContainer}>
-        {renderTags(['니트','데님','코튼','패딩'], 'material')}
-      </View>
+      <Text style={styles.sectionTitle}>분위기</Text>
+      {renderChips(TAG_OPTIONS.mood, 'mood')}
 
-      {/* 두께 */}
-      <Text style={styles.label}>
-        두께 {selected.thickness ? '(선택됨)' : ''}
-      </Text>
-      <View style={styles.tagContainer}>
-        {renderTags(['얇음','보통','두꺼움'], 'thickness')}
-      </View>
+      <Text style={styles.sectionTitle}>소재</Text>
+      {renderChips(TAG_OPTIONS.material, 'material')}
 
-      {/* 포인트 */}
-      <Text style={styles.label}>
-        포인트 {selected.point ? '(선택됨)' : ''}
-      </Text>
-      <View style={styles.tagContainer}>
-        {renderTags(
-          ['프린팅','로고','레이어드','컬러포인트','무지','패턴','스트라이프','체크'],
-          'point'
-        )}
-      </View>
+      <Text style={styles.sectionTitle}>두께</Text>
+      {renderChips(TAG_OPTIONS.thickness, 'thickness')}
 
-      {/* 초기화 */}
-      <TouchableOpacity
-        style={styles.resetButton}
-        onPress={() =>
-          setSelected({
-            type: '',   // ⭐ 추가
-            style: '',
-            mood: '',
-            fit: '',
-            material: '',
-            thickness: '',
-            point: '',
-            color: '',
-            season: '',
-          })
-        }
-      >
-        <Text style={styles.resetText}>초기화</Text>
+      <Text style={styles.sectionTitle}>포인트</Text>
+      {renderChips(TAG_OPTIONS.point, 'point')}
+
+      <Text style={styles.sectionTitle}>TPO</Text>
+      {renderChips(TAG_OPTIONS.tpo, 'tpo')}
+
+      <TouchableOpacity style={styles.resetButton} onPress={() => setSelected(EMPTY_TAGS)}>
+        <Text style={styles.resetButtonText}>태그 초기화</Text>
       </TouchableOpacity>
 
-      {/* 등록 */}
       <TouchableOpacity
-        style={[styles.button, loading && { opacity: 0.5 }]}
+        style={[styles.saveButton, loading && styles.disabledButton]}
+        onPress={handleSave}
         disabled={loading}
-        onPress={() => {
-          setLoading(true);
-
-          if (!image) {
-            Alert.alert('이미지를 선택하세요');
-            setLoading(false);
-            return;
-          }
-
-          addClothes({
-            id: Date.now().toString(),
-            image,
-            tags: selected,
-          });
-
-          setTimeout(() => {
-            setLoading(false);
-            router.replace('/');
-          }, 300);
-        }}
       >
-        <Text style={styles.buttonText}>
-          {loading ? '등록 중...' : '등록하기'}
-        </Text>
+        <Text style={styles.saveButtonText}>{loading ? '등록 중...' : '등록하기'}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, backgroundColor: '#fff' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
-
+  container: { flex: 1, backgroundColor: '#fff' },
+  content: { padding: 16, paddingBottom: 32 },
+  title: { fontSize: 26, fontWeight: '700', marginBottom: 16 },
   imageBox: {
-    height: 150,
-    backgroundColor: '#eee',
+    height: 220,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 10,
-    marginBottom: 20,
     overflow: 'hidden',
+    marginBottom: 20,
   },
   image: { width: '100%', height: '100%' },
-  imageText: { color: '#666' },
-
-  label: { fontSize: 16, fontWeight: '600', marginTop: 12 },
-
-  tagContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 6,
-  },
-
-  tag: {
-    paddingVertical: 6,
+  imagePlaceholder: { color: '#6b7280', fontSize: 16, fontWeight: '600' },
+  sectionTitle: { fontSize: 16, fontWeight: '700', marginTop: 10, marginBottom: 8 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6 },
+  chip: {
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#eee',
-    borderRadius: 20,
-    margin: 4,
+    borderRadius: 999,
+    backgroundColor: '#f3f4f6',
+    marginRight: 8,
+    marginBottom: 8,
   },
-
-  selectedTag: {
-    backgroundColor: '#000',
-  },
-
-  selectedText: {
-    color: '#fff',
-  },
-
+  chipSelected: { backgroundColor: '#111827' },
+  chipText: { color: '#111827' },
+  chipTextSelected: { color: '#fff' },
   resetButton: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#ccc',
-    borderRadius: 8,
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#e5e7eb',
     alignItems: 'center',
   },
-
-  resetText: {
-    color: '#000',
-  },
-
-  button: {
-    marginTop: 20,
-    backgroundColor: '#000',
-    padding: 14,
-    borderRadius: 10,
+  resetButtonText: { color: '#111827', fontWeight: '600' },
+  saveButton: {
+    marginTop: 12,
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: '#111827',
     alignItems: 'center',
   },
-
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-  },
+  disabledButton: { opacity: 0.6 },
+  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });
