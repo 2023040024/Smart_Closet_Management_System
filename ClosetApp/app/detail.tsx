@@ -1,121 +1,124 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useCloset } from './_closetStore';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+import { getVisibleTagEntries, useCloset } from './_closetStore';
 
 export default function DetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const { clothes } = useCloset();
 
-  const item = clothes.find((c: any) => c.id === id);
+  const item = clothes.find((clothesItem) => clothesItem.id === id);
 
-  if (!item) return <Text>데이터 없음</Text>;
-
-  const renderTag = (label: string, value: string) => {
-    if (!value) return null;
-
+  if (!item) {
     return (
-      <View style={styles.tagRow}>
-        <Text style={styles.tagLabel}>{label}</Text>
-        <View style={styles.tagPill}>
-          <Text style={styles.tagText}>{value}</Text>
-        </View>
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>데이터가 없습니다.</Text>
       </View>
     );
-  };
+  }
+
+  const visibleTags = getVisibleTagEntries(item.tags);
 
   return (
-    <View style={styles.container}>
-      
-      {/* 이미지 */}
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Image source={{ uri: item.image }} style={styles.image} />
 
-      {/* 태그 */}
       <Text style={styles.sectionTitle}>선택된 태그</Text>
 
-      <View style={styles.tagsContainer}>
-        {renderTag('스타일', item.tags.style)}
-        {renderTag('분위기', item.tags.mood)}
-        {renderTag('핏', item.tags.fit)}
-        {renderTag('소재', item.tags.material)}
-        {renderTag('두께', item.tags.thickness)}
-        {renderTag('포인트', item.tags.point)}
-      </View>
+      {visibleTags.length === 0 ? (
+        <Text style={styles.emptyTagText}>표시할 태그가 없습니다.</Text>
+      ) : (
+        <View style={styles.tagList}>
+          {visibleTags.map((tag) => (
+            <View key={`${tag.label}-${tag.value}`} style={styles.tagRow}>
+              <Text style={styles.tagLabel}>{tag.label}</Text>
+              <View style={styles.tagPill}>
+                <Text style={styles.tagText}>{tag.value}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
-      {/* 수정 버튼 */}
       <TouchableOpacity
-  style={styles.button}
-  onPress={() =>
-    router.push({
-      pathname: '/edit',
-      params: { id: item.id },
-    })
-  }
->
-  <Text style={styles.buttonText}>수정하기</Text>
-     </TouchableOpacity>
-
-    </View>
+        style={styles.button}
+        onPress={() => router.push({ pathname: '/edit', params: { id: item.id } })}
+      >
+        <Text style={styles.buttonText}>수정하기</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  emptyContainer: {
     flex: 1,
-    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: '#fff',
   },
-
+  emptyText: {
+    color: '#6b7280',
+    fontSize: 15,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  content: {
+    padding: 16,
+    paddingBottom: 32,
+  },
   image: {
     width: '100%',
-    height: 220,
-    borderRadius: 12,
-    marginBottom: 16,
+    height: 280,
+    borderRadius: 16,
+    marginBottom: 20,
+    backgroundColor: '#f3f4f6',
   },
-
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 12,
   },
-
-  tagsContainer: {
+  emptyTagText: {
+    color: '#6b7280',
     marginBottom: 20,
   },
-
+  tagList: {
+    marginBottom: 20,
+  },
   tagRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
-
   tagLabel: {
-    width: 60,
-    fontSize: 13,
-    color: '#666',
+    width: 72,
+    fontSize: 14,
+    color: '#6b7280',
   },
-
   tagPill: {
-    backgroundColor: '#000',
-    paddingVertical: 6,
+    flexShrink: 1,
+    backgroundColor: '#111827',
+    borderRadius: 999,
+    paddingVertical: 7,
     paddingHorizontal: 12,
-    borderRadius: 20,
   },
-
   tagText: {
     color: '#fff',
     fontSize: 14,
   },
-
   button: {
-    marginTop: 20,
-    backgroundColor: '#000',
-    padding: 14,
-    borderRadius: 10,
+    marginTop: 8,
+    backgroundColor: '#111827',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
   },
-
   buttonText: {
     color: '#fff',
+    fontWeight: '700',
     fontSize: 16,
   },
 });
