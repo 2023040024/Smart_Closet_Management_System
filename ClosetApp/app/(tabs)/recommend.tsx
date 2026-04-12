@@ -125,7 +125,9 @@ function OutfitItemCard({
 
   return (
     <View style={styles.itemCard}>
-      <Text style={styles.itemLabel}>{label}</Text>
+      <View style={styles.itemHeaderRow}>
+        <Text style={styles.itemBadge}>{label}</Text>
+      </View>
 
       {item.image ? (
         <Image source={{ uri: item.image }} style={styles.itemImage} />
@@ -264,15 +266,15 @@ export default function RecommendScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F8FA',
+    backgroundColor: '#F4F6F8',
   },
   content: {
     padding: 16,
     paddingBottom: 40,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 30,
+    fontWeight: '800',
     color: '#111827',
     marginBottom: 6,
   },
@@ -280,45 +282,51 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#6B7280',
     marginBottom: 24,
+    lineHeight: 22,
   },
   section: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: '#111827',
     marginBottom: 16,
   },
   inputBox: {
     backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 14,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#EEF2F7',
   },
   inputLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#374151',
+    color: '#4B5563',
     marginBottom: 6,
   },
   valueText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#111827',
-    lineHeight: 20,
+    lineHeight: 22,
+    fontWeight: '600',
   },
   outfitCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 18,
     padding: 14,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   outfitTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 19,
+    fontWeight: '800',
     color: '#111827',
     marginBottom: 6,
   },
@@ -330,42 +338,53 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 12,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#EEF2F7',
   },
-  itemLabel: {
-    fontSize: 15,
+  itemHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    marginBottom: 10,
+  },
+  itemBadge: {
+    backgroundColor: '#E8EEF9',
+    color: '#2563EB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#374151',
-    marginBottom: 8,
   },
   itemImage: {
     width: '100%',
-    height: 160,
-    borderRadius: 10,
+    height: 180,
+    borderRadius: 12,
     backgroundColor: '#E5E7EB',
-    marginBottom: 10,
+    marginBottom: 12,
     resizeMode: 'cover',
   },
   imagePlaceholder: {
     width: '100%',
-    height: 160,
-    borderRadius: 10,
+    height: 180,
+    borderRadius: 12,
     backgroundColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   imagePlaceholderText: {
     fontSize: 13,
     color: '#6B7280',
+    fontWeight: '600',
   },
   itemName: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
     color: '#111827',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   tagRow: {
     flexDirection: 'row',
@@ -379,17 +398,19 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   emptyBox: {
     backgroundColor: '#F9FAFB',
-    borderRadius: 14,
-    padding: 20,
+    borderRadius: 16,
+    padding: 22,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EEF2F7',
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#111827',
     marginBottom: 8,
   },
