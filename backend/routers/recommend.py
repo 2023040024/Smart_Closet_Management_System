@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,7 +8,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from database import get_db
-from models import Clothes, CategoryEnum, StatusEnum
+from models import Clothes, CategoryEnum, StatusEnum, User
+from routers.auth import get_current_user
 from tpo_rules import get_tpo_prompt_text
 
 router = APIRouter(prefix="/recommend", tags=["코디 추천"])
@@ -157,12 +159,15 @@ def build_prompt(
 {clothes_text}
 
 [추천 규칙]
-1. 반드시 보유한 옷 ID만 사용하세요
-2. 코디는 상의 1개 + 하의 1개 조합이 기본이며, 날씨에 따라 아우터 추가
+1. 반드시 보유한 옷 ID만 사용하세요 (목록에 없는 ID 절대 사용 금지)
+2. 코디는 상의 1개 + 하의 1개 조합이 기본이며, 기온 14°C 이하면 아우터 추가
 3. 미착용 기간이 긴 옷을 우선 포함하세요
 4. 색 조합이 자연스러워야 합니다 (무채색 베이스 선호)
 5. {situation_kr} 상황에 어울리는 스타일을 선택하세요
 6. 면접이면 포멀 위주, 운동이면 활동성 우선
+7. 코디 3가지는 서로 겹치는 옷이 없어야 합니다
+8. items 배열이 절대 비어있으면 안 됩니다
+9. reason은 반드시 한국어 2~3문장으로 작성하세요
 
 [응답 형식] 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만:
 {{
@@ -192,25 +197,41 @@ def build_prompt(
     return prompt
 
 
-def call_gemini(prompt: str) -> dict:
-    """Gemini API 호출 및 JSON 파싱"""
-    try:
-        response = model.generate_content(prompt)
-        text = response.text.strip()
+def call_gemini(prompt: str, retries: int = 2) -> dict:
+    """Gemini API 호출 및 JSON 파싱 (최대 2회 재시도)"""
+    last_error = None
 
-        # ```json ... ``` 형식으로 올 경우 제거
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        text = text.strip()
+    for attempt in range(retries + 1):
+        try:
+            response = model.generate_content(prompt)
+            text = response.text.strip()
 
-        return json.loads(text)
+            # ```json ... ``` 또는 ``` ... ``` 모두 안전하게 처리
+            match = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+            if match:
+                text = match.group(1).strip()
 
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Gemini 응답 파싱 실패")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini API 오류: {str(e)}")
+            result = json.loads(text)
+
+            # outfits 빈 items 검증
+            if "outfits" in result:
+                for outfit in result["outfits"]:
+                    if not outfit.get("items"):
+                        raise ValueError("Gemini가 빈 코디를 반환했습니다.")
+
+            return result
+
+        except (json.JSONDecodeError, ValueError) as e:
+            last_error = str(e)
+            if attempt < retries:
+                continue  # 재시도
+            raise HTTPException(
+                status_code=500,
+                detail=f"Gemini 응답 파싱 실패 ({retries + 1}회 시도): {last_error}"
+            )
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Gemini API 오류: {str(e)}")
 
 
 # ──────────────────────────────────────────────
@@ -222,13 +243,15 @@ def recommend_today(
     situation: Optional[str] = None,
     temperature: Optional[float] = None,
     weather_condition: Optional[str] = "sunny",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     오늘의 코디 추천
     GET /recommend/today?situation=date&temperature=18&weather_condition=cloudy
     """
-    user_id = 1  # TODO: JWT에서 추출
+    user_id = current_user.id
+    preferred_style = current_user.preferred_style or "캐주얼"
 
     # 1단계: DB에서 옷 전체 조회
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
@@ -253,8 +276,6 @@ def recommend_today(
         )
 
     # 3단계: Gemini API 호출
-    # 사용자 선호 스타일 (실제로는 DB에서 가져와야 함)
-    preferred_style = "캐주얼"  # TODO: user.preferred_style
 
     prompt = build_prompt(
         filtered,
@@ -269,13 +290,17 @@ def recommend_today(
 
 
 @router.post("/custom")
-def recommend_custom(body: RecommendRequest, db: Session = Depends(get_db)):
+def recommend_custom(
+    body: RecommendRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
     상황·날씨 직접 지정 추천
     POST /recommend/custom
     Body: { "situation": "date", "temperature": 18, "weather_condition": "rainy" }
     """
-    user_id = 1  # TODO: JWT에서 추출
+    user_id = current_user.id
 
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
 
@@ -291,7 +316,7 @@ def recommend_custom(body: RecommendRequest, db: Session = Depends(get_db)):
         body.weather_condition or "sunny"
     )
 
-    preferred_style = "캐주얼"  # TODO: user.preferred_style
+    preferred_style = current_user.preferred_style or "캐주얼"
 
     prompt = build_prompt(
         filtered,
@@ -308,13 +333,16 @@ def recommend_custom(body: RecommendRequest, db: Session = Depends(get_db)):
 @router.get("/weekly")
 def recommend_weekly(
     situation: Optional[str] = None,
-    db: Session = Depends(get_db)
+    temperature: Optional[float] = None,
+    weather_condition: Optional[str] = "sunny",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     일주일치 코디 추천 (옷 돌려막기)
-    GET /recommend/weekly?situation=school
+    GET /recommend/weekly?situation=school&temperature=18&weather_condition=cloudy
     """
-    user_id = 1  # TODO: JWT에서 추출
+    user_id = current_user.id
 
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     filtered = [c for c in all_clothes if c.status == StatusEnum.wearable]
@@ -335,11 +363,21 @@ def recommend_weekly(
 당신은 패션 코디 전문가입니다.
 아래 옷장에서 월~금 5일치 코디를 짜주세요. (옷 돌려막기 스타일)
 
+[오늘 날씨]
+- 기온: {temperature or 20.0}°C
+- 날씨: {weather_condition or 'sunny'}
+
 [목표]
 - 같은 옷을 연속으로 입지 않기
 - 상의 하나로 여러 코디 만들기
 - 미착용 기간이 긴 옷 우선 활용
 - 상황: {situation_kr}
+
+[추천 규칙]
+1. 반드시 보유한 옷 ID만 사용하세요 (목록에 없는 ID 절대 사용 금지)
+2. 코디는 상의 1개 + 하의 1개 조합이 기본이며, 기온 14°C 이하면 아우터 추가
+3. items 배열이 절대 비어있으면 안 됩니다
+4. reason은 반드시 한국어 2~3문장으로 작성하세요
 
 [보유 옷]
 {clothes_text}
