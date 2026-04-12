@@ -11,65 +11,71 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useCloset } from '../_closetStore';
+import { Category, ClothesItem, TAG_OPTIONS, useCloset } from '../_closetStore';
 
 type FilterType = {
   style: string;
   mood: string;
   thickness: string;
-  fit: string;
+  topFit: string;
+  bottomFit: string;
   material: string;
   point: string;
   color: string;
   season: string;
+  tone: string;
+  tpo: string;
 };
 
-type Clothes = {
-  id: string;
-  image: string;
-  tags: FilterType & { type: string };
-};
-
-const FILTER_OPTIONS: Record<keyof FilterType, string[]> = {
-  color: ['블랙', '화이트', '그레이', '베이지', '브라운', '블루', '그린', '레드', '기타'],
-  season: ['봄', '여름', '가을', '겨울'],
-  style: ['캐주얼', '세미캐주얼', '포멀', '미니멀', '스트릿', '댄디', '스포티', '빈티지', '아메카지'],
-  mood: ['활동적인', '세련된', '귀여운', '힙한', '차분한', '고급스러운'],
-  fit: ['오버핏', '슬림핏', '와이드핏', '크롭', '롱기장'],
-  material: ['니트', '데님', '코튼', '패딩'],
-  thickness: ['얇음', '보통', '두꺼움'],
-  point: ['프린팅', '로고', '레이어드', '컬러포인트', '무지', '패턴', '스트라이프', '체크'],
+const FILTER_OPTIONS = {
+  color: [...TAG_OPTIONS.color],
+  season: [...TAG_OPTIONS.season],
+  tone: [...TAG_OPTIONS.tone],
+  style: [...TAG_OPTIONS.style],
+  mood: [...TAG_OPTIONS.mood],
+  topFit: [...TAG_OPTIONS.topFit],
+  bottomFit: [...TAG_OPTIONS.bottomFit],
+  material: [...TAG_OPTIONS.material],
+  thickness: [...TAG_OPTIONS.thickness],
+  point: [...TAG_OPTIONS.point],
+  tpo: [...TAG_OPTIONS.tpo],
 };
 
 export default function HomeScreen() {
   const { clothes, deleteClothes } = useCloset();
   const router = useRouter();
 
-  const [selectedType, setSelectedType] = useState<string>('전체');
+  const [selectedType, setSelectedType] = useState<'전체' | Category>('전체');
   const [showFilter, setShowFilter] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<Clothes | null>(null);
+  const [selectedItem, setSelectedItem] = useState<ClothesItem | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
 
   const [filter, setFilter] = useState<FilterType>({
     style: '',
     mood: '',
     thickness: '',
-    fit: '',
+    topFit: '',
+    bottomFit: '',
     material: '',
     point: '',
     color: '',
     season: '',
+    tone: '',
+    tpo: '',
   });
 
   const [expanded, setExpanded] = useState<Record<keyof FilterType, boolean>>({
     style: false,
     mood: false,
     thickness: false,
-    fit: false,
+    topFit: false,
+    bottomFit: false,
     material: false,
     point: false,
     color: false,
     season: false,
+    tone: false,
+    tpo: false,
   });
 
   const toggleFilter = (category: keyof FilterType, value: string) => {
@@ -89,11 +95,14 @@ export default function HomeScreen() {
   const goRecommend = () => {
     router.push({
       pathname: '/(tabs)/recommend',
-      params: filter,
+      params: {
+        category: selectedType === '전체' ? '' : selectedType,
+        ...filter,
+      },
     });
   };
 
-  const openMenu = (item: Clothes) => {
+  const openMenu = (item: ClothesItem) => {
     setSelectedItem(item);
     setMenuVisible(true);
   };
@@ -107,7 +116,7 @@ export default function HomeScreen() {
     if (!selectedItem) return;
     const id = selectedItem.id;
     closeMenu();
-    router.push(`/detail?id=${id}`);
+    router.push({ pathname: '/detail', params: { id } });
   };
 
   const handleDelete = () => {
@@ -127,19 +136,22 @@ export default function HomeScreen() {
   };
 
   const filteredClothes = useMemo(() => {
-    return (clothes as Clothes[]).filter((item) => {
+    return clothes.filter((item) => {
       const matchType =
-        selectedType === '전체' || item.tags.type === selectedType;
+        selectedType === '전체' || item.tags.category === selectedType;
 
       const matchFilter =
         (!filter.style || item.tags.style === filter.style) &&
         (!filter.mood || item.tags.mood === filter.mood) &&
         (!filter.thickness || item.tags.thickness === filter.thickness) &&
-        (!filter.fit || item.tags.fit === filter.fit) &&
+        (!filter.topFit || item.tags.topFit === filter.topFit) &&
+        (!filter.bottomFit || item.tags.bottomFit === filter.bottomFit) &&
         (!filter.material || item.tags.material === filter.material) &&
         (!filter.point || item.tags.point === filter.point) &&
         (!filter.color || item.tags.color === filter.color) &&
-        (!filter.season || item.tags.season === filter.season);
+        (!filter.season || item.tags.season === filter.season) &&
+        (!filter.tone || item.tags.tone === filter.tone) &&
+        (!filter.tpo || item.tags.tpo === filter.tpo);
 
       return matchType && matchFilter;
     });
@@ -179,7 +191,7 @@ export default function HomeScreen() {
     </View>
   );
 
-  const renderCard = ({ item }: { item: Clothes }) => (
+  const renderCard = ({ item }: { item: ClothesItem }) => (
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.9}
@@ -189,7 +201,7 @@ export default function HomeScreen() {
       <Image source={{ uri: item.image }} style={styles.cardImage} />
 
       <View style={styles.cardBody}>
-        <Text style={styles.cardTitle}>{item.tags.type || '미분류'}</Text>
+        <Text style={styles.cardTitle}>{item.tags.category || '미분류'}</Text>
 
         <View style={styles.cardTagRow}>
           {!!item.tags.color && <Text style={styles.cardTag}>{item.tags.color}</Text>}
@@ -215,13 +227,15 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         <View style={styles.typeContainer}>
-          {['전체', '상의', '하의', '아우터', '신발'].map((type) => {
-            const isSelected = selectedType === type;
+          {['전체', ...TAG_OPTIONS.category].map((type) => {
+            const typedCategory = type as '전체' | Category;
+            const isSelected = selectedType === typedCategory;
+
             return (
               <TouchableOpacity
                 key={type}
                 style={[styles.typeBtn, isSelected && styles.selected]}
-                onPress={() => setSelectedType(type)}
+                onPress={() => setSelectedType(typedCategory)}
               >
                 <Text style={isSelected ? styles.selectedText : styles.typeText}>
                   {type}
@@ -238,10 +252,13 @@ export default function HomeScreen() {
           {renderSection('계절', 'season', FILTER_OPTIONS.season)}
           {renderSection('스타일', 'style', FILTER_OPTIONS.style)}
           {renderSection('분위기', 'mood', FILTER_OPTIONS.mood)}
-          {renderSection('핏', 'fit', FILTER_OPTIONS.fit)}
+          {renderSection('상의 핏', 'topFit', FILTER_OPTIONS.topFit)}
+          {renderSection('하의 핏', 'bottomFit', FILTER_OPTIONS.bottomFit)}
           {renderSection('소재', 'material', FILTER_OPTIONS.material)}
           {renderSection('두께', 'thickness', FILTER_OPTIONS.thickness)}
           {renderSection('포인트', 'point', FILTER_OPTIONS.point)}
+          {renderSection('톤', 'tone', FILTER_OPTIONS.tone)}
+          {renderSection('TPO', 'tpo', FILTER_OPTIONS.tpo)}
         </View>
       )}
 
