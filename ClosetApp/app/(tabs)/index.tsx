@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { Category, ClothesItem, TAG_OPTIONS, useCloset } from '../_closetStore';
 
+const CATEGORY_ORDER: Array<'전체' | Category> = ['전체', ...TAG_OPTIONS.category];
+
 type FilterType = {
   style: string;
   mood: string;
@@ -227,37 +229,36 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         <View style={styles.typeContainer}>
-          {['전체', ...TAG_OPTIONS.category].map((type) => {
-            const typedCategory = type as '전체' | Category;
-            const isSelected = selectedType === typedCategory;
+          {CATEGORY_ORDER.map((type) => {
+  const isSelected = selectedType === type;
 
-            return (
-              <TouchableOpacity
-                key={type}
-                style={[styles.typeBtn, isSelected && styles.selected]}
-                onPress={() => setSelectedType(typedCategory)}
-              >
-                <Text style={isSelected ? styles.selectedText : styles.typeText}>
-                  {type}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+  return (
+    <TouchableOpacity
+      key={type}
+      style={[styles.typeBtn, isSelected && styles.selected]}
+      onPress={() => setSelectedType(type)}
+    >
+      <Text style={isSelected ? styles.selectedText : styles.typeText}>
+        {type}
+      </Text>
+    </TouchableOpacity>
+  );
+})}
         </View>
       </View>
 
       {showFilter && (
         <View style={styles.filterPanel}>
-          {renderSection('색상', 'color', FILTER_OPTIONS.color)}
-          {renderSection('계절', 'season', FILTER_OPTIONS.season)}
-          {renderSection('스타일', 'style', FILTER_OPTIONS.style)}
-          {renderSection('분위기', 'mood', FILTER_OPTIONS.mood)}
           {renderSection('상의 핏', 'topFit', FILTER_OPTIONS.topFit)}
           {renderSection('하의 핏', 'bottomFit', FILTER_OPTIONS.bottomFit)}
+          {renderSection('색상', 'color', FILTER_OPTIONS.color)}
+          {renderSection('계절', 'season', FILTER_OPTIONS.season)}
+          {renderSection('톤', 'tone', FILTER_OPTIONS.tone)}
+          {renderSection('스타일', 'style', FILTER_OPTIONS.style)}
+          {renderSection('분위기', 'mood', FILTER_OPTIONS.mood)}
           {renderSection('소재', 'material', FILTER_OPTIONS.material)}
           {renderSection('두께', 'thickness', FILTER_OPTIONS.thickness)}
           {renderSection('포인트', 'point', FILTER_OPTIONS.point)}
-          {renderSection('톤', 'tone', FILTER_OPTIONS.tone)}
           {renderSection('TPO', 'tpo', FILTER_OPTIONS.tpo)}
         </View>
       )}
