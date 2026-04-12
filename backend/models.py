@@ -164,10 +164,15 @@ class Clothes(Base):
     user_id        = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     name           = Column(String(100), nullable=False)
     category       = Column(Enum(CategoryEnum), nullable=False)
-    color          = Column(String(50), nullable=False)
+    color          = Column(Enum(ColorEnum), nullable=False)
+    top_fit        = Column(Enum(TopFitEnum), nullable=True)     # 상의일 때만 사용
+    bottom_fit     = Column(Enum(BottomFitEnum), nullable=True)  # 하의일 때만 사용
     season         = Column(Enum(SeasonEnum), nullable=False)
     style          = Column(Enum(StyleEnum), nullable=False)
-    material       = Column(String(50), nullable=True)   # 면, 폴리, 울, 니트 등
+    tone           = Column(Enum(ToneEnum), nullable=True)
+    mood           = Column(Enum(MoodEnum), nullable=True)
+    material       = Column(Enum(MaterialEnum), nullable=True)   # 면, 폴리, 울, 니트 등
+    point          = Column(Enum(PointEnum), nullable=True)
     thickness      = Column(Enum(ThicknessEnum), nullable=True)
     purchase_price = Column(Integer, nullable=True)       # 가성비 계산용 (0원 허용)
     image_url      = Column(String(255), nullable=True)
