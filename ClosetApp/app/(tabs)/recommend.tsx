@@ -1,70 +1,140 @@
 import { useLocalSearchParams } from 'expo-router';
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo } from 'react';
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
-function normalizeParam(value: string | string[] | undefined): string {
-  if (!value) return '선택되지 않음';
+import { ClothesItem, useCloset } from '../_closetStore';
+
+type OutfitSet = {
+  top?: ClothesItem;
+  bottom?: ClothesItem;
+  outer?: ClothesItem;
+  shoes?: ClothesItem;
+  accessory?: ClothesItem;
+};
+
+function normalizeParam(value: string | string[] | undefined): string[] {
+  if (!value) return [];
+
   if (Array.isArray(value)) {
-    const filtered = value.filter(Boolean);
-    return filtered.length > 0 ? filtered.join(', ') : '선택되지 않음';
+    return value
+      .flatMap((v) => v.split(','))
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
-  return value.trim() ? value : '선택되지 않음';
+
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
-type OutfitItem = {
-  label: string;
-  name: string;
-  tags: string[];
-};
+function displayText(values: string[]) {
+  return values.length > 0 ? values.join(', ') : '선택되지 않음';
+}
 
-type OutfitCardData = {
-  title: string;
-  description: string;
-  items: OutfitItem[];
-};
+function includesAny(source?: string, targets?: string[]) {
+  if (!targets || targets.length === 0) return true;
+  if (!source || source.trim() === '') return false;
+  return targets.includes(source);
+}
 
-const mockOutfits: OutfitCardData[] = [
-  {
-    title: '추천 코디 1',
-    description: '상황에 어울리는 기본 코디 조합입니다.',
-    items: [
-      { label: '상의', name: '화이트 셔츠', tags: ['미니멀', '차분한'] },
-      { label: '하의', name: '블랙 슬랙스', tags: ['포멀', '세련된'] },
-      { label: '아우터', name: '베이지 자켓', tags: ['세미캐주얼'] },
-      { label: '신발', name: '화이트 스니커즈', tags: ['데일리'] },
-      { label: '악세사리', name: '실버 시계', tags: ['깔끔한'] },
-    ],
-  },
-  {
-    title: '추천 코디 2',
-    description: '조금 더 편안한 분위기의 코디 조합입니다.',
-    items: [
-      { label: '상의', name: '네이비 니트', tags: ['캐주얼', '차분한'] },
-      { label: '하의', name: '아이보리 팬츠', tags: ['미니멀'] },
-      { label: '아우터', name: '그레이 코트', tags: ['고급스러운'] },
-      { label: '신발', name: '로퍼', tags: ['세련된'] },
-      { label: '악세사리', name: '블랙 백', tags: ['심플'] },
-    ],
-  },
-];
+function filterItems(
+  items: ClothesItem[],
+  seasonFilters: string[],
+  tpoFilters: string[],
+  styleFilters: string[],
+  moodFilters: string[]
+) {
+  return items.filter((item) => {
+    const seasonMatch =
+      seasonFilters.length === 0 || includesAny(item.tags.season, seasonFilters);
+    const tpoMatch =
+      tpoFilters.length === 0 || includesAny(item.tags.tpo, tpoFilters);
+    const styleMatch =
+      styleFilters.length === 0 || includesAny(item.tags.style, styleFilters);
+    const moodMatch =
+      moodFilters.length === 0 || includesAny(item.tags.mood, moodFilters);
+
+    return seasonMatch && tpoMatch && styleMatch && moodMatch;
+  });
+}
+
+function createOutfits(items: ClothesItem[]): OutfitSet[] {
+  const tops = items.filter((item) => item.tags.category === '상의');
+  const bottoms = items.filter((item) => item.tags.category === '하의');
+  const outers = items.filter((item) => item.tags.category === '아우터');
+  const shoes = items.filter((item) => item.tags.category === '신발');
+  const accessories = items.filter((item) => item.tags.category === '악세사리');
+
+  const outfits: OutfitSet[] = [];
+  const maxCount = Math.min(3, tops.length, bottoms.length);
+
+  for (let i = 0; i < maxCount; i++) {
+    outfits.push({
+      top: tops[i],
+      bottom: bottoms[i],
+      outer: outers[i],
+      shoes: shoes[i],
+      accessory: accessories[i],
+    });
+  }
+
+  return outfits;
+}
 
 function TagChip({ text }: { text: string }) {
+  if (!text) return null;
   return <Text style={styles.tag}>{text}</Text>;
 }
 
-function OutfitItemCard({ item }: { item: OutfitItem }) {
+function getItemTitle(item: ClothesItem) {
+  const color = item.tags.color || '무색상';
+  const category = item.tags.category || '옷';
+  return `${color} ${category}`;
+}
+
+function getFitText(item: ClothesItem) {
+  if (item.tags.category === '상의') return item.tags.topFit;
+  if (item.tags.category === '하의') return item.tags.bottomFit;
+  return '';
+}
+
+function OutfitItemCard({
+  label,
+  item,
+}: {
+  label: string;
+  item?: ClothesItem;
+}) {
+  if (!item) return null;
+
+  const fitText = getFitText(item);
+
   return (
     <View style={styles.itemCard}>
-      <Text style={styles.itemLabel}>{item.label}</Text>
-      <View style={styles.imagePlaceholder}>
-        <Text style={styles.imagePlaceholderText}>이미지 예정</Text>
-      </View>
-      <Text style={styles.itemName}>{item.name}</Text>
+      <Text style={styles.itemLabel}>{label}</Text>
+
+      {item.image ? (
+        <Image source={{ uri: item.image }} style={styles.itemImage} />
+      ) : (
+        <View style={styles.imagePlaceholder}>
+          <Text style={styles.imagePlaceholderText}>이미지 없음</Text>
+        </View>
+      )}
+
+      <Text style={styles.itemName}>{getItemTitle(item)}</Text>
 
       <View style={styles.tagRow}>
-        {item.tags.map((tag, index) => (
-          <TagChip key={`${item.label}-${tag}-${index}`} text={tag} />
-        ))}
+        <TagChip text={item.tags.style} />
+        <TagChip text={item.tags.mood} />
+        <TagChip text={item.tags.tpo} />
+        <TagChip text={fitText} />
       </View>
     </View>
   );
@@ -72,11 +142,32 @@ function OutfitItemCard({ item }: { item: OutfitItem }) {
 
 export default function RecommendScreen() {
   const params = useLocalSearchParams();
+  const { clothes } = useCloset();
 
-  const season = normalizeParam(params.season as string | string[] | undefined);
-  const tpo = normalizeParam(params.tpo as string | string[] | undefined);
-  const style = normalizeParam(params.style as string | string[] | undefined);
-  const mood = normalizeParam(params.mood as string | string[] | undefined);
+  const seasonFilters = useMemo(
+    () => normalizeParam(params.season as string | string[] | undefined),
+    [params.season]
+  );
+  const tpoFilters = useMemo(
+    () => normalizeParam(params.tpo as string | string[] | undefined),
+    [params.tpo]
+  );
+  const styleFilters = useMemo(
+    () => normalizeParam(params.style as string | string[] | undefined),
+    [params.style]
+  );
+  const moodFilters = useMemo(
+    () => normalizeParam(params.mood as string | string[] | undefined),
+    [params.mood]
+  );
+
+  const filteredItems = useMemo(() => {
+    return filterItems(clothes, seasonFilters, tpoFilters, styleFilters, moodFilters);
+  }, [clothes, seasonFilters, tpoFilters, styleFilters, moodFilters]);
+
+  const outfitResults = useMemo(() => {
+    return createOutfits(filteredItems);
+  }, [filteredItems]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -90,41 +181,54 @@ export default function RecommendScreen() {
 
         <View style={styles.inputBox}>
           <Text style={styles.inputLabel}>계절</Text>
-          <Text style={styles.valueText}>{season}</Text>
+          <Text style={styles.valueText}>{displayText(seasonFilters)}</Text>
         </View>
 
         <View style={styles.inputBox}>
           <Text style={styles.inputLabel}>TPO</Text>
-          <Text style={styles.valueText}>{tpo}</Text>
+          <Text style={styles.valueText}>{displayText(tpoFilters)}</Text>
         </View>
 
         <View style={styles.inputBox}>
           <Text style={styles.inputLabel}>스타일</Text>
-          <Text style={styles.valueText}>{style}</Text>
+          <Text style={styles.valueText}>{displayText(styleFilters)}</Text>
         </View>
 
         <View style={styles.inputBox}>
           <Text style={styles.inputLabel}>분위기</Text>
-          <Text style={styles.valueText}>{mood}</Text>
+          <Text style={styles.valueText}>{displayText(moodFilters)}</Text>
         </View>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>추천 결과</Text>
 
-        {mockOutfits.map((outfit, index) => (
-          <View key={index} style={styles.outfitCard}>
-            <Text style={styles.outfitTitle}>{outfit.title}</Text>
-            <Text style={styles.outfitDescription}>{outfit.description}</Text>
-
-            {outfit.items.map((item, itemIndex) => (
-              <OutfitItemCard
-                key={`${outfit.title}-${item.label}-${itemIndex}`}
-                item={item}
-              />
-            ))}
+        {outfitResults.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyTitle}>추천 결과가 없습니다</Text>
+            <Text style={styles.emptyText}>
+              등록된 옷의 카테고리나 선택한 조건을 확인해주세요.
+            </Text>
+            <Text style={styles.emptyText}>
+              최소 상의 1개, 하의 1개가 있어야 코디가 만들어집니다.
+            </Text>
           </View>
-        ))}
+        ) : (
+          outfitResults.map((outfit, index) => (
+            <View key={index} style={styles.outfitCard}>
+              <Text style={styles.outfitTitle}>추천 코디 {index + 1}</Text>
+              <Text style={styles.outfitDescription}>
+                선택한 조건을 반영한 코디 조합입니다.
+              </Text>
+
+              <OutfitItemCard label="상의" item={outfit.top} />
+              <OutfitItemCard label="하의" item={outfit.bottom} />
+              <OutfitItemCard label="아우터" item={outfit.outer} />
+              <OutfitItemCard label="신발" item={outfit.shoes} />
+              <OutfitItemCard label="악세사리" item={outfit.accessory} />
+            </View>
+          ))
+        )}
       </View>
     </ScrollView>
   );
@@ -209,9 +313,17 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
   },
+  itemImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: 10,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 10,
+    resizeMode: 'cover',
+  },
   imagePlaceholder: {
     width: '100%',
-    height: 120,
+    height: 160,
     borderRadius: 10,
     backgroundColor: '#E5E7EB',
     alignItems: 'center',
@@ -241,5 +353,24 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     fontSize: 12,
     fontWeight: '600',
+  },
+  emptyBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 4,
   },
 });
