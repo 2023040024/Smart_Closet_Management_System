@@ -46,22 +46,29 @@ function includesAny(source?: string, targets?: string[]) {
 
 function filterItems(
   items: ClothesItem[],
+  categoryFilters: string[],
   seasonFilters: string[],
   tpoFilters: string[],
   styleFilters: string[],
   moodFilters: string[]
 ) {
   return items.filter((item) => {
+    const categoryMatch =
+      categoryFilters.length === 0 || categoryFilters.includes(item.tags.category);
+
     const seasonMatch =
       seasonFilters.length === 0 || includesAny(item.tags.season, seasonFilters);
+
     const tpoMatch =
       tpoFilters.length === 0 || includesAny(item.tags.tpo, tpoFilters);
+
     const styleMatch =
       styleFilters.length === 0 || includesAny(item.tags.style, styleFilters);
+
     const moodMatch =
       moodFilters.length === 0 || includesAny(item.tags.mood, moodFilters);
 
-    return seasonMatch && tpoMatch && styleMatch && moodMatch;
+    return categoryMatch && seasonMatch && tpoMatch && styleMatch && moodMatch;
   });
 }
 
@@ -144,26 +151,41 @@ export default function RecommendScreen() {
   const params = useLocalSearchParams();
   const { clothes } = useCloset();
 
+  const categoryFilters = useMemo(
+    () => normalizeParam(params.category as string | string[] | undefined),
+    [params.category]
+  );
+
   const seasonFilters = useMemo(
     () => normalizeParam(params.season as string | string[] | undefined),
     [params.season]
   );
+
   const tpoFilters = useMemo(
     () => normalizeParam(params.tpo as string | string[] | undefined),
     [params.tpo]
   );
+
   const styleFilters = useMemo(
     () => normalizeParam(params.style as string | string[] | undefined),
     [params.style]
   );
+
   const moodFilters = useMemo(
     () => normalizeParam(params.mood as string | string[] | undefined),
     [params.mood]
   );
 
   const filteredItems = useMemo(() => {
-    return filterItems(clothes, seasonFilters, tpoFilters, styleFilters, moodFilters);
-  }, [clothes, seasonFilters, tpoFilters, styleFilters, moodFilters]);
+    return filterItems(
+      clothes,
+      categoryFilters,
+      seasonFilters,
+      tpoFilters,
+      styleFilters,
+      moodFilters
+    );
+  }, [clothes, categoryFilters, seasonFilters, tpoFilters, styleFilters, moodFilters]);
 
   const outfitResults = useMemo(() => {
     return createOutfits(filteredItems);
@@ -178,6 +200,11 @@ export default function RecommendScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>추천 조건</Text>
+
+        <View style={styles.inputBox}>
+          <Text style={styles.inputLabel}>카테고리</Text>
+          <Text style={styles.valueText}>{displayText(categoryFilters)}</Text>
+        </View>
 
         <View style={styles.inputBox}>
           <Text style={styles.inputLabel}>계절</Text>
@@ -210,7 +237,7 @@ export default function RecommendScreen() {
               등록된 옷의 카테고리나 선택한 조건을 확인해주세요.
             </Text>
             <Text style={styles.emptyText}>
-              최소 상의 1개, 하의 1개가 있어야 코디가 만들어집니다.
+              최소 상의 1개와 하의 1개가 있어야 코디를 만들 수 있습니다.
             </Text>
           </View>
         ) : (
