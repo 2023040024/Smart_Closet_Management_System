@@ -50,8 +50,7 @@ export default function RegisterScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 1,
-      allowsEditing: true,
-      aspect: [4, 5],
+      allowsEditing: false,
     });
 
     if (!result.canceled) {
@@ -133,7 +132,7 @@ export default function RegisterScreen() {
 
       <TouchableOpacity style={styles.imageBox} onPress={pickImage}>
         {image ? (
-          <Image source={{ uri: image }} style={styles.image} />
+          <Image source={{ uri: image }} style={styles.image} resizeMode="contain" />
         ) : (
           <Text style={styles.imagePlaceholder}>+ 사진 추가</Text>
         )}
@@ -205,7 +204,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 20,
   },
-  image: { width: '100%', height: '100%' },
+  image: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#f3f4f6',
+  },
   imagePlaceholder: { color: '#6b7280', fontSize: 16, fontWeight: '600' },
   sectionTitle: { fontSize: 16, fontWeight: '700', marginTop: 10, marginBottom: 8 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6 },

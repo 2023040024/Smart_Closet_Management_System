@@ -200,7 +200,13 @@ export default function HomeScreen() {
       onLongPress={() => openMenu(item)}
       delayLongPress={250}
     >
-      <Image source={{ uri: item.image }} style={styles.cardImage} />
+    <View style={styles.cardImageWrap}>
+      <Image
+        source={{ uri: item.image }}
+        style={styles.cardImage}
+        resizeMode="contain"
+      />
+    </View>
 
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle}>{item.tags.category || '미분류'}</Text>
@@ -450,9 +456,19 @@ const styles = StyleSheet.create({
     borderColor: '#eee',
   },
 
+  cardImageWrap: {
+    width: '100%',
+    height: 220,
+    backgroundColor: '#f7f7f7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eeeeee',
+  },
+
   cardImage: {
     width: '100%',
-    height: 180,
+    height: 220,
     backgroundColor: '#f2f2f2',
   },
 

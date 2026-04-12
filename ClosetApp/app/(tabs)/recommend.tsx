@@ -87,7 +87,14 @@ export default function RecommendScreen() {
         contentContainerStyle={recommended.length === 0 ? styles.emptyWrap : styles.listContent}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <Image source={{ uri: item.image }} style={styles.image} />
+            <View style={styles.imageWrap}>
+              <Image
+                source={{ uri: item.image }}
+                style={styles.image}
+                resizeMode="contain"
+              />
+            </View>
+
             <Text style={styles.cardTitle}>{item.tags.category || '미분류'}</Text>
             <Text style={styles.cardMeta}>
               {[item.tags.color, item.tags.style, item.tags.tpo].filter(Boolean).join(' · ')}
@@ -146,10 +153,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#fff',
   },
-  image: {
+  imageWrap: {
     width: '100%',
-    height: 180,
-    backgroundColor: '#f3f4f6',
+    height: 240,
+    backgroundColor: '#f7f7f7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eeeeee',
+  },
+  image: {
+    width: '92%',
+    height: '92%',
   },
   cardTitle: {
     fontSize: 16,
