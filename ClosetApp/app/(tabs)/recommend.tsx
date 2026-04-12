@@ -1,7 +1,24 @@
+import { useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+function normalizeParam(value: string | string[] | undefined): string {
+  if (!value) return '선택되지 않음';
+  if (Array.isArray(value)) {
+    const filtered = value.filter(Boolean);
+    return filtered.length > 0 ? filtered.join(', ') : '선택되지 않음';
+  }
+  return value.trim() ? value : '선택되지 않음';
+}
+
 export default function RecommendScreen() {
+  const params = useLocalSearchParams();
+
+  const season = normalizeParam(params.season as string | string[] | undefined);
+  const tpo = normalizeParam(params.tpo as string | string[] | undefined);
+  const style = normalizeParam(params.style as string | string[] | undefined);
+  const mood = normalizeParam(params.mood as string | string[] | undefined);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>코디 추천</Text>
@@ -14,22 +31,22 @@ export default function RecommendScreen() {
 
         <View style={styles.inputBox}>
           <Text style={styles.inputLabel}>계절</Text>
-          <Text style={styles.placeholder}>선택한 계절이 여기에 표시될 예정입니다.</Text>
+          <Text style={styles.valueText}>{season}</Text>
         </View>
 
         <View style={styles.inputBox}>
           <Text style={styles.inputLabel}>TPO</Text>
-          <Text style={styles.placeholder}>선택한 TPO가 여기에 표시될 예정입니다.</Text>
+          <Text style={styles.valueText}>{tpo}</Text>
         </View>
 
         <View style={styles.inputBox}>
           <Text style={styles.inputLabel}>스타일</Text>
-          <Text style={styles.placeholder}>선택한 스타일이 여기에 표시될 예정입니다.</Text>
+          <Text style={styles.valueText}>{style}</Text>
         </View>
 
         <View style={styles.inputBox}>
           <Text style={styles.inputLabel}>분위기</Text>
-          <Text style={styles.placeholder}>선택한 분위기가 여기에 표시될 예정입니다.</Text>
+          <Text style={styles.valueText}>{mood}</Text>
         </View>
       </View>
 
@@ -39,7 +56,7 @@ export default function RecommendScreen() {
         <View style={styles.resultBox}>
           <Text style={styles.resultTitle}>추천 결과 영역</Text>
           <Text style={styles.resultText}>
-            추천 로직이 연결되면 이곳에 코디 결과가 표시됩니다.
+            다음 단계에서 코디 카드 UI와 추천 결과가 표시됩니다.
           </Text>
         </View>
       </View>
@@ -91,9 +108,9 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 6,
   },
-  placeholder: {
+  valueText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#111827',
     lineHeight: 20,
   },
   resultBox: {
