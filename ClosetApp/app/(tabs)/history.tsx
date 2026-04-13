@@ -25,24 +25,7 @@ const clothesData: ClothingItem[] = [
 ];
 
 const historyData: WearHistoryItem[] = [
-  {
-    id: '1',
-    date: '2026-04-13',
-    clothesIds: ['c1', 'c2', 'c3'],
-    style: '미니멀',
-    mood: '차분한',
-    tpo: '데일리',
-    memo: '발표 있어서 단정하게 입음',
-  },
-  {
-    id: '2',
-    date: '2026-04-12',
-    clothesIds: ['c4', 'c1', 'c2'],
-    style: '세미캐주얼',
-    mood: '세련된',
-    tpo: '모임',
-    memo: '저녁 약속',
-  },
+  
 ];
 
 export default function HistoryScreen() {
@@ -78,6 +61,13 @@ export default function HistoryScreen() {
     );
   };
 
+  const EmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyTitle}>아직 착용 기록이 없습니다</Text>
+      <Text style={styles.emptyDescription}>오늘 입은 옷을 기록해보세요.</Text>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -88,7 +78,11 @@ export default function HistoryScreen() {
         data={historyData}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          historyData.length === 0 && styles.emptyListContent,
+        ]}
+        ListEmptyComponent={<EmptyState />}
       />
     </SafeAreaView>
   );
@@ -111,6 +105,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 24,
+  },
+  emptyListContent: {
+    flexGrow: 1,
   },
   card: {
     backgroundColor: '#f7f7f7',
@@ -157,5 +154,20 @@ const styles = StyleSheet.create({
   memo: {
     fontSize: 14,
     color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#222',
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: 14,
+    color: '#777',
   },
 });
