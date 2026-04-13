@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Alert,
@@ -105,6 +106,23 @@ export default function HistoryScreen() {
     ]);
   };
 
+  const handleDetailPress = (item: WearHistoryItem) => {
+    const clothes = getClothesByIds(item.clothesIds);
+
+    router.push({
+      pathname: '/history-detail',
+      params: {
+        id: item.id,
+        date: item.date,
+        style: item.style ?? '',
+        mood: item.mood ?? '',
+        tpo: item.tpo ?? '',
+        memo: item.memo ?? '',
+        clothes: JSON.stringify(clothes),
+      },
+    });
+  };
+
   const renderItem = ({ item }: { item: WearHistoryItem }) => {
     const clothes = getClothesByIds(item.clothesIds);
 
@@ -129,7 +147,10 @@ export default function HistoryScreen() {
         <Text style={styles.memo}>{item.memo}</Text>
 
         <View style={styles.actionRow}>
-          <Pressable style={styles.actionButton}>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => handleDetailPress(item)}
+          >
             <Text style={styles.actionButtonText}>상세보기</Text>
           </Pressable>
 
