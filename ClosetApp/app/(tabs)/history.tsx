@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -51,9 +51,27 @@ const historyData: WearHistoryItem[] = [
     tpo: '모임',
     memo: '저녁 약속',
   },
+  {
+    id: '3',
+    date: '2026-04-10',
+    clothesIds: ['c1', 'c3'],
+    style: '캐주얼',
+    mood: '활동적인',
+    tpo: '여행',
+    memo: '가볍게 외출',
+  },
+  {
+    id: '4',
+    date: '2026-04-08',
+    clothesIds: ['c2', 'c3'],
+    style: '스포티',
+    mood: '활동적인',
+    tpo: '운동',
+    memo: '편하게 입음',
+  },
 ];
 
-const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여행', '운동'];
+const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여행', '운동', '모임'];
 
 export default function HistoryScreen() {
   const [selectedFilter, setSelectedFilter] = useState('전체');
@@ -63,6 +81,14 @@ export default function HistoryScreen() {
       .map((id) => clothesData.find((cloth) => cloth.id === id))
       .filter(Boolean) as ClothingItem[];
   };
+
+  const filteredHistoryData = useMemo(() => {
+    if (selectedFilter === '전체') {
+      return historyData;
+    }
+
+    return historyData.filter((item) => item.tpo === selectedFilter);
+  }, [selectedFilter]);
 
   const renderItem = ({ item }: { item: WearHistoryItem }) => {
     const clothes = getClothesByIds(item.clothesIds);
@@ -101,8 +127,10 @@ export default function HistoryScreen() {
 
   const EmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Text style={styles.emptyTitle}>아직 착용 기록이 없습니다</Text>
-      <Text style={styles.emptyDescription}>오늘 입은 옷을 기록해보세요.</Text>
+      <Text style={styles.emptyTitle}>해당 조건의 착용 기록이 없습니다</Text>
+      <Text style={styles.emptyDescription}>
+        다른 필터를 선택하거나 새 기록을 추가해보세요.
+      </Text>
     </View>
   );
 
@@ -139,12 +167,12 @@ export default function HistoryScreen() {
       </View>
 
       <FlatList
-        data={historyData}
+        data={filteredHistoryData}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={[
           styles.listContent,
-          historyData.length === 0 && styles.emptyListContent,
+          filteredHistoryData.length === 0 && styles.emptyListContent,
         ]}
         ListEmptyComponent={<EmptyState />}
         showsVerticalScrollIndicator={false}
@@ -272,9 +300,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#222',
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptyDescription: {
     fontSize: 14,
     color: '#777',
+    textAlign: 'center',
   },
 });
