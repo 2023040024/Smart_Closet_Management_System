@@ -1,18 +1,34 @@
 import { FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
+type ClothingItem = {
+  id: string;
+  name: string;
+  category: string;
+  color: string;
+};
+
 type WearHistoryItem = {
   id: string;
   date: string;
+  clothesIds: string[];
   style?: string;
   mood?: string;
   tpo?: string;
   memo?: string;
 };
 
+const clothesData: ClothingItem[] = [
+  { id: 'c1', name: '블랙 셔츠', category: '상의', color: '블랙' },
+  { id: 'c2', name: '베이지 슬랙스', category: '하의', color: '베이지' },
+  { id: 'c3', name: '화이트 스니커즈', category: '신발', color: '화이트' },
+  { id: 'c4', name: '네이비 자켓', category: '아우터', color: '네이비' },
+];
+
 const historyData: WearHistoryItem[] = [
   {
     id: '1',
     date: '2026-04-13',
+    clothesIds: ['c1', 'c2', 'c3'],
     style: '미니멀',
     mood: '차분한',
     tpo: '데일리',
@@ -21,23 +37,46 @@ const historyData: WearHistoryItem[] = [
   {
     id: '2',
     date: '2026-04-12',
-    style: '캐주얼',
-    mood: '활동적인',
-    tpo: '여행',
-    memo: '가볍게 외출',
+    clothesIds: ['c4', 'c1', 'c2'],
+    style: '세미캐주얼',
+    mood: '세련된',
+    tpo: '모임',
+    memo: '저녁 약속',
   },
 ];
 
 export default function HistoryScreen() {
-  const renderItem = ({ item }: { item: WearHistoryItem }) => (
-    <View style={styles.card}>
-      <Text style={styles.date}>{item.date}</Text>
-      <Text style={styles.tags}>
-        {item.style} · {item.mood} · {item.tpo}
-      </Text>
-      <Text style={styles.memo}>{item.memo}</Text>
-    </View>
-  );
+  const getClothesByIds = (ids: string[]) => {
+    return ids
+      .map((id) => clothesData.find((cloth) => cloth.id === id))
+      .filter(Boolean) as ClothingItem[];
+  };
+
+  const renderItem = ({ item }: { item: WearHistoryItem }) => {
+    const clothes = getClothesByIds(item.clothesIds);
+
+    return (
+      <View style={styles.card}>
+        <Text style={styles.date}>{item.date}</Text>
+
+        <View style={styles.clothesRow}>
+          {clothes.map((cloth) => (
+            <View key={cloth.id} style={styles.clothBox}>
+              <Text style={styles.clothCategory}>{cloth.category}</Text>
+              <Text style={styles.clothName} numberOfLines={1}>
+                {cloth.name}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.tags}>
+          {item.style} · {item.mood} · {item.tpo}
+        </Text>
+        <Text style={styles.memo}>{item.memo}</Text>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -83,7 +122,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#111',
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  clothesRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  clothBox: {
+    flex: 1,
+    minHeight: 72,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 8,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  clothCategory: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
+  },
+  clothName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#222',
   },
   tags: {
     fontSize: 14,
