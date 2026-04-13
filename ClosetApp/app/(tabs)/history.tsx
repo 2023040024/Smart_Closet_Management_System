@@ -25,8 +25,27 @@ const clothesData: ClothingItem[] = [
 ];
 
 const historyData: WearHistoryItem[] = [
-  
+  {
+    id: '1',
+    date: '2026-04-13',
+    clothesIds: ['c1', 'c2', 'c3'],
+    style: '미니멀',
+    mood: '차분한',
+    tpo: '데일리',
+    memo: '발표 있어서 단정하게 입음',
+  },
+  {
+    id: '2',
+    date: '2026-04-12',
+    clothesIds: ['c4', 'c1', 'c2'],
+    style: '세미캐주얼',
+    mood: '세련된',
+    tpo: '모임',
+    memo: '저녁 약속',
+  },
 ];
+
+const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여행', '운동'];
 
 export default function HistoryScreen() {
   const getClothesByIds = (ids: string[]) => {
@@ -74,6 +93,14 @@ export default function HistoryScreen() {
         <Text style={styles.title}>착용 기록</Text>
       </View>
 
+      <View style={styles.filterRow}>
+        {filterOptions.map((filter) => (
+          <View key={filter} style={styles.filterChip}>
+            <Text style={styles.filterChipText}>{filter}</Text>
+          </View>
+        ))}
+      </View>
+
       <FlatList
         data={historyData}
         keyExtractor={(item) => item.id}
@@ -102,6 +129,23 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#111',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  filterChip: {
+    backgroundColor: '#f1f1f1',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  filterChipText: {
+    fontSize: 13,
+    color: '#333',
+    fontWeight: '500',
   },
   listContent: {
     paddingBottom: 24,
