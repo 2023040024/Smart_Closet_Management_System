@@ -76,6 +76,15 @@ export default function HistoryScreen() {
           {item.style} · {item.mood} · {item.tpo}
         </Text>
         <Text style={styles.memo}>{item.memo}</Text>
+
+        <View style={styles.actionRow}>
+          <View style={styles.actionButton}>
+            <Text style={styles.actionButtonText}>상세보기</Text>
+          </View>
+          <View style={styles.actionButton}>
+            <Text style={styles.actionButtonText}>삭제</Text>
+          </View>
+        </View>
       </View>
     );
   };
@@ -198,6 +207,25 @@ const styles = StyleSheet.create({
   memo: {
     fontSize: 14,
     color: '#666',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 12,
+  },
+  actionButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
   },
   emptyContainer: {
     flex: 1,
