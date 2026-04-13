@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -32,7 +33,7 @@ const clothesData: ClothingItem[] = [
   { id: 'c4', name: '네이비 자켓', category: '아우터', color: '네이비' },
 ];
 
-const historyData: WearHistoryItem[] = [
+const initialHistoryData: WearHistoryItem[] = [
   {
     id: '1',
     date: '2026-04-13',
@@ -75,6 +76,7 @@ const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여�
 
 export default function HistoryScreen() {
   const [selectedFilter, setSelectedFilter] = useState('전체');
+  const [historyList, setHistoryList] = useState<WearHistoryItem[]>(initialHistoryData);
 
   const getClothesByIds = (ids: string[]) => {
     return ids
@@ -84,11 +86,24 @@ export default function HistoryScreen() {
 
   const filteredHistoryData = useMemo(() => {
     if (selectedFilter === '전체') {
-      return historyData;
+      return historyList;
     }
 
-    return historyData.filter((item) => item.tpo === selectedFilter);
-  }, [selectedFilter]);
+    return historyList.filter((item) => item.tpo === selectedFilter);
+  }, [historyList, selectedFilter]);
+
+  const handleDelete = (id: string) => {
+    Alert.alert('기록 삭제', '이 착용 기록을 삭제할까요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: () => {
+          setHistoryList((prev) => prev.filter((item) => item.id !== id));
+        },
+      },
+    ]);
+  };
 
   const renderItem = ({ item }: { item: WearHistoryItem }) => {
     const clothes = getClothesByIds(item.clothesIds);
@@ -114,12 +129,18 @@ export default function HistoryScreen() {
         <Text style={styles.memo}>{item.memo}</Text>
 
         <View style={styles.actionRow}>
-          <View style={styles.actionButton}>
+          <Pressable style={styles.actionButton}>
             <Text style={styles.actionButtonText}>상세보기</Text>
-          </View>
-          <View style={styles.actionButton}>
-            <Text style={styles.actionButtonText}>삭제</Text>
-          </View>
+          </Pressable>
+
+          <Pressable
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={() => handleDelete(item.id)}
+          >
+            <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
+              삭제
+            </Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -289,6 +310,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#333',
+  },
+  deleteButton: {
+    borderColor: '#f0caca',
+  },
+  deleteButtonText: {
+    color: '#c0392b',
   },
   emptyContainer: {
     flex: 1,
