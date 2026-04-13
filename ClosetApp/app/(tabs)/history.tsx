@@ -1,4 +1,12 @@
-import { FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import {
+  FlatList,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 type ClothingItem = {
   id: string;
@@ -48,6 +56,8 @@ const historyData: WearHistoryItem[] = [
 const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여행', '운동'];
 
 export default function HistoryScreen() {
+  const [selectedFilter, setSelectedFilter] = useState('전체');
+
   const getClothesByIds = (ids: string[]) => {
     return ids
       .map((id) => clothesData.find((cloth) => cloth.id === id))
@@ -103,11 +113,29 @@ export default function HistoryScreen() {
       </View>
 
       <View style={styles.filterRow}>
-        {filterOptions.map((filter) => (
-          <View key={filter} style={styles.filterChip}>
-            <Text style={styles.filterChipText}>{filter}</Text>
-          </View>
-        ))}
+        {filterOptions.map((filter) => {
+          const isSelected = selectedFilter === filter;
+
+          return (
+            <Pressable
+              key={filter}
+              style={[
+                styles.filterChip,
+                isSelected && styles.filterChipSelected,
+              ]}
+              onPress={() => setSelectedFilter(filter)}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  isSelected && styles.filterChipTextSelected,
+                ]}
+              >
+                {filter}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       <FlatList
@@ -119,6 +147,7 @@ export default function HistoryScreen() {
           historyData.length === 0 && styles.emptyListContent,
         ]}
         ListEmptyComponent={<EmptyState />}
+        showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
   );
@@ -151,10 +180,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
+  filterChipSelected: {
+    backgroundColor: '#111',
+  },
   filterChipText: {
     fontSize: 13,
     color: '#333',
     fontWeight: '500',
+  },
+  filterChipTextSelected: {
+    color: '#fff',
   },
   listContent: {
     paddingBottom: 24,
