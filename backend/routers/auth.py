@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from jose import jwt
+from jose import jwt, JWTError
 from passlib.context import CryptContext
+from fastapi.security import OAuth2PasswordBearer
 
 from database import get_db
 from models import User
@@ -69,3 +70,35 @@ def update_style(body: StyleUpdate, db: Session = Depends(get_db)):
     """
     # TODO: JWT 미들웨어 완성 후 토큰에서 user_id 파싱
     raise HTTPException(status_code=501, detail="JWT 미들웨어 연결 후 구현")
+
+# 토큰을 추출할 위치 설정 (로그인 엔드포인트와 연결)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    """
+    JWT 토큰을 검증하고 현재 로그인한 사용자 객체를 반환합니다.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="자격 증명을 확인할 수 없습니다",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        # 1. 토큰 복호화
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # create_token에서 "sub"에 user_id를 넣었으므로 이를 추출
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    # 2. 데이터베이스에서 사용자 조회
+    # recommend.py에서 current_user.id를 사용하므로 모델의 ID 필드와 매칭
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    
+    if user is None:
+        raise credentials_exception
+        
+    return user

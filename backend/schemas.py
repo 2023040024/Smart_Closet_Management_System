@@ -1,11 +1,36 @@
 from datetime import date, datetime
-from typing import Optional
-from pydantic import BaseModel, EmailStr, field_validator
+from typing import Optional, Any
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from models import (
-    CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum,
-    StatusEnum, FeedbackTempEnum, FeedbackFitEnum, FeedbackTpoEnum
+    CategoryEnum, TopFitEnum, BottomFitEnum, ColorEnum, SeasonEnum,
+    ToneEnum, StyleEnum, MoodEnum, MaterialEnum, ThicknessEnum, PointEnum,
+    StatusEnum, SituationEnum, FeedbackTempEnum, FeedbackFitEnum, FeedbackTpoEnum
 )
 
+# 1. 클래스 외부에서는 순수 함수로 정의 (데코레이터 제거)
+def map_korean_to_enum_logic(v: Any, info: Any) -> Any:
+    # 빈 값("")이 들어오면 None으로 반환하여 nullable 허용
+    if v is None or (isinstance(v, str) and v.strip() == ""):
+        return None
+    
+    # 이미 Enum 객체라면 그대로 반환
+    if not isinstance(v, str):
+        return v
+
+    enum_map = {
+        'category': CategoryEnum, 'color': ColorEnum, 'season': SeasonEnum,
+        'style': StyleEnum, 'top_fit': TopFitEnum, 'bottom_fit': BottomFitEnum,
+        'tone': ToneEnum, 'mood': MoodEnum, 'material': MaterialEnum,
+        'point': PointEnum, 'thickness': ThicknessEnum, 
+        'situation': SituationEnum, 'status': StatusEnum
+    }
+    
+    target_enum = enum_map.get(info.field_name)
+    if target_enum:
+        for item in target_enum:
+            if item.value == v:
+                return item
+    return v
 
 # ──────────────────────────────────────────────
 # Auth
@@ -44,30 +69,54 @@ class StyleUpdate(BaseModel):
 class ClothesCreate(BaseModel):
     name:           str
     category:       CategoryEnum
-    color:          str
+    top_fit:        TopFitEnum
+    bottom_fit:     BottomFitEnum
+    color:          ColorEnum
     season:         SeasonEnum
+    tone:           ToneEnum
     style:          StyleEnum
-    material:       Optional[str]  = None
-    thickness:      Optional[ThicknessEnum] = None
-    purchase_price: Optional[int]  = None  # 없으면 null → cost_per_wear 계산불가
+    mood:           MoodEnum
+    material:       MaterialEnum
+    thickness:      ThicknessEnum
+    point:          PointEnum
+    purchase_price: Optional[int]  # 없으면 null → cost_per_wear 계산불가
+    status:         StatusEnum
+    situation:      SituationEnum
 
-    @field_validator("purchase_price")
+    @field_validator(
+        'category', 'color', 'season', 'style', 'top_fit', 'situation',
+        'bottom_fit', 'tone', 'mood', 'material', 'point', 'thickness', 'status',
+        mode='before'
+    )
     @classmethod
-    def price_non_negative(cls, v):
-        if v is not None and v < 0:
-            raise ValueError("구매가는 0 이상이어야 합니다")
-        return v
-
+    def validate_enums(cls, v: Any, info: Any) -> Any:
+        return map_korean_to_enum_logic(v, info)
+    
 class ClothesUpdate(BaseModel):
-    name:           Optional[str]            = None
-    category:       Optional[CategoryEnum]   = None
-    color:          Optional[str]            = None
-    season:         Optional[SeasonEnum]     = None
-    style:          Optional[StyleEnum]      = None
-    material:       Optional[str]            = None
-    thickness:      Optional[ThicknessEnum]  = None
-    purchase_price: Optional[int]            = None
-    status:         Optional[StatusEnum]     = None
+    name:           Optional[str] = None
+    category:       Optional[CategoryEnum] = None
+    top_fit:        Optional[TopFitEnum] = None
+    bottom_fit:     Optional[BottomFitEnum] = None
+    color:          Optional[ColorEnum] = None
+    season:         Optional[SeasonEnum] = None
+    tone:           Optional[ToneEnum] = None
+    style:          Optional[StyleEnum] = None
+    mood:           Optional[MoodEnum] = None
+    material:       Optional[MaterialEnum] = None
+    thickness:      Optional[ThicknessEnum] = None
+    point:          Optional[PointEnum] = None
+    purchase_price: Optional[int] = None
+    status:         Optional[StatusEnum] = None
+    situation:      Optional[SituationEnum] = None
+
+    @field_validator(
+        'category', 'color', 'season', 'style', 'top_fit', 'situation',
+        'bottom_fit', 'tone', 'mood', 'material', 'point', 'thickness', 'status',
+        mode='before'
+    )
+    @classmethod
+    def validate_enums(cls, v: Any, info: Any) -> Any:
+        return map_korean_to_enum_logic(v, info)
 
 class ClothesStatusUpdate(BaseModel):
     status: StatusEnum
@@ -76,21 +125,26 @@ class ClothesResponse(BaseModel):
     clothes_id:     int
     name:           str
     category:       CategoryEnum
-    color:          str
+    top_fit:        Optional[TopFitEnum] = None
+    bottom_fit:     Optional[BottomFitEnum] = None
+    color:          ColorEnum
     season:         SeasonEnum
+    tone:           Optional[ToneEnum] = None
     style:          StyleEnum
-    material:       Optional[str]
-    thickness:      Optional[ThicknessEnum]
-    purchase_price: Optional[int]
-    image_url:      Optional[str]
+    mood:           Optional[MoodEnum] = None
+    material:       Optional[MaterialEnum] = None
+    thickness:      Optional[ThicknessEnum] = None
+    point:          Optional[PointEnum] = None
+    purchase_price: Optional[int] = None
+    situation:      Optional[SituationEnum] = None
+    image_url:      Optional[str] = None
     status:         StatusEnum
     wear_count:     int
-    last_worn_date: Optional[date]
-    cost_per_wear:  Optional[float]  # 계산된 값 (wear_count=0이면 null)
+    last_worn_date: Optional[date] = None
+    cost_per_wear:  Optional[float] = None  # 계산된 값 (wear_count=0이면 null)
     created_at:     datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ──────────────────────────────────────────────
@@ -115,5 +169,4 @@ class WearHistoryResponse(BaseModel):
     memo:                 Optional[str]
     created_at:           datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

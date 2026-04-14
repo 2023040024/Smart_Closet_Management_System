@@ -20,6 +20,36 @@ class CategoryEnum(str, enum.Enum):
     shoes    = "신발"
     acc      = "악세사리"
 
+class TopFitEnum(str, enum.Enum):
+    slim    = "슬림"
+    regular = "레귤러"
+    over    = "오버핏"
+    crop    = "크롭"
+
+class BottomFitEnum(str, enum.Enum):
+    slim     = "슬림"
+    straight = "스트레이트"
+    wide     = "와이드"
+    jogger   = "조거"
+    tapered  = "테이퍼드"
+
+class ColorEnum(str, enum.Enum):
+    black      = "블랙"
+    white      = "화이트"
+    gray       = "그레이"
+    charcoal   = "차콜"
+    navy       = "네이비"
+    beige      = "베이지"
+    ivory      = "아이보리"
+    brown      = "브라운"
+    camel      = "카멜"
+    khaki      = "카키"
+    olive      = "올리브"
+    blue       = "블루"
+    skyblue    = "스카이블루"
+    red        = "레드"
+    pink       = "핑크"
+
 class SeasonEnum(str, enum.Enum):
     spring   = "봄"
     summer   = "여름"
@@ -27,16 +57,52 @@ class SeasonEnum(str, enum.Enum):
     winter   = "겨울"
     all_year = "사계절"
 
+class ToneEnum(str, enum.Enum):
+    bright   = "화사한"
+    vivid    = "선명한"
+    calm     = "차분한"
+    deep     = "진한"
+
 class StyleEnum(str, enum.Enum):
-    casual   = "캐주얼"
-    formal   = "포멀"
-    minimal  = "미니멀"
-    street   = "스트릿"
+    casual      = "캐주얼"
+    semi_casual = "세미캐주얼"
+    formal      = "포멀"
+    minimal     = "미니멀"
+    street      = "스트릿"
+    dandy       = "댄디"
+    sporty      = "스포티"
+    vintage     = "빈티지"
+    amekaji     = "아메카지"
+    gorpcore    = "고프코어"
+
+class MoodEnum(str, enum.Enum):
+    active       = "활동적인"
+    sophisticated = "세련된"
+    cute         = "귀여운"
+    hip          = "힙한"
+    calm         = "차분한"
+    luxury       = "고급스러운"
+
+class MaterialEnum(str, enum.Enum):
+    knit   = "니트"
+    denim  = "데님"
+    cotton = "코튼"
+    leather = "레더"
+    nylon  = "나일론"
+    padding = "패딩"
 
 class ThicknessEnum(str, enum.Enum):
-    thin     = "thin"
-    medium   = "medium"
-    thick    = "thick"
+    thin     = "얇음"
+    medium   = "보통"
+    thick    = "두꺼움"
+
+class PointEnum(str, enum.Enum):
+    printing = "프린팅"
+    layered  = "레이어드"
+    color    = "컬러포인트"
+    plain    = "무지"
+    stripe   = "스트라이프"
+    check    = "체크"
 
 class StatusEnum(str, enum.Enum):
     wearable  = "착용가능"
@@ -46,11 +112,14 @@ class StatusEnum(str, enum.Enum):
     stored    = "보관중"
 
 class SituationEnum(str, enum.Enum):
-    school   = "학교"
-    date     = "데이트"
+    daily   = "데일리"
+    business = "비즈니스"
     interview = "면접"
+    wedding = "결혼식"
+    funeral = "장례식"
     exercise = "운동"
-    cafe     = "카페"
+    date     = "데이트"
+    meeting = "모임"
     travel   = "여행"
 
 class FeedbackTempEnum(str, enum.Enum):
@@ -95,10 +164,15 @@ class Clothes(Base):
     user_id        = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     name           = Column(String(100), nullable=False)
     category       = Column(Enum(CategoryEnum), nullable=False)
-    color          = Column(String(50), nullable=False)
+    color          = Column(Enum(ColorEnum), nullable=False)
+    top_fit        = Column(Enum(TopFitEnum), nullable=True)     # 상의일 때만 사용
+    bottom_fit     = Column(Enum(BottomFitEnum), nullable=True)  # 하의일 때만 사용
     season         = Column(Enum(SeasonEnum), nullable=False)
     style          = Column(Enum(StyleEnum), nullable=False)
-    material       = Column(String(50), nullable=True)   # 면, 폴리, 울, 니트 등
+    tone           = Column(Enum(ToneEnum), nullable=True)
+    mood           = Column(Enum(MoodEnum), nullable=True)
+    material       = Column(Enum(MaterialEnum), nullable=True)   # 면, 폴리, 울, 니트 등
+    point          = Column(Enum(PointEnum), nullable=True)
     thickness      = Column(Enum(ThicknessEnum), nullable=True)
     purchase_price = Column(Integer, nullable=True)       # 가성비 계산용 (0원 허용)
     image_url      = Column(String(255), nullable=True)
