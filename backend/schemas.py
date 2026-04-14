@@ -125,23 +125,23 @@ class ClothesResponse(BaseModel):
     clothes_id:     int
     name:           str
     category:       CategoryEnum
-    top_fit:        TopFitEnum
-    bottom_fit:     BottomFitEnum
+    top_fit:        Optional[TopFitEnum] = None
+    bottom_fit:     Optional[BottomFitEnum] = None
     color:          ColorEnum
     season:         SeasonEnum
-    tone:           ToneEnum
+    tone:           Optional[ToneEnum] = None
     style:          StyleEnum
-    mood:           MoodEnum
-    material:       MaterialEnum
-    thickness:      ThicknessEnum
-    point:          PointEnum
-    purchase_price: Optional[int]
-    situation:      SituationEnum
-    image_url:      Optional[str]
+    mood:           Optional[MoodEnum] = None
+    material:       Optional[MaterialEnum] = None
+    thickness:      Optional[ThicknessEnum] = None
+    point:          Optional[PointEnum] = None
+    purchase_price: Optional[int] = None
+    situation:      Optional[SituationEnum] = None
+    image_url:      Optional[str] = None
     status:         StatusEnum
     wear_count:     int
-    last_worn_date: Optional[date]
-    cost_per_wear:  Optional[float]  # 계산된 값 (wear_count=0이면 null)
+    last_worn_date: Optional[date] = None
+    cost_per_wear:  Optional[float] = None  # 계산된 값 (wear_count=0이면 null)
     created_at:     datetime
 
     model_config = ConfigDict(from_attributes=True)
