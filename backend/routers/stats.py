@@ -45,22 +45,22 @@ def get_top_frequency(db: Session = Depends(get_db)):
 @router.get("/disposal-recommendation")
 def get_disposal_recommendation(db: Session = Depends(get_db)):
     current_user_id = 1
-    ninety_days_ago = datetime.now() - timedelta(days=90)
+    
+    # Date와 DateTime 변수 명확히 분리
+    ninety_days_ago_datetime = datetime.now() - timedelta(days=90)
+    ninety_days_ago_date = ninety_days_ago_datetime.date() 
     
     disposal_targets = (
         db.query(Clothes)
         .filter(
             Clothes.user_id == current_user_id,
-            (Clothes.last_worn_date <= ninety_days_ago) |
+            (Clothes.last_worn_date <= ninety_days_ago_date) | 
             (
                 ((Clothes.wear_count == 0) | (Clothes.wear_count == None)) & 
-                (Clothes.created_at <= ninety_days_ago)
+                (Clothes.created_at <= ninety_days_ago_datetime) 
             )
         )
         .all()
     )
     
-    return {
-        "message": f"90일 이상 방치된 옷이 {len(disposal_targets)}벌 있습니다. 처분을 고려해 보세요.", 
-        "data": disposal_targets
-    }
+    return {"message": f"90일 방치 옷 {len(disposal_targets)}벌 조회 완료", "data": disposal_targets}
