@@ -26,7 +26,7 @@ def get_underutilized_clothes(current_season: SeasonEnum, db: Session = Depends(
         .limit(10)
         .all()
     )
-    
+
     return {"message": f"우선 추천 후보 추출 완료", "data": priority_clothes}
 
 # 착용 빈도 통계 API
@@ -124,4 +124,10 @@ def get_closet_overload(threshold: int = 3, db: Session = Depends(get_db)):
             "items": items
         })
 
-    return {"message": f"과다 보유 리포트: {len(detailed_data)}건 발견", "data": detailed_data}
+
+    return {
+        "message": f"과다 보유 리포트: {len(detailed_data)}건 발견",
+        "overload_details": detailed_data,
+        "ai_insight": f"사용자는 현재 {len(detailed_data)}개의 스타일에서 중복 구매 패턴을 보입니다."
+    }
+
