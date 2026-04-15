@@ -90,3 +90,24 @@ def get_cost_efficiency(db: Session = Depends(get_db)):
             "total_investment_on_worst": sum(c.purchase_price for c in sorted_clothes[-3:])
         }
     }
+
+
+# 옷장 과부하 분석 API
+@router.get("/overload-analysis")
+def get_closet_overload(threshold: int = 3, db: Session = Depends(get_db)):
+    current_user_id = 1
+    
+    # 카테고리/색상별 그룹화 및 threshold 이상 중복 감지
+    overloaded_groups = (
+        db.query(
+            Clothes.category, 
+            Clothes.color, 
+            func.count(Clothes.clothes_id).label("count")
+        )
+        .filter(Clothes.user_id == current_user_id)
+        .group_by(Clothes.category, Clothes.color)
+        .having(func.count(Clothes.clothes_id) >= threshold)
+        .all()
+    )
+
+    return {"message": f"중복 보유 카테고리 {len(overloaded_groups)}건 발견"}
