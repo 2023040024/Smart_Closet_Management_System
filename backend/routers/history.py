@@ -42,8 +42,11 @@ def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session 
             feedback_tpo=history_data.feedback_tpo,
             memo=history_data.memo
         )
-        cloth.wear_count += 1
-        cloth.last_worn_date = history_data.worn_date
+        
+        cloth.wear_count = (cloth.wear_count or 0) + 1
+        if cloth.last_worn_date is None or history_data.worn_date > cloth.last_worn_date:
+            cloth.last_worn_date = history_data.worn_date
+
         db.add(new_history)
         db.add(cloth)
         created_histories.append(new_history)
