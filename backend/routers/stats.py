@@ -79,4 +79,14 @@ def get_cost_efficiency(db: Session = Depends(get_db)):
         Clothes.wear_count > 0
     ).all()
 
-    return {"message": f"가성비 계산 대상 {len(clothes)}벌 추출 완료"}
+    sorted_clothes = sorted(clothes, key=lambda x: x.cost_per_wear)
+
+    return {
+        "message": "가성비 분석 완료",
+        "best_efficiency": sorted_clothes[:3],   # UI용 가성비 좋은 옷
+        "worst_efficiency": sorted_clothes[-3:], # UI용 가성비 나쁜 옷
+        "ai_summary": {                          # AI 프롬프트용 요약 데이터
+            "most_efficient_item": sorted_clothes[0].name if sorted_clothes else None,
+            "total_investment_on_worst": sum(c.purchase_price for c in sorted_clothes[-3:])
+        }
+    }
