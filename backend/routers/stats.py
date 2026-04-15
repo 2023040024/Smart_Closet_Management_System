@@ -110,4 +110,18 @@ def get_closet_overload(threshold: int = 3, db: Session = Depends(get_db)):
         .all()
     )
 
-    return {"message": f"중복 보유 카테고리 {len(overloaded_groups)}건 발견"}
+    detailed_data = []
+    for group in overloaded_groups:
+        items = db.query(Clothes).filter(
+            Clothes.user_id == current_user_id,
+            Clothes.category == group.category,
+            Clothes.color == group.color
+        ).all()
+        detailed_data.append({
+            "category": group.category,
+            "color": group.color,
+            "count": group.count,
+            "items": items
+        })
+
+    return {"message": f"과다 보유 리포트: {len(detailed_data)}건 발견", "data": detailed_data}
