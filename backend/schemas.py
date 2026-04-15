@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import Optional, Any
-from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field
 from models import (
     CategoryEnum, TopFitEnum, BottomFitEnum, ColorEnum, SeasonEnum,
     ToneEnum, StyleEnum, MoodEnum, MaterialEnum, ThicknessEnum, PointEnum,
@@ -38,7 +38,7 @@ def map_korean_to_enum_logic(v: Any, info: Any) -> Any:
 
 class UserSignup(BaseModel):
     email:    EmailStr
-    password: str
+    password: str = Field(..., max_length=60)
 
 class UserLogin(BaseModel):
     email:    EmailStr
@@ -50,8 +50,7 @@ class UserResponse(BaseModel):
     preferred_style: Optional[StyleEnum]
     created_at:      datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TokenResponse(BaseModel):
     access_token: str
