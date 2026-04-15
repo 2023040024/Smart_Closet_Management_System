@@ -9,6 +9,14 @@ router = APIRouter(prefix="/history", tags=["착용 기록"])
 
 @router.post("", response_model=List[WearHistoryResponse])
 def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session = Depends(get_db)):
+    
+    seen = set()
+    for data in history_data_list:
+        key = (data.clothes_id, data.worn_date)
+        if key in seen:
+            raise HTTPException(status_code=400, detail="요청 내에 중복된 기록이 포함되어 있습니다.")
+        seen.add(key)
+
     if not history_data_list:
         raise HTTPException(status_code=400, detail="기록할 옷 데이터가 비어있습니다.")
     
