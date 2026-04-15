@@ -73,7 +73,18 @@ const initialHistoryData: WearHistoryItem[] = [
   },
 ];
 
-const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여행', '운동', '모임'];
+const filterOptions = [
+  '전체',
+  '데일리',
+  '비즈니스',
+  '면접',
+  '결혼식',
+  '장례식',
+  '운동',
+  '데이트',
+  '모임',
+  '여행',
+];
 
 export default function HistoryScreen() {
   const [selectedFilter, setSelectedFilter] = useState('전체');
@@ -121,6 +132,10 @@ export default function HistoryScreen() {
         clothes: JSON.stringify(clothes),
       },
     });
+  };
+
+  const handleCreatePress = () => {
+    router.push('/history-create');
   };
 
   const renderItem = ({ item }: { item: WearHistoryItem }) => {
@@ -178,8 +193,12 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={styles.headerRow}>
         <Text style={styles.title}>착용 기록</Text>
+
+        <Pressable style={styles.addButton} onPress={handleCreatePress}>
+          <Text style={styles.addButtonText}>+ 추가</Text>
+        </Pressable>
       </View>
 
       <View style={styles.filterRow}>
@@ -230,13 +249,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
   },
-  header: {
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: '#111',
+  },
+  addButton: {
+    backgroundColor: '#111',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   filterRow: {
     flexDirection: 'row',
