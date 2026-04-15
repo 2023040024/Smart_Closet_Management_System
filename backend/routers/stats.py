@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime, timedelta 
 from database import get_db
 from models import Clothes
 
@@ -8,18 +9,26 @@ from models import Clothes
 router = APIRouter(prefix="/stats", tags=["통계 및 분석"])
 
 
-# 미착용 옷 분석 API
-@router.get("/unworn")
-def get_unworn_clothes(db: Session = Depends(get_db)):
-    current_user_id = 1  # TODO: 인증 모듈 연동 필요
+# 미착용 옷/ 재활용 옷 우선순위 추출 API
+@router.get("/unworn/priority")
+def get_underutilized_clothes(current_season: str, db: Session = Depends(get_db)):
+    current_user_id = 1 
     
-    # wear_count가 0이거나 데이터가 없는 옷 필터링
-    unworn_clothes = db.query(Clothes).filter(
-        Clothes.user_id == current_user_id,
-        (Clothes.wear_count == 0) | (Clothes.wear_count == None)
-    ).all()
+    priority_clothes = (
+        db.query(Clothes)
+        .filter(
+            Clothes.user_id == current_user_id,
+            Clothes.season == current_season
+        )
+        .order_by(Clothes.wear_count.asc())
+        .limit(10)
+        .all()
+    )
     
-    return {"message": f"미착용 옷 {len(unworn_clothes)}벌 조회 성공", "data": unworn_clothes}
+    return {
+        "message": f"이번 {current_season} 시즌에 우선적으로 활용할 옷을 찾았습니다.", 
+        "data": priority_clothes
+    }
 
 # 착용 빈도 통계 API
 @router.get("/frequency/top")
