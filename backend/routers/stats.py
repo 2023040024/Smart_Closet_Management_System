@@ -42,3 +42,27 @@ def get_top_frequency(db: Session = Depends(get_db)):
     ).order_by(Clothes.wear_count.desc()).limit(5).all()
     
     return {"message": "가장 즐겨 입는 상위 5벌 조회", "data": top_clothes}
+
+
+@router.get("/disposal-recommendation")
+def get_disposal_recommendation(db: Session = Depends(get_db)):
+    current_user_id = 1
+    ninety_days_ago = datetime.now() - timedelta(days=90)
+    
+    disposal_targets = (
+        db.query(Clothes)
+        .filter(
+            Clothes.user_id == current_user_id,
+            (Clothes.last_worn_date <= ninety_days_ago) |
+            (
+                ((Clothes.wear_count == 0) | (Clothes.wear_count == None)) & 
+                (Clothes.created_at <= ninety_days_ago)
+            )
+        )
+        .all()
+    )
+    
+    return {
+        "message": f"90일 이상 방치된 옷이 {len(disposal_targets)}벌 있습니다. 처분을 고려해 보세요.", 
+        "data": disposal_targets
+    }
