@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func  
 from typing import List
 from datetime import datetime, timedelta, date 
 from database import get_db
@@ -64,3 +65,18 @@ def get_disposal_recommendation(db: Session = Depends(get_db)):
     )
     
     return {"message": f"90일 방치 옷 {len(disposal_targets)}벌 조회 완료", "data": disposal_targets}
+
+
+# 가성비 계산 API
+@router.get("/cost-efficiency")
+def get_cost_efficiency(db: Session = Depends(get_db)):
+    current_user_id = 1
+    
+    # 가격 정보가 있고 한 번이라도 입은 옷 필터링
+    clothes = db.query(Clothes).filter(
+        Clothes.user_id == current_user_id,
+        Clothes.purchase_price > 0,
+        Clothes.wear_count > 0
+    ).all()
+
+    return {"message": f"가성비 계산 대상 {len(clothes)}벌 추출 완료"}
