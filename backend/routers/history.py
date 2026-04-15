@@ -50,3 +50,33 @@ def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session 
 def get_wear_histories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     histories = db.query(WearHistory).order_by(WearHistory.worn_date.desc()).offset(skip).limit(limit).all()
     return histories
+
+@router.delete("/{history_id}")
+def delete_wear_history(history_id: int, db: Session = Depends(get_db)):
+    # 1. 삭제할 기록 찾기
+    history = db.query(WearHistory).filter(WearHistory.history_id == history_id).first()
+    
+    if not history:
+        raise HTTPException(status_code=404, detail="삭제할 기록을 찾을 수 없습니다.")
+    
+    # 2. 연결된 옷 정보 가져오기 (wear_count 수정을 위해)
+    cloth = db.query(Clothes).filter(Clothes.clothes_id == history.clothes_id).first()
+    
+    if cloth:
+        # 착용 횟수 1 감소
+        if cloth.wear_count > 0:
+            cloth.wear_count -= 1
+        
+        # 마지막 착용일 갱신, 삭제 후 가장 최근의 남은 기록으로 업데이트
+        remaining_last_history = db.query(WearHistory)\
+            .filter(WearHistory.clothes_id == history.clothes_id, WearHistory.history_id != history_id)\
+            .order_by(WearHistory.worn_date.desc()).first()
+        
+        cloth.last_worn_date = remaining_last_history.worn_date if remaining_last_history else None
+        db.add(cloth)
+
+    # 3. DB에서 실제 삭제
+    db.delete(history)
+    db.commit()
+    
+    return {"message": f"기록 {history_id}번이 성공적으로 삭제되었으며, 옷의 착용 횟수가 조정되었습니다."}

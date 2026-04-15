@@ -69,19 +69,19 @@ class StyleUpdate(BaseModel):
 class ClothesCreate(BaseModel):
     name:           str
     category:       CategoryEnum
-    top_fit:        TopFitEnum
-    bottom_fit:     BottomFitEnum
-    color:          ColorEnum
-    season:         SeasonEnum
-    tone:           ToneEnum
-    style:          StyleEnum
-    mood:           MoodEnum
-    material:       MaterialEnum
-    thickness:      ThicknessEnum
-    point:          PointEnum
-    purchase_price: Optional[int]  # 없으면 null → cost_per_wear 계산불가
-    status:         StatusEnum
-    situation:      SituationEnum
+    top_fit:        Optional[TopFitEnum] = None
+    bottom_fit:     Optional[BottomFitEnum] = None
+    color:          Optional[ColorEnum] = None
+    season:         Optional[SeasonEnum] = None
+    tone:           Optional[ToneEnum] = None
+    style:          Optional[StyleEnum] = None
+    mood:           Optional[MoodEnum] = None
+    material:       Optional[MaterialEnum] = None
+    thickness:      Optional[ThicknessEnum] = None
+    point:          Optional[PointEnum] = None
+    purchase_price: Optional[int] = None
+    status:         Optional[StatusEnum] = None
+    situation:      Optional[SituationEnum] = None
 
     @field_validator(
         'category', 'color', 'season', 'style', 'top_fit', 'situation',
@@ -138,7 +138,7 @@ class ClothesResponse(BaseModel):
     purchase_price: Optional[int] = None
     situation:      Optional[SituationEnum] = None
     image_url:      Optional[str] = None
-    status:         StatusEnum
+    status:         Optional[StatusEnum] = None
     wear_count:     int
     last_worn_date: Optional[date] = None
     cost_per_wear:  Optional[float] = None  # 계산된 값 (wear_count=0이면 null)
