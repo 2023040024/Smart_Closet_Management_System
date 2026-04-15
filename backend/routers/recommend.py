@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import google.generativeai as genai
 
 from database import get_db
-from models import Clothes, CategoryEnum, StatusEnum, User
+from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum, MaterialEnum
 from routers.auth import get_current_user
 from tpo_rules import get_tpo_prompt_text
 
@@ -68,12 +68,14 @@ def _filter_by_weather(clothes_list: list[Clothes], temperature: float, weather_
     result = []
     for c in clothes_list:
         if temperature is not None:
-            if temperature >= 25 and c.thickness == "thick":
+            # ThicknessEnum: thick="두꺼움", thin="얇음" → .value로 비교
+            if temperature >= 25 and c.thickness == ThicknessEnum.thick:
                 continue
-            if temperature <= 14 and c.thickness == "thin":
+            if temperature <= 14 and c.thickness == ThicknessEnum.thin:
                 continue
         if weather_condition in ("rainy", "snowy"):
-            if c.material in ("leather", "가죽"):
+            # MaterialEnum: leather="레더" → .value로 비교
+            if c.material == MaterialEnum.leather:
                 continue
         result.append(c)
     return result
@@ -116,32 +118,37 @@ def clothes_to_text(c: Clothes) -> str:
 # 유저 개인화 정보 추출 헬퍼
 # ──────────────────────────────────────────────
 
-def get_user_profile_text(user: User, temperature: float) -> tuple[str, str, float]:
+def get_user_profile_text(user: User, temperature: float) -> tuple[str, str, float, int]:
     """
     User 모델의 개인화 필드를 읽어 프롬프트용 텍스트 생성.
-    B가 아직 컬럼을 추가 안 했을 경우 getattr로 안전하게 기본값 처리.
+    temp_sensitivity: -2.0(더위 잘 탐) ~ 0(보통) ~ +2.0(추위 잘 탐)
     """
-    cold_sensitive    = getattr(user, "cold_sensitive", False)
-    heat_sensitive    = getattr(user, "heat_sensitive", False)
-    temp_offset       = getattr(user, "preferred_temp_offset", 0) or 0
-    preferred_style   = getattr(user, "preferred_style", None) or "캐주얼"
+    # temp_sensitivity: models.py User 테이블 실제 컬럼
+    temp_sensitivity = getattr(user, "temp_sensitivity", 0.0) or 0.0
+    preferred_style  = getattr(user, "preferred_style", None)
+    preferred_style  = preferred_style.value if preferred_style else "캐주얼"
 
-    # 체감온도 보정
-    felt_temp = temperature + temp_offset
+    # 체감온도 = 실제기온 + temp_sensitivity 보정값
+    felt_temp = temperature + temp_sensitivity
 
-    sensitivity_lines = []
-    if cold_sensitive:
-        sensitivity_lines.append("추위를 잘 타는 편 (체감온도 더 낮게 느낌)")
-    if heat_sensitive:
-        sensitivity_lines.append("더위를 잘 타는 편 (체감온도 더 높게 느낌)")
-    if not sensitivity_lines:
-        sensitivity_lines.append("온도 민감도 보통")
+    # 민감도 텍스트
+    if temp_sensitivity >= 1.0:
+        sensitivity_str = f"추위를 잘 타는 편 (체감온도 {temp_sensitivity:+.1f}°C 보정)"
+    elif temp_sensitivity <= -1.0:
+        sensitivity_str = f"더위를 잘 타는 편 (체감온도 {temp_sensitivity:+.1f}°C 보정)"
+    else:
+        sensitivity_str = "온도 민감도 보통"
 
-    return (
+    # 아우터 기준: 추위 잘 타면 기준 올림, 더위 잘 타면 내림
+    outer_threshold = 14 + round(temp_sensitivity)  # 추위 잘 탐 +2 → 16°C, 더위 잘 탐 -2 → 12°C
+
+    profile_text = (
         f"- 선호 스타일: {preferred_style}\n"
-        f"- 체감온도: {felt_temp:.1f}°C (실제 {temperature:.1f}°C, 보정 {temp_offset:+.1f}°C)\n"
-        f"- 온도 민감도: {', '.join(sensitivity_lines)}"
-    ), preferred_style, felt_temp
+        f"- 체감온도: {felt_temp:.1f}°C (실제 {temperature:.1f}°C, 보정 {temp_sensitivity:+.1f}°C)\n"
+        f"- 온도 민감도: {sensitivity_str}"
+    )
+
+    return profile_text, preferred_style, felt_temp, outer_threshold
 
 
 # ──────────────────────────────────────────────
@@ -157,14 +164,22 @@ def build_prompt(
 ) -> str:
     context = get_tpo_prompt_text(situation, temperature, weather_condition)
 
+    # situation_map — models.py SituationEnum 키 기준
     situation_map = {
-        "school": "학교", "date": "데이트", "interview": "면접",
-        "exercise": "운동", "cafe": "카페", "travel": "여행",
+        "daily":    "데일리",
+        "business": "비즈니스",
+        "interview": "면접",
+        "wedding":  "결혼식",
+        "funeral":  "장례식",
+        "exercise": "운동",
+        "date":     "데이트",
+        "meeting":  "모임",
+        "travel":   "여행",
     }
     situation_kr = situation_map.get(situation, situation)
 
-    # 개인화 정보
-    profile_text, preferred_style, felt_temp = get_user_profile_text(user, temperature)
+    # 개인화 정보 (반환값 4개로 변경됨)
+    profile_text, preferred_style, felt_temp, outer_threshold = get_user_profile_text(user, temperature)
 
     # 카테고리별 분류 및 미착용 기간 긴 옷 우선
     tops    = sorted([c for c in clothes_list if c.category == CategoryEnum.top],    key=get_unworn_days, reverse=True)[:5]
@@ -174,10 +189,6 @@ def build_prompt(
 
     all_candidates = tops + bottoms + outers + shoes
     clothes_text = "\n".join([clothes_to_text(c) for c in all_candidates])
-
-    # 개인화 온도 민감도에 따른 아우터 기준 조정
-    cold_sensitive = getattr(user, "cold_sensitive", False)
-    outer_threshold = 17 if cold_sensitive else 14  # 추위 잘 타면 아우터 기준 올림
 
     prompt = f"""
 당신은 패션 코디 전문가입니다. 아래 정보를 바탕으로 오늘 입기 좋은 코디 3가지를 추천해주세요.
@@ -283,7 +294,7 @@ def recommend_today(
     오늘의 코디 추천
     GET /recommend/today?situation=date&temperature=18&weather_condition=cloudy
     """
-    all_clothes = db.query(Clothes).filter(Clothes.user_id == current_user.id).all()
+    all_clothes = db.query(Clothes).filter(Clothes.user_id == current_user.user_id).all()
 
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
@@ -295,7 +306,7 @@ def recommend_today(
 
     prompt = build_prompt(
         filtered,
-        situation or "cafe",
+        situation or "daily",
         temperature or 20.0,
         weather_condition or "sunny",
         current_user
@@ -315,16 +326,19 @@ def recommend_custom(
     POST /recommend/custom
     Body: { "situation": "date", "temperature": 18, "weather_condition": "rainy" }
     """
-    all_clothes = db.query(Clothes).filter(Clothes.user_id == current_user.id).all()
+    all_clothes = db.query(Clothes).filter(Clothes.user_id == current_user.user_id).all()
 
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
 
     filtered = filter_clothes(all_clothes, body.temperature or 20.0, body.weather_condition or "sunny")
 
+    if len(filtered) < 2:
+        raise HTTPException(status_code=400, detail="날씨·상태 조건에 맞는 옷이 부족합니다")
+
     prompt = build_prompt(
         filtered,
-        body.situation or "cafe",
+        body.situation or "daily",
         body.temperature or 20.0,
         body.weather_condition or "sunny",
         current_user
@@ -345,27 +359,34 @@ def recommend_weekly(
     일주일치 코디 추천 (옷 돌려막기)
     GET /recommend/weekly?situation=school&temperature=18&weather_condition=cloudy
     """
-    all_clothes = db.query(Clothes).filter(Clothes.user_id == current_user.id).all()
+    all_clothes = db.query(Clothes).filter(Clothes.user_id == current_user.user_id).all()
     filtered = filter_clothes(all_clothes, temperature or 20.0, weather_condition or "sunny")
 
     if len(filtered) < 4:
         raise HTTPException(status_code=400, detail="주간 추천을 위해 최소 4벌 이상의 옷이 필요합니다")
 
     clothes_text = "\n".join([clothes_to_text(c) for c in filtered])
-    situation_kr = {
-        "school": "학교", "date": "데이트", "cafe": "카페",
-        "travel": "여행", "exercise": "운동", "interview": "면접"
-    }.get(situation or "school", "일상")
 
-    # 개인화 정보
-    cold_sensitive  = getattr(current_user, "cold_sensitive", False)
-    heat_sensitive  = getattr(current_user, "heat_sensitive", False)
-    temp_offset     = getattr(current_user, "preferred_temp_offset", 0) or 0
-    preferred_style = getattr(current_user, "preferred_style", None) or "캐주얼"
-    felt_temp       = (temperature or 20.0) + temp_offset
+    situation_map = {
+        "daily": "데일리", "business": "비즈니스", "interview": "면접",
+        "wedding": "결혼식", "funeral": "장례식", "exercise": "운동",
+        "date": "데이트", "meeting": "모임", "travel": "여행"
+    }
+    situation_kr = situation_map.get(situation or "daily", "데일리")
 
-    sensitivity_str = "추위를 잘 탐" if cold_sensitive else ("더위를 잘 탐" if heat_sensitive else "보통")
-    outer_threshold = 17 if cold_sensitive else 14
+    # 개인화 정보 (temp_sensitivity 기반)
+    temp_sensitivity = getattr(current_user, "temp_sensitivity", 0.0) or 0.0
+    preferred_style  = getattr(current_user, "preferred_style", None)
+    preferred_style  = preferred_style.value if preferred_style else "캐주얼"
+    felt_temp        = (temperature or 20.0) + temp_sensitivity
+    outer_threshold  = 14 + round(temp_sensitivity)
+
+    if temp_sensitivity >= 1.0:
+        sensitivity_str = f"추위를 잘 타는 편 ({temp_sensitivity:+.1f}°C 보정)"
+    elif temp_sensitivity <= -1.0:
+        sensitivity_str = f"더위를 잘 타는 편 ({temp_sensitivity:+.1f}°C 보정)"
+    else:
+        sensitivity_str = "보통"
 
     prompt = f"""
 당신은 패션 코디 전문가입니다.
@@ -431,28 +452,33 @@ def get_clothes_tips(
     # 해당 옷 조회 (본인 소유 확인)
     clothes = db.query(Clothes).filter(
         Clothes.clothes_id == clothes_id,
-        Clothes.user_id == current_user.id
+        Clothes.user_id == current_user.user_id
     ).first()
 
     if not clothes:
         raise HTTPException(status_code=404, detail="옷을 찾을 수 없습니다")
 
-    # 개인화 정보
-    cold_sensitive  = getattr(current_user, "cold_sensitive", False)
-    heat_sensitive  = getattr(current_user, "heat_sensitive", False)
-    temp_offset     = getattr(current_user, "preferred_temp_offset", 0) or 0
-    preferred_style = getattr(current_user, "preferred_style", None) or "캐주얼"
+    # 개인화 정보 (temp_sensitivity 기반)
+    temp_sensitivity = getattr(current_user, "temp_sensitivity", 0.0) or 0.0
+    preferred_style  = getattr(current_user, "preferred_style", None)
+    preferred_style  = preferred_style.value if preferred_style else "캐주얼"
 
     temp = temperature or 20.0
-    felt_temp = temp + temp_offset
+    felt_temp = temp + temp_sensitivity
     unworn_days = get_unworn_days(clothes)
     unworn_str = f"{unworn_days}일 미착용" if unworn_days < 999 else "착용 기록 없음"
 
-    sensitivity_str = "추위를 잘 타는 편" if cold_sensitive else ("더위를 잘 타는 편" if heat_sensitive else "온도 민감도 보통")
+    if temp_sensitivity >= 1.0:
+        sensitivity_str = f"추위를 잘 타는 편 ({temp_sensitivity:+.1f}°C 보정)"
+    elif temp_sensitivity <= -1.0:
+        sensitivity_str = f"더위를 잘 타는 편 ({temp_sensitivity:+.1f}°C 보정)"
+    else:
+        sensitivity_str = "온도 민감도 보통"
 
     situation_kr = {
-        "school": "학교", "date": "데이트", "interview": "면접",
-        "exercise": "운동", "cafe": "카페", "travel": "여행"
+        "daily": "데일리", "business": "비즈니스", "interview": "면접",
+        "wedding": "결혼식", "funeral": "장례식", "exercise": "운동",
+        "date": "데이트", "meeting": "모임", "travel": "여행"
     }.get(situation or "", "일상")
 
     prompt = f"""
@@ -511,7 +537,7 @@ def recommend_rotation(
     Body: {
         "fixed_clothes_ids": [3, 7],   ← 매일 입을 옷 ID (상의+신발 고정 등)
         "days": 7,                      ← 며칠치
-        "situation": "school",
+        "situation": "daily",
         "temperature": 18,
         "weather_condition": "sunny"
     }
@@ -528,7 +554,7 @@ def recommend_rotation(
     for cid in body.fixed_clothes_ids:
         c = db.query(Clothes).filter(
             Clothes.clothes_id == cid,
-            Clothes.user_id == current_user.id
+            Clothes.user_id == current_user.user_id
         ).first()
         if not c:
             raise HTTPException(
@@ -540,7 +566,7 @@ def recommend_rotation(
     # 착용 가능한 나머지 옷 (고정 옷 제외, 액세서리 제외)
     fixed_ids_set = set(body.fixed_clothes_ids)
     all_clothes = db.query(Clothes).filter(
-        Clothes.user_id == current_user.id,
+        Clothes.user_id == current_user.user_id,
         Clothes.status == StatusEnum.wearable
     ).all()
 
@@ -561,19 +587,26 @@ def recommend_rotation(
             detail="날씨·상태 조건에 맞는 나머지 옷이 부족합니다 (최소 2벌 필요)"
         )
 
-    # 개인화 정보
-    cold_sensitive  = getattr(current_user, "cold_sensitive", False)
-    heat_sensitive  = getattr(current_user, "heat_sensitive", False)
-    temp_offset     = getattr(current_user, "preferred_temp_offset", 0) or 0
-    preferred_style = getattr(current_user, "preferred_style", None) or "캐주얼"
-    felt_temp       = temp + temp_offset
-    outer_threshold = 17 if cold_sensitive else 14
-    sensitivity_str = "추위를 잘 탐" if cold_sensitive else ("더위를 잘 탐" if heat_sensitive else "보통")
+    # 개인화 정보 (temp_sensitivity 기반)
+    temp_sensitivity = getattr(current_user, "temp_sensitivity", 0.0) or 0.0
+    preferred_style  = getattr(current_user, "preferred_style", None)
+    preferred_style  = preferred_style.value if preferred_style else "캐주얼"
+    felt_temp        = temp + temp_sensitivity
+    outer_threshold  = 14 + round(temp_sensitivity)
 
-    situation_kr = {
-        "school": "학교", "date": "데이트", "cafe": "카페",
-        "travel": "여행", "exercise": "운동", "interview": "면접"
-    }.get(body.situation or "", "일상")
+    if temp_sensitivity >= 1.0:
+        sensitivity_str = f"추위를 잘 탐 ({temp_sensitivity:+.1f}°C 보정)"
+    elif temp_sensitivity <= -1.0:
+        sensitivity_str = f"더위를 잘 탐 ({temp_sensitivity:+.1f}°C 보정)"
+    else:
+        sensitivity_str = "보통"
+
+    situation_map = {
+        "daily": "데일리", "business": "비즈니스", "interview": "면접",
+        "wedding": "결혼식", "funeral": "장례식", "exercise": "운동",
+        "date": "데이트", "meeting": "모임", "travel": "여행"
+    }
+    situation_kr = situation_map.get(body.situation or "", "데일리")
 
     # 고정 옷 텍스트
     fixed_text = "\n".join([
