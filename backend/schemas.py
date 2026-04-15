@@ -67,8 +67,8 @@ class StyleUpdate(BaseModel):
 # ──────────────────────────────────────────────
 
 class ClothesCreate(BaseModel):
-    name:           str
-    category:       CategoryEnum
+    name:           Optional[str] = None
+    category:       Optional[CategoryEnum] = None
     top_fit:        Optional[TopFitEnum] = None
     bottom_fit:     Optional[BottomFitEnum] = None
     color:          Optional[ColorEnum] = None
