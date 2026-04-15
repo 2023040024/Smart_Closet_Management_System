@@ -20,10 +20,15 @@ def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session 
     if not history_data_list:
         raise HTTPException(status_code=400, detail="기록할 옷 데이터가 비어있습니다.")
     
+    current_user_id = 1 #TODO: 인증 모듈 완료 후 JWT에서 실제 user_id 추출 필요
+
     created_histories = []
     try:
         for history_data in history_data_list:
-            cloth = db.query(Clothes).filter(Clothes.clothes_id == history_data.clothes_id).first()
+            cloth = db.query(Clothes).filter(
+                Clothes.clothes_id == history_data.clothes_id,
+                Clothes.user_id == current_user_id
+            ).first()
             if not cloth:
                 raise HTTPException(status_code=404, detail=f"해당 ID({history_data.clothes_id})의 옷을 찾을 수 없습니다.")
             existing_record = db.query(WearHistory).filter(
@@ -63,5 +68,14 @@ def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session 
 
 @router.get("", response_model=List[WearHistoryResponse])
 def get_wear_histories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    histories = db.query(WearHistory).order_by(WearHistory.worn_date.desc()).offset(skip).limit(limit).all()
+    current_user_id = 1 # TODO: 인증 모듈 완료 후 JWT에서 실제 user_id 추출 필요
+    
+    histories = (
+        db.query(WearHistory)
+        .filter(WearHistory.user_id == current_user_id) 
+        .order_by(WearHistory.worn_date.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return histories
