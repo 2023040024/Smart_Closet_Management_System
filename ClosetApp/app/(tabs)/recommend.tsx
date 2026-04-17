@@ -166,7 +166,13 @@ function OutfitItemCard({
       </View>
 
       {item.image ? (
-        <Image source={{ uri: item.image }} style={styles.itemImage} />
+        <View style={styles.imageBox}>
+          <Image
+            source={{ uri: item.image }}
+            style={styles.itemImage}
+            resizeMode="contain"
+          />
+        </View>
       ) : (
         <View style={styles.imagePlaceholder}>
           <Text style={styles.imagePlaceholderText}>이미지 없음</Text>
@@ -505,17 +511,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  imageBox: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    marginBottom: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
   itemImage: {
     width: '100%',
-    height: 180,
-    borderRadius: 12,
-    backgroundColor: '#E5E7EB',
-    marginBottom: 12,
-    resizeMode: 'cover',
+    height: '100%',
   },
   imagePlaceholder: {
     width: '100%',
-    height: 180,
+    height: 220,
     borderRadius: 12,
     backgroundColor: '#E5E7EB',
     alignItems: 'center',
