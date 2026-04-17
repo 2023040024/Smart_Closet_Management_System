@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import { ClothesItem, TAG_OPTIONS, useCloset } from '../_closetStore';
@@ -192,6 +193,7 @@ function OutfitItemCard({
 
 export default function RecommendScreen() {
   const { clothes } = useCloset();
+  const { width } = useWindowDimensions();
 
   const [filters, setFilters] = useState<RecommendFilterType>(INITIAL_FILTERS);
   const [expanded, setExpanded] =
@@ -237,6 +239,8 @@ export default function RecommendScreen() {
     setRecommendedOutfits([]);
     setHasSearched(false);
   };
+
+  const pageWidth = width - 64;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -325,19 +329,41 @@ export default function RecommendScreen() {
             </Text>
           </View>
         ) : (
-          recommendedOutfits.map((outfit, index) => (
-            <View key={index} style={styles.outfitCard}>
-              <Text style={styles.outfitTitle}>추천 코디 {index + 1}</Text>
-              <Text style={styles.outfitDescription}>
-                {buildRecommendReason(filters, outfit)}
-              </Text>
+          <>
+            <Text style={styles.swipeHint}>
+              좌우로 넘겨서 다른 추천 코디를 확인하세요.
+            </Text>
 
-              <OutfitItemCard label="아우터" item={outfit.outer} />
-              <OutfitItemCard label="상의" item={outfit.top} />
-              <OutfitItemCard label="하의" item={outfit.bottom} />
-              <OutfitItemCard label="신발" item={outfit.shoes} />
-            </View>
-          ))
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              nestedScrollEnabled
+              decelerationRate="fast"
+              snapToInterval={pageWidth}
+              snapToAlignment="start"
+              contentContainerStyle={styles.outfitSliderContent}
+            >
+              {recommendedOutfits.map((outfit, index) => (
+                <View
+                  key={index}
+                  style={[styles.outfitSlide, { width: pageWidth }]}
+                >
+                  <View style={styles.outfitCard}>
+                    <Text style={styles.outfitTitle}>추천 코디 {index + 1}</Text>
+                    <Text style={styles.outfitDescription}>
+                      {buildRecommendReason(filters, outfit)}
+                    </Text>
+
+                    <OutfitItemCard label="아우터" item={outfit.outer} />
+                    <OutfitItemCard label="상의" item={outfit.top} />
+                    <OutfitItemCard label="하의" item={outfit.bottom} />
+                    <OutfitItemCard label="신발" item={outfit.shoes} />
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </>
         )}
       </View>
     </ScrollView>
@@ -469,11 +495,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  swipeHint: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 12,
+    fontWeight: '600',
+  },
+  outfitSliderContent: {
+    paddingRight: 8,
+  },
+  outfitSlide: {
+    marginRight: 12,
+  },
   outfitCard: {
     backgroundColor: '#F8FAFC',
     borderRadius: 18,
     padding: 14,
-    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
