@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os, bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -40,7 +40,7 @@ def verify_password(plain: str, hashed: str) -> bool:
     )
 
 def create_token(user_id: int) -> str:
-    expire = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS)
+    expire = datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS)
     return jwt.encode({"sub": str(user_id), "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -65,7 +65,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
     # 2. 데이터베이스에서 사용자 조회
     # recommend.py에서 current_user.id를 사용하므로 모델의 ID 필드와 매칭
-    user = db.query(User).filter(User.user_id == int(user_id_from_token)).first()
+    user = db.query(User).filter(User.id == int(user_id_from_token)).first()
     
     if user is None:
         raise credentials_exception
@@ -80,14 +80,14 @@ def signup(body: UserSignup, db: Session = Depends(get_db)):
 
     new_user = User(
         email         = body.email,
-        password_hash = hash_password(body.password)
+        password_hash = bcrypt.hashpw(body.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
     return TokenResponse(
-        access_token = create_token(new_user.user_id),
+        access_token = create_token(new_user.id),
         user         = UserResponse.model_validate(new_user)
     )
 
@@ -99,7 +99,7 @@ def login(body: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다")
 
     return TokenResponse(
-        access_token = create_token(user.user_id),
+        access_token = create_token(user.id),
         user         = UserResponse.model_validate(user)
     )
 
@@ -110,7 +110,6 @@ def update_style(body: StyleUpdate,
                  current_user: User = Depends(get_current_user)):
     """
     선호 스타일 업데이트
-    실제로는 JWT 토큰에서 user_id 추출해야 함 (미들웨어 추가 후 연결)
     """
     current_user.preferred_style = body.preferred_style
     db.commit()

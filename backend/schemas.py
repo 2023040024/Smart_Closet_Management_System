@@ -45,9 +45,9 @@ class UserLogin(BaseModel):
     password: str
 
 class UserResponse(BaseModel):
-    user_id:         int
+    id:              int
     email:           str
-    preferred_style: Optional[StyleEnum]
+    preferred_style: Optional[StyleEnum] = None
     created_at:      datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -59,6 +59,11 @@ class TokenResponse(BaseModel):
 
 class StyleUpdate(BaseModel):
     preferred_style: StyleEnum
+
+    @field_validator('preferred_style', mode='before')
+    @classmethod
+    def validate_enums(cls, v: Any, info: Any) -> Any:
+        return map_korean_to_enum_logic(v, info)
 
 
 # ──────────────────────────────────────────────
@@ -122,14 +127,14 @@ class ClothesStatusUpdate(BaseModel):
 
 class ClothesResponse(BaseModel):
     clothes_id:     int
-    name:           str
-    category:       CategoryEnum
+    name:           Optional[str] = None
+    category:       Optional[CategoryEnum] = None
     top_fit:        Optional[TopFitEnum] = None
     bottom_fit:     Optional[BottomFitEnum] = None
-    color:          ColorEnum
-    season:         SeasonEnum
+    color:          Optional[ColorEnum] = None
+    season:         Optional[SeasonEnum] = None
     tone:           Optional[ToneEnum] = None
-    style:          StyleEnum
+    style:          Optional[StyleEnum] = None
     mood:           Optional[MoodEnum] = None
     material:       Optional[MaterialEnum] = None
     thickness:      Optional[ThicknessEnum] = None

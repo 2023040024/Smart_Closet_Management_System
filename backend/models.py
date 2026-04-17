@@ -1,10 +1,11 @@
 import enum
-from datetime import datetime, date
+from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean,
-    Date, DateTime, Enum, ForeignKey, Text
+    Date, DateTime, Enum, ForeignKey
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from database import Base
 
 
@@ -145,12 +146,12 @@ class FeedbackTpoEnum(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    user_id          = Column(Integer, primary_key=True, index=True)
+    id               = Column(Integer, primary_key=True, index=True)
     email            = Column(String(100), unique=True, nullable=False, index=True)
     password_hash    = Column(String(255), nullable=False)
     preferred_style  = Column(Enum(StyleEnum), nullable=True)
     temp_sensitivity = Column(Float, default=0.0)  # -2.0(더위) ~ +2.0(추위)
-    created_at       = Column(DateTime, default=datetime.utcnow)
+    created_at       = Column(DateTime(timezone=True), server_default=func.now())
 
     clothes      = relationship("Clothes", back_populates="owner")
     wear_history = relationship("WearHistory", back_populates="user")
@@ -161,7 +162,7 @@ class Clothes(Base):
     __tablename__ = "clothes"
 
     clothes_id     = Column(Integer, primary_key=True, index=True)
-    user_id        = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    user_id        = Column(Integer, ForeignKey("users.id"), nullable=False)
     name           = Column(String(100), nullable=False)
     category       = Column(Enum(CategoryEnum), nullable=False)
     color          = Column(Enum(ColorEnum), nullable=False)
@@ -179,7 +180,7 @@ class Clothes(Base):
     status         = Column(Enum(StatusEnum), default=StatusEnum.wearable)
     wear_count     = Column(Integer, default=0)
     last_worn_date = Column(Date, nullable=True)
-    created_at     = Column(DateTime, default=datetime.utcnow)
+    created_at     = Column(DateTime(timezone=True), server_default=func.now())
 
     owner        = relationship("User", back_populates="clothes")
     wear_history = relationship("WearHistory", back_populates="clothes")
@@ -199,14 +200,14 @@ class WearHistory(Base):
     __tablename__ = "wear_history"
 
     history_id           = Column(Integer, primary_key=True, index=True)
-    user_id              = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    user_id              = Column(Integer, ForeignKey("users.id"), nullable=False)
     clothes_id           = Column(Integer, ForeignKey("clothes.clothes_id"), nullable=False)
     worn_date            = Column(Date, nullable=False)
     feedback_temperature = Column(Enum(FeedbackTempEnum), nullable=True)
     feedback_fit         = Column(Enum(FeedbackFitEnum), nullable=True)
     feedback_tpo         = Column(Enum(FeedbackTpoEnum), nullable=True)
     memo                 = Column(String(200), nullable=True)
-    created_at           = Column(DateTime, default=datetime.utcnow)
+    created_at           = Column(DateTime(timezone=True), server_default=func.now())
 
     user    = relationship("User", back_populates="wear_history")
     clothes = relationship("Clothes", back_populates="wear_history")
@@ -216,14 +217,14 @@ class Outfit(Base):
     __tablename__ = "outfits"
 
     outfit_id         = Column(Integer, primary_key=True, index=True)
-    user_id           = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    user_id           = Column(Integer, ForeignKey("users.id"), nullable=False)
     recommended_date  = Column(Date, nullable=False)
     situation         = Column(Enum(SituationEnum), nullable=True)
     weather_condition = Column(String(50), nullable=True)  # 맑음, 흐림, 비, 눈
     temperature       = Column(Float, nullable=True)        # 기온(°C)
     total_score       = Column(Float, nullable=True)        # S 점수
     is_worn           = Column(Boolean, default=False)
-    created_at        = Column(DateTime, default=datetime.utcnow)
+    created_at        = Column(DateTime(timezone=True), server_default=func.now())
 
     user   = relationship("User", back_populates="outfits")
     items  = relationship("OutfitClothes", back_populates="outfit")
