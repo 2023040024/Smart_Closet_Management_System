@@ -94,16 +94,6 @@ export default function HomeScreen() {
     }));
   };
 
-  const goRecommend = () => {
-    router.push({
-      pathname: '/(tabs)/recommend',
-      params: {
-        category: selectedType === '전체' ? '' : selectedType,
-        ...filter,
-      },
-    });
-  };
-
   const openMenu = (item: ClothesItem) => {
     setSelectedItem(item);
     setMenuVisible(true);
@@ -135,6 +125,10 @@ export default function HomeScreen() {
         },
       },
     ]);
+  };
+
+  const goRecommend = () => {
+    router.push('/(tabs)/recommend');
   };
 
   const filteredClothes = useMemo(() => {
@@ -200,13 +194,13 @@ export default function HomeScreen() {
       onLongPress={() => openMenu(item)}
       delayLongPress={250}
     >
-    <View style={styles.cardImageWrap}>
-      <Image
-        source={{ uri: item.image }}
-        style={styles.cardImage}
-        resizeMode="contain"
-      />
-    </View>
+      <View style={styles.cardImageWrap}>
+        <Image
+          source={{ uri: item.image }}
+          style={styles.cardImage}
+          resizeMode="contain"
+        />
+      </View>
 
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle}>{item.tags.category || '미분류'}</Text>
@@ -224,7 +218,16 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>내 옷장</Text>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.title}>내 옷장</Text>
+          <Text style={styles.subtitle}>등록한 옷을 확인하고 관리해보세요.</Text>
+        </View>
+
+        <TouchableOpacity style={styles.moveRecommendBtn} onPress={goRecommend}>
+          <Text style={styles.moveRecommendText}>추천 화면</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.topRow}>
         <TouchableOpacity
@@ -236,20 +239,20 @@ export default function HomeScreen() {
 
         <View style={styles.typeContainer}>
           {CATEGORY_ORDER.map((type) => {
-  const isSelected = selectedType === type;
+            const isSelected = selectedType === type;
 
-  return (
-    <TouchableOpacity
-      key={type}
-      style={[styles.typeBtn, isSelected && styles.selected]}
-      onPress={() => setSelectedType(type)}
-    >
-      <Text style={isSelected ? styles.selectedText : styles.typeText}>
-        {type}
-      </Text>
-    </TouchableOpacity>
-  );
-})}
+            return (
+              <TouchableOpacity
+                key={type}
+                style={[styles.typeBtn, isSelected && styles.selected]}
+                onPress={() => setSelectedType(type)}
+              >
+                <Text style={isSelected ? styles.selectedText : styles.typeText}>
+                  {type}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
@@ -268,10 +271,6 @@ export default function HomeScreen() {
           {renderSection('TPO', 'tpo', FILTER_OPTIONS.tpo)}
         </View>
       )}
-
-      <TouchableOpacity style={styles.recommendBtn} onPress={goRecommend}>
-        <Text style={styles.recommendText}>코디 추천 받기</Text>
-      </TouchableOpacity>
 
       <FlatList
         data={filteredClothes}
@@ -325,10 +324,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
 
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    gap: 12,
+  },
+
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 4,
+  },
+
+  subtitle: {
+    fontSize: 13,
+    color: '#666',
+  },
+
+  moveRecommendBtn: {
+    backgroundColor: '#000',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+
+  moveRecommendText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   topRow: {
@@ -423,19 +448,6 @@ const styles = StyleSheet.create({
 
   tagText: {
     color: '#222',
-  },
-
-  recommendBtn: {
-    backgroundColor: '#000',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 14,
-    alignItems: 'center',
-  },
-
-  recommendText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
 
   listContent: {

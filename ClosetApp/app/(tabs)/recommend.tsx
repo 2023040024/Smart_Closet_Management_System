@@ -1,42 +1,61 @@
-import { useLocalSearchParams } from 'expo-router';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
-import { ClothesItem, useCloset } from '../_closetStore';
+import { ClothesItem, TAG_OPTIONS, useCloset } from '../_closetStore';
 
 type OutfitSet = {
+  outer?: ClothesItem;
   top?: ClothesItem;
   bottom?: ClothesItem;
-  outer?: ClothesItem;
   shoes?: ClothesItem;
-  accessory?: ClothesItem;
 };
 
-function normalizeParam(value: string | string[] | undefined): string[] {
-  if (!value) return [];
+type RecommendFilterType = {
+  category: string[];
+  season: string[];
+  style: string[];
+  mood: string[];
+  tpo: string[];
+};
 
-  if (Array.isArray(value)) {
-    return value
-      .flatMap((v) => v.split(','))
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
+const FILTER_OPTIONS = {
+  category: [...TAG_OPTIONS.category],
+  season: [...TAG_OPTIONS.season],
+  style: [...TAG_OPTIONS.style],
+  mood: [...TAG_OPTIONS.mood],
+  tpo: [...TAG_OPTIONS.tpo],
+};
 
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
+const FILTER_LABELS: Record<keyof RecommendFilterType, string> = {
+  category: '카테고리',
+  season: '계절',
+  style: '스타일',
+  mood: '분위기',
+  tpo: 'TPO',
+};
 
-function displayText(values: string[]) {
-  return values.length > 0 ? values.join(', ') : '선택되지 않음';
-}
+const INITIAL_FILTERS: RecommendFilterType = {
+  category: [],
+  season: [],
+  style: [],
+  mood: [],
+  tpo: [],
+};
+
+const INITIAL_EXPANDED: Record<keyof RecommendFilterType, boolean> = {
+  category: true,
+  season: true,
+  style: true,
+  mood: false,
+  tpo: true,
+};
 
 function includesAny(source?: string, targets?: string[]) {
   if (!targets || targets.length === 0) return true;
@@ -44,31 +63,30 @@ function includesAny(source?: string, targets?: string[]) {
   return targets.includes(source);
 }
 
-function filterItems(
-  items: ClothesItem[],
-  categoryFilters: string[],
-  seasonFilters: string[],
-  tpoFilters: string[],
-  styleFilters: string[],
-  moodFilters: string[]
-) {
+function filterItems(items: ClothesItem[], filters: RecommendFilterType) {
   return items.filter((item) => {
     const categoryMatch =
-      categoryFilters.length === 0 || categoryFilters.includes(item.tags.category);
+      filters.category.length === 0 || filters.category.includes(item.tags.category);
 
     const seasonMatch =
-      seasonFilters.length === 0 || includesAny(item.tags.season, seasonFilters);
-
-    const tpoMatch =
-      tpoFilters.length === 0 || includesAny(item.tags.tpo, tpoFilters);
+      filters.season.length === 0 || includesAny(item.tags.season, filters.season);
 
     const styleMatch =
-      styleFilters.length === 0 || includesAny(item.tags.style, styleFilters);
+      filters.style.length === 0 || includesAny(item.tags.style, filters.style);
 
     const moodMatch =
-      moodFilters.length === 0 || includesAny(item.tags.mood, moodFilters);
+      filters.mood.length === 0 || includesAny(item.tags.mood, filters.mood);
 
-    return categoryMatch && seasonMatch && tpoMatch && styleMatch && moodMatch;
+    const tpoMatch =
+      filters.tpo.length === 0 || includesAny(item.tags.tpo, filters.tpo);
+
+    return (
+      categoryMatch &&
+      seasonMatch &&
+      styleMatch &&
+      moodMatch &&
+      tpoMatch
+    );
   });
 }
 
@@ -77,18 +95,16 @@ function createOutfits(items: ClothesItem[]): OutfitSet[] {
   const bottoms = items.filter((item) => item.tags.category === '하의');
   const outers = items.filter((item) => item.tags.category === '아우터');
   const shoes = items.filter((item) => item.tags.category === '신발');
-  const accessories = items.filter((item) => item.tags.category === '악세사리');
 
   const outfits: OutfitSet[] = [];
   const maxCount = Math.min(3, tops.length, bottoms.length);
 
   for (let i = 0; i < maxCount; i++) {
     outfits.push({
+      outer: outers[i],
       top: tops[i],
       bottom: bottoms[i],
-      outer: outers[i],
       shoes: shoes[i],
-      accessory: accessories[i],
     });
   }
 
@@ -106,10 +122,32 @@ function getItemTitle(item: ClothesItem) {
   return `${color} ${category}`;
 }
 
-function getFitText(item: ClothesItem) {
-  if (item.tags.category === '상의') return item.tags.topFit;
-  if (item.tags.category === '하의') return item.tags.bottomFit;
-  return '';
+function buildRecommendReason(filters: RecommendFilterType, outfit: OutfitSet) {
+  const reasons: string[] = [];
+
+  if (filters.season.length > 0) {
+    reasons.push(`선택한 계절(${filters.season.join(', ')}) 조건을 반영했습니다`);
+  }
+
+  if (filters.style.length > 0) {
+    reasons.push(`선택한 스타일(${filters.style.join(', ')})에 맞는 조합을 우선 고려했습니다`);
+  }
+
+  if (filters.mood.length > 0) {
+    reasons.push(`선택한 분위기(${filters.mood.join(', ')})와 어울리는 아이템을 반영했습니다`);
+  }
+
+  if (filters.tpo.length > 0) {
+    reasons.push(`TPO(${filters.tpo.join(', ')})에 맞는 코디를 기준으로 추천했습니다`);
+  }
+
+  if (outfit.outer) {
+    reasons.push('아우터부터 보기 쉬운 순서로 정리했습니다');
+  } else {
+    reasons.push('현재 보유한 옷 기준으로 자연스러운 조합을 구성했습니다');
+  }
+
+  return reasons.join('. ') + '.';
 }
 
 function OutfitItemCard({
@@ -120,8 +158,6 @@ function OutfitItemCard({
   item?: ClothesItem;
 }) {
   if (!item) return null;
-
-  const fitText = getFitText(item);
 
   return (
     <View style={styles.itemCard}>
@@ -143,96 +179,136 @@ function OutfitItemCard({
         <TagChip text={item.tags.style} />
         <TagChip text={item.tags.mood} />
         <TagChip text={item.tags.tpo} />
-        <TagChip text={fitText} />
       </View>
     </View>
   );
 }
 
 export default function RecommendScreen() {
-  const params = useLocalSearchParams();
   const { clothes } = useCloset();
 
-  const categoryFilters = useMemo(
-    () => normalizeParam(params.category as string | string[] | undefined),
-    [params.category]
-  );
+  const [filters, setFilters] = useState<RecommendFilterType>(INITIAL_FILTERS);
+  const [expanded, setExpanded] =
+    useState<Record<keyof RecommendFilterType, boolean>>(INITIAL_EXPANDED);
+  const [recommendedOutfits, setRecommendedOutfits] = useState<OutfitSet[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  const seasonFilters = useMemo(
-    () => normalizeParam(params.season as string | string[] | undefined),
-    [params.season]
-  );
+  const toggleExpand = (key: keyof RecommendFilterType) => {
+    setExpanded((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
 
-  const tpoFilters = useMemo(
-    () => normalizeParam(params.tpo as string | string[] | undefined),
-    [params.tpo]
-  );
+  const toggleFilter = (key: keyof RecommendFilterType, value: string) => {
+    setFilters((prev) => {
+      const exists = prev[key].includes(value);
 
-  const styleFilters = useMemo(
-    () => normalizeParam(params.style as string | string[] | undefined),
-    [params.style]
-  );
+      return {
+        ...prev,
+        [key]: exists
+          ? prev[key].filter((item) => item !== value)
+          : [...prev[key], value],
+      };
+    });
+  };
 
-  const moodFilters = useMemo(
-    () => normalizeParam(params.mood as string | string[] | undefined),
-    [params.mood]
-  );
+  const selectedSummary = useMemo(() => {
+    const allSelected = Object.values(filters).flat();
+    return allSelected.length > 0 ? allSelected.join(', ') : '선택된 조건이 없습니다';
+  }, [filters]);
 
-  const filteredItems = useMemo(() => {
-    return filterItems(
-      clothes,
-      categoryFilters,
-      seasonFilters,
-      tpoFilters,
-      styleFilters,
-      moodFilters
-    );
-  }, [clothes, categoryFilters, seasonFilters, tpoFilters, styleFilters, moodFilters]);
+  const handleRecommend = () => {
+    const filteredItems = filterItems(clothes, filters);
+    const outfits = createOutfits(filteredItems);
 
-  const outfitResults = useMemo(() => {
-    return createOutfits(filteredItems);
-  }, [filteredItems]);
+    setRecommendedOutfits(outfits);
+    setHasSearched(true);
+  };
+
+  const resetFilters = () => {
+    setFilters(INITIAL_FILTERS);
+    setRecommendedOutfits([]);
+    setHasSearched(false);
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>코디 추천</Text>
       <Text style={styles.subtitle}>
-        상황에 맞는 코디를 추천해드릴게요.
+        추천 조건을 직접 선택하고 코디를 추천받아보세요.
       </Text>
+
+      <View style={styles.summaryBox}>
+        <Text style={styles.summaryLabel}>현재 선택 조건</Text>
+        <Text style={styles.summaryText}>{selectedSummary}</Text>
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>추천 조건</Text>
 
-        <View style={styles.inputBox}>
-          <Text style={styles.inputLabel}>카테고리</Text>
-          <Text style={styles.valueText}>{displayText(categoryFilters)}</Text>
-        </View>
+        {(Object.keys(FILTER_OPTIONS) as Array<keyof RecommendFilterType>).map((key) => (
+          <View key={key} style={styles.filterSection}>
+            <Pressable
+              style={styles.filterHeader}
+              onPress={() => toggleExpand(key)}
+            >
+              <Text style={styles.filterTitle}>{FILTER_LABELS[key]}</Text>
+              <Text style={styles.arrowText}>{expanded[key] ? '▲' : '▼'}</Text>
+            </Pressable>
 
-        <View style={styles.inputBox}>
-          <Text style={styles.inputLabel}>계절</Text>
-          <Text style={styles.valueText}>{displayText(seasonFilters)}</Text>
-        </View>
+            {expanded[key] && (
+              <View style={styles.filterChipWrap}>
+                {FILTER_OPTIONS[key].map((option) => {
+                  const isSelected = filters[key].includes(option);
 
-        <View style={styles.inputBox}>
-          <Text style={styles.inputLabel}>TPO</Text>
-          <Text style={styles.valueText}>{displayText(tpoFilters)}</Text>
-        </View>
+                  return (
+                    <Pressable
+                      key={option}
+                      style={[
+                        styles.filterChip,
+                        isSelected && styles.filterChipSelected,
+                      ]}
+                      onPress={() => toggleFilter(key, option)}
+                    >
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          isSelected && styles.filterChipTextSelected,
+                        ]}
+                      >
+                        {option}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        ))}
 
-        <View style={styles.inputBox}>
-          <Text style={styles.inputLabel}>스타일</Text>
-          <Text style={styles.valueText}>{displayText(styleFilters)}</Text>
-        </View>
+        <View style={styles.actionRow}>
+          <Pressable style={styles.resetButton} onPress={resetFilters}>
+            <Text style={styles.resetButtonText}>초기화</Text>
+          </Pressable>
 
-        <View style={styles.inputBox}>
-          <Text style={styles.inputLabel}>분위기</Text>
-          <Text style={styles.valueText}>{displayText(moodFilters)}</Text>
+          <Pressable style={styles.recommendButton} onPress={handleRecommend}>
+            <Text style={styles.recommendButtonText}>추천 받기</Text>
+          </Pressable>
         </View>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>추천 결과</Text>
 
-        {outfitResults.length === 0 ? (
+        {!hasSearched ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyTitle}>아직 추천 결과가 없습니다</Text>
+            <Text style={styles.emptyText}>
+              추천 조건을 선택한 뒤 추천 받기를 눌러주세요.
+            </Text>
+          </View>
+        ) : recommendedOutfits.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyTitle}>추천 결과가 없습니다</Text>
             <Text style={styles.emptyText}>
@@ -243,18 +319,17 @@ export default function RecommendScreen() {
             </Text>
           </View>
         ) : (
-          outfitResults.map((outfit, index) => (
+          recommendedOutfits.map((outfit, index) => (
             <View key={index} style={styles.outfitCard}>
               <Text style={styles.outfitTitle}>추천 코디 {index + 1}</Text>
               <Text style={styles.outfitDescription}>
-                선택한 조건을 반영한 코디 조합입니다.
+                {buildRecommendReason(filters, outfit)}
               </Text>
 
+              <OutfitItemCard label="아우터" item={outfit.outer} />
               <OutfitItemCard label="상의" item={outfit.top} />
               <OutfitItemCard label="하의" item={outfit.bottom} />
-              <OutfitItemCard label="아우터" item={outfit.outer} />
               <OutfitItemCard label="신발" item={outfit.shoes} />
-              <OutfitItemCard label="악세사리" item={outfit.accessory} />
             </View>
           ))
         )}
@@ -284,6 +359,24 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 22,
   },
+  summaryBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 20,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4B5563',
+    marginBottom: 6,
+  },
+  summaryText: {
+    fontSize: 15,
+    color: '#111827',
+    lineHeight: 22,
+    fontWeight: '600',
+  },
   section: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
@@ -296,25 +389,79 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 16,
   },
-  inputBox: {
+  filterSection: {
+    marginBottom: 12,
     backgroundColor: '#F9FAFB',
     borderRadius: 14,
     padding: 14,
-    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#EEF2F7',
   },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#4B5563',
-    marginBottom: 6,
+  filterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  valueText: {
+  filterTitle: {
     fontSize: 15,
+    fontWeight: '700',
     color: '#111827',
-    lineHeight: 22,
+  },
+  arrowText: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  filterChipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
+    gap: 8,
+  },
+  filterChip: {
+    backgroundColor: '#EEF2F7',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  filterChipSelected: {
+    backgroundColor: '#111827',
+  },
+  filterChipText: {
+    fontSize: 13,
+    color: '#374151',
     fontWeight: '600',
+  },
+  filterChipTextSelected: {
+    color: '#FFFFFF',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  resetButton: {
+    flex: 1,
+    backgroundColor: '#E5E7EB',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  resetButtonText: {
+    color: '#374151',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  recommendButton: {
+    flex: 1,
+    backgroundColor: '#111827',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  recommendButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   outfitCard: {
     backgroundColor: '#F8FAFC',

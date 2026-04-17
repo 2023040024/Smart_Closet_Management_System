@@ -18,7 +18,6 @@ type ClothingItem = {
   color: string;
 };
 
-// 👉 임시 옷 데이터 (나중에 API로 교체)
 const clothesData: ClothingItem[] = [
   { id: 'c1', name: '블랙 셔츠', category: '상의', color: '블랙' },
   { id: 'c2', name: '베이지 슬랙스', category: '하의', color: '베이지' },
@@ -26,7 +25,6 @@ const clothesData: ClothingItem[] = [
   { id: 'c4', name: '네이비 자켓', category: '아우터', color: '네이비' },
 ];
 
-// 👉 TPO (수정된 최종 버전)
 const tpoOptions = [
   '데일리',
   '비즈니스',
@@ -51,7 +49,6 @@ export default function HistoryCreateScreen() {
   const [temperature, setTemperature] = useState('');
   const [memo, setMemo] = useState('');
 
-  // 👉 카테고리별로 묶기
   const groupedClothes = useMemo(() => {
     return {
       상의: clothesData.filter((item) => item.category === '상의'),
@@ -61,16 +58,12 @@ export default function HistoryCreateScreen() {
     };
   }, []);
 
-  // 👉 옷 선택 토글
   const toggleCloth = (id: string) => {
     setSelectedClothes((prev) =>
-      prev.includes(id)
-        ? prev.filter((item) => item !== id)
-        : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
-  // 👉 공통 칩 UI
   const renderChips = (
     options: string[],
     selected: string,
@@ -102,7 +95,6 @@ export default function HistoryCreateScreen() {
     );
   };
 
-  // 👉 저장
   const handleSave = () => {
     if (selectedClothes.length === 0) {
       Alert.alert('안내', '옷을 선택해주세요.');
@@ -114,21 +106,27 @@ export default function HistoryCreateScreen() {
       return;
     }
 
-    const payload = {
+    const newHistoryItem = {
+      id: Date.now().toString(),
       date: today,
       clothesIds: selectedClothes,
+      style: fit || '-',
+      mood: temperature || '-',
       tpo,
-      fit,
-      temperature,
-      memo,
+      memo: memo.trim() || '메모 없음',
     };
-
-    console.log('저장 데이터:', payload);
 
     Alert.alert('저장 완료', '착용 기록이 저장되었습니다.', [
       {
         text: '확인',
-        onPress: () => router.back(),
+        onPress: () => {
+          router.push({
+            pathname: '/(tabs)/history',
+            params: {
+              newItem: JSON.stringify(newHistoryItem),
+            },
+          });
+        },
       },
     ]);
   };
@@ -139,19 +137,16 @@ export default function HistoryCreateScreen() {
 
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.content}>
-          
-          {/* 날짜 */}
           <View style={styles.section}>
             <Text style={styles.title}>날짜</Text>
             <Text style={styles.value}>{today}</Text>
           </View>
 
-          {/* 옷 선택 */}
           <View style={styles.section}>
             <Text style={styles.title}>오늘 입은 옷</Text>
 
             {Object.entries(groupedClothes).map(([category, items]) => (
-              <View key={category} style={{ marginTop: 10 }}>
+              <View key={category} style={styles.categoryBlock}>
                 <Text style={styles.subTitle}>{category}</Text>
 
                 <View style={styles.clothRow}>
@@ -167,7 +162,14 @@ export default function HistoryCreateScreen() {
                         ]}
                         onPress={() => toggleCloth(item.id)}
                       >
-                        <Text style={styles.clothName}>{item.name}</Text>
+                        <Text
+                          style={[
+                            styles.clothName,
+                            isSelected && styles.clothNameSelected,
+                          ]}
+                        >
+                          {item.name}
+                        </Text>
                       </Pressable>
                     );
                   })}
@@ -176,25 +178,21 @@ export default function HistoryCreateScreen() {
             ))}
           </View>
 
-          {/* TPO */}
           <View style={styles.section}>
             <Text style={styles.title}>TPO</Text>
             {renderChips(tpoOptions, tpo, setTpo)}
           </View>
 
-          {/* 핏 */}
           <View style={styles.section}>
             <Text style={styles.title}>핏</Text>
             {renderChips(fitOptions, fit, setFit)}
           </View>
 
-          {/* 체감온도 */}
           <View style={styles.section}>
             <Text style={styles.title}>체감온도</Text>
             {renderChips(temperatureOptions, temperature, setTemperature)}
           </View>
 
-          {/* 메모 */}
           <View style={styles.section}>
             <Text style={styles.title}>메모</Text>
             <TextInput
@@ -206,11 +204,9 @@ export default function HistoryCreateScreen() {
             />
           </View>
 
-          {/* 저장 버튼 */}
           <Pressable style={styles.saveButton} onPress={handleSave}>
             <Text style={styles.saveText}>저장하기</Text>
           </Pressable>
-
         </ScrollView>
       </SafeAreaView>
     </>
@@ -223,6 +219,10 @@ const styles = StyleSheet.create({
 
   section: {
     marginBottom: 20,
+  },
+
+  categoryBlock: {
+    marginTop: 10,
   },
 
   title: {
@@ -262,6 +262,10 @@ const styles = StyleSheet.create({
   clothName: {
     color: '#333',
     fontSize: 13,
+  },
+
+  clothNameSelected: {
+    color: '#fff',
   },
 
   chipRow: {
