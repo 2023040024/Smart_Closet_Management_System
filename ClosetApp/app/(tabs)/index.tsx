@@ -1,10 +1,12 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
   Image,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -85,6 +87,7 @@ export default function HomeScreen() {
   const { clothes, deleteClothes } = useCloset();
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const filterScrollRef = useRef<ScrollView | null>(null);
 
   const [selectedType, setSelectedType] = useState<'전체' | Category>('전체');
   const [showFilter, setShowFilter] = useState(false);
@@ -123,6 +126,28 @@ export default function HomeScreen() {
   const activeFilterCount = useMemo(() => {
     return Object.values(filter).filter(Boolean).length;
   }, [filter]);
+
+  const filteredClothes = useMemo(() => {
+    return clothes.filter((item) => {
+      const matchType =
+        selectedType === '전체' || item.tags.category === selectedType;
+
+      const matchFilter =
+        (!filter.style || item.tags.style === filter.style) &&
+        (!filter.mood || item.tags.mood === filter.mood) &&
+        (!filter.thickness || item.tags.thickness === filter.thickness) &&
+        (!filter.topFit || item.tags.topFit === filter.topFit) &&
+        (!filter.bottomFit || item.tags.bottomFit === filter.bottomFit) &&
+        (!filter.material || item.tags.material === filter.material) &&
+        (!filter.point || item.tags.point === filter.point) &&
+        (!filter.color || item.tags.color === filter.color) &&
+        (!filter.season || item.tags.season === filter.season) &&
+        (!filter.tone || item.tags.tone === filter.tone) &&
+        (!filter.tpo || item.tags.tpo === filter.tpo);
+
+      return matchType && matchFilter;
+    });
+  }, [clothes, selectedType, filter]);
 
   const toggleFilter = (category: keyof FilterType, value: string) => {
     setFilter((prev) => ({
@@ -191,27 +216,23 @@ export default function HomeScreen() {
     router.push('/(tabs)/recommend');
   };
 
-  const filteredClothes = useMemo(() => {
-    return clothes.filter((item) => {
-      const matchType =
-        selectedType === '전체' || item.tags.category === selectedType;
+  const handleFilterPageChange = (
+    e: NativeSyntheticEvent<NativeScrollEvent>
+  ) => {
+    const pageWidth = width - 32;
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const nextPage = Math.round(offsetX / pageWidth);
+    setCurrentFilterPage(nextPage);
+  };
 
-      const matchFilter =
-        (!filter.style || item.tags.style === filter.style) &&
-        (!filter.mood || item.tags.mood === filter.mood) &&
-        (!filter.thickness || item.tags.thickness === filter.thickness) &&
-        (!filter.topFit || item.tags.topFit === filter.topFit) &&
-        (!filter.bottomFit || item.tags.bottomFit === filter.bottomFit) &&
-        (!filter.material || item.tags.material === filter.material) &&
-        (!filter.point || item.tags.point === filter.point) &&
-        (!filter.color || item.tags.color === filter.color) &&
-        (!filter.season || item.tags.season === filter.season) &&
-        (!filter.tone || item.tags.tone === filter.tone) &&
-        (!filter.tpo || item.tags.tpo === filter.tpo);
-
-      return matchType && matchFilter;
+  const moveToFilterPage = (pageIndex: number) => {
+    const pageWidth = width - 32;
+    filterScrollRef.current?.scrollTo({
+      x: pageIndex * pageWidth,
+      animated: true,
     });
-  }, [clothes, selectedType, filter]);
+    setCurrentFilterPage(pageIndex);
+  };
 
   const renderSection = (
     label: string,
@@ -222,7 +243,7 @@ export default function HomeScreen() {
       <TouchableOpacity
         style={styles.filterItemHeader}
         onPress={() => toggleExpand(key)}
-        activeOpacity={0.8}
+        activeOpacity={0.85}
       >
         <View style={styles.filterItemHeaderLeft}>
           <Text style={styles.filterItemLabel}>{label}</Text>
@@ -291,12 +312,12 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
-  const ListHeader = () => {
-    const sliderWidth = width - 32;
-    const cardWidth = sliderWidth - 8;
+  const pageWidth = width - 32;
+  const innerCardWidth = pageWidth - 4;
 
-    return (
-      <View>
+  return (
+    <View style={styles.container}>
+      <View style={styles.topArea}>
         <View style={styles.headerRow}>
           <View style={styles.headerTextBox}>
             <Text style={styles.title}>내 옷장</Text>
@@ -369,41 +390,34 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView
+              ref={filterScrollRef}
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
-              decelerationRate="fast"
-              snapToInterval={sliderWidth}
-              snapToAlignment="start"
-              disableIntervalMomentum
-              onMomentumScrollEnd={(e) => {
-                const page = Math.round(
-                  e.nativeEvent.contentOffset.x / sliderWidth
-                );
-                setCurrentFilterPage(page);
-              }}
-              contentContainerStyle={styles.filterSliderContent}
+              onMomentumScrollEnd={handleFilterPageChange}
+              style={styles.filterSlider}
             >
               {FILTER_SECTIONS.map((section) => (
                 <View
                   key={section.title}
-                  style={[
-                    styles.filterSectionCard,
-                    { width: cardWidth, marginRight: 8 },
-                  ]}
+                  style={[styles.filterSlide, { width: pageWidth }]}
                 >
-                  <Text style={styles.filterSectionTitle}>{section.title}</Text>
-                  {section.items.map((sectionItem) =>
-                    renderSection(sectionItem.label, sectionItem.key, sectionItem.options)
-                  )}
+                  <View style={[styles.filterSectionCard, { width: innerCardWidth }]}>
+                    <Text style={styles.filterSectionTitle}>{section.title}</Text>
+                    {section.items.map((sectionItem) =>
+                      renderSection(sectionItem.label, sectionItem.key, sectionItem.options)
+                    )}
+                  </View>
                 </View>
               ))}
             </ScrollView>
 
             <View style={styles.paginationWrap}>
               {FILTER_SECTIONS.map((_, index) => (
-                <View
+                <TouchableOpacity
                   key={index}
+                  activeOpacity={0.8}
+                  onPress={() => moveToFilterPage(index)}
                   style={[
                     styles.paginationDot,
                     currentFilterPage === index && styles.paginationDotActive,
@@ -419,11 +433,7 @@ export default function HomeScreen() {
           <Text style={styles.resultCount}>{filteredClothes.length}개</Text>
         </View>
       </View>
-    );
-  };
 
-  return (
-    <View style={styles.container}>
       <FlatList
         data={filteredClothes}
         keyExtractor={(item) => item.id}
@@ -433,7 +443,6 @@ export default function HomeScreen() {
           filteredClothes.length === 0 ? styles.emptyContainer : styles.listContent
         }
         renderItem={renderCard}
-        ListHeaderComponent={ListHeader}
         ListEmptyComponent={
           <Text style={styles.emptyText}>조건에 맞는 옷이 없습니다.</Text>
         }
@@ -477,6 +486,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     backgroundColor: '#fff',
+  },
+
+  topArea: {
+    marginBottom: 8,
   },
 
   headerRow: {
@@ -634,8 +647,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  filterSliderContent: {
-    paddingRight: 8,
+  filterSlider: {
+    marginHorizontal: -2,
+  },
+
+  filterSlide: {
+    alignItems: 'center',
   },
 
   filterSectionCard: {
