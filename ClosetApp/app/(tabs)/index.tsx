@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  FlatList,
   Image,
   Modal,
   NativeScrollEvent,
@@ -283,8 +282,9 @@ export default function HomeScreen() {
     </View>
   );
 
-  const renderCard = ({ item }: { item: ClothesItem }) => (
+  const renderCard = (item: ClothesItem) => (
     <TouchableOpacity
+      key={item.id}
       style={styles.card}
       activeOpacity={0.9}
       onLongPress={() => openMenu(item)}
@@ -317,7 +317,10 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.topArea}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.headerRow}>
           <View style={styles.headerTextBox}>
             <Text style={styles.title}>내 옷장</Text>
@@ -432,22 +435,15 @@ export default function HomeScreen() {
           <Text style={styles.resultTitle}>옷 목록</Text>
           <Text style={styles.resultCount}>{filteredClothes.length}개</Text>
         </View>
-      </View>
 
-      <FlatList
-        data={filteredClothes}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={filteredClothes.length > 1 ? styles.columnWrapper : undefined}
-        contentContainerStyle={
-          filteredClothes.length === 0 ? styles.emptyContainer : styles.listContent
-        }
-        renderItem={renderCard}
-        ListEmptyComponent={
+        {filteredClothes.length === 0 ? (
           <Text style={styles.emptyText}>조건에 맞는 옷이 없습니다.</Text>
-        }
-        showsVerticalScrollIndicator={false}
-      />
+        ) : (
+          <View style={styles.grid}>
+            {filteredClothes.map((item) => renderCard(item))}
+          </View>
+        )}
+      </ScrollView>
 
       <Modal
         visible={menuVisible}
@@ -488,8 +484,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
 
-  topArea: {
-    marginBottom: 8,
+  scrollContent: {
+    paddingBottom: 28,
   },
 
   headerRow: {
@@ -787,11 +783,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  listContent: {
-    paddingBottom: 28,
-  },
-
-  columnWrapper: {
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
 
@@ -855,18 +849,12 @@ const styles = StyleSheet.create({
     color: '#7a7a7a',
   },
 
-  emptyContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 80,
-  },
-
   emptyText: {
     color: '#666',
     fontSize: 14,
     fontWeight: '500',
-    marginTop: 24,
+    textAlign: 'center',
+    paddingVertical: 40,
   },
 
   modalOverlay: {
