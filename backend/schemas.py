@@ -22,7 +22,7 @@ def map_korean_to_enum_logic(v: Any, info: Any) -> Any:
         'style': StyleEnum, 'top_fit': TopFitEnum, 'bottom_fit': BottomFitEnum,
         'tone': ToneEnum, 'mood': MoodEnum, 'material': MaterialEnum,
         'point': PointEnum, 'thickness': ThicknessEnum, 
-        'situation': SituationEnum, 'status': StatusEnum
+        'situation': SituationEnum, 'status': StatusEnum , 'preferred_style': StyleEnum
     }
     
     target_enum = enum_map.get(info.field_name)
@@ -47,7 +47,7 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     id:              int
     email:           str
-    preferred_style: Optional[StyleEnum] = None
+    preferred_style: Optional[StyleEnum]
     created_at:      datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -63,6 +63,7 @@ class StyleUpdate(BaseModel):
     @field_validator('preferred_style', mode='before')
     @classmethod
     def validate_enums(cls, v: Any, info: Any) -> Any:
+        print(f"--- 검증기 진입: 필드명={info.field_name}, 값={v} ---")
         return map_korean_to_enum_logic(v, info)
 
 

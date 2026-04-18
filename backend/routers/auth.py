@@ -111,7 +111,14 @@ def update_style(body: StyleUpdate,
     """
     선호 스타일 업데이트
     """
-    current_user.preferred_style = body.preferred_style
-    db.commit()
-    db.refresh(current_user)
-    return current_user
+    try:
+        current_user.preferred_style = body.preferred_style
+        db.commit()
+        db.refresh(current_user)
+        return UserResponse.model_validate(current_user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"스타일 업데이트 중 오류가 발생했습니다: {str(e)}"
+        )
