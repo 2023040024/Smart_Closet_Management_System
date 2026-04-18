@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -338,8 +339,14 @@ export default function HomeScreen() {
             onPress={() => setShowFilter((prev) => !prev)}
             activeOpacity={0.85}
           >
+            <Ionicons
+              name={showFilter ? 'close-outline' : 'options-outline'}
+              size={18}
+              color="#fff"
+              style={styles.primaryActionIcon}
+            />
             <Text style={styles.primaryActionText}>
-              {showFilter ? '필터 닫기' : '필터 열기'}
+              {showFilter ? '닫기' : '필터'}
             </Text>
           </TouchableOpacity>
 
@@ -539,19 +546,25 @@ const styles = StyleSheet.create({
 
   primaryActionBtn: {
     backgroundColor: '#111',
-    paddingVertical: 10,
+    paddingVertical: 11,
     paddingHorizontal: 14,
     borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 
   primaryActionBtnActive: {
-    opacity: 0.92,
+    opacity: 0.94,
+  },
+
+  primaryActionIcon: {
+    marginRight: 6,
   },
 
   primaryActionText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 
   secondaryActionBtn: {
@@ -671,13 +684,13 @@ const styles = StyleSheet.create({
   },
 
   filterItemHeader: {
-    minHeight: 42,
-    borderRadius: 14,
-    backgroundColor: '#fff',
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: '#f8f8f8',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#ededed',
+    borderColor: '#e4e4e4',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -697,14 +710,16 @@ const styles = StyleSheet.create({
   },
 
   activeBadge: {
-    backgroundColor: '#111',
+    backgroundColor: '#efefef',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
   },
 
   activeBadgeText: {
-    color: '#fff',
+    color: '#333',
     fontSize: 11,
     fontWeight: '700',
   },
@@ -723,24 +738,31 @@ const styles = StyleSheet.create({
   },
 
   optionChip: {
+    minHeight: 38,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#f1f1f1',
-    borderRadius: 999,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#dcdcdc',
+    justifyContent: 'center',
   },
 
   optionChipSelected: {
-    backgroundColor: '#111',
+    backgroundColor: '#f5f5f5',
+    borderColor: '#111',
+    borderWidth: 1.5,
   },
 
   optionChipText: {
-    color: '#222',
+    color: '#333',
     fontSize: 13,
     fontWeight: '600',
   },
 
   optionChipTextSelected: {
-    color: '#fff',
+    color: '#111',
+    fontWeight: '800',
   },
 
   paginationWrap: {
