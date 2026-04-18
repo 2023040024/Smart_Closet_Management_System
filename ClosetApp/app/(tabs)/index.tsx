@@ -11,6 +11,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { Category, ClothesItem, TAG_OPTIONS, useCloset } from '../_closetStore';
 
@@ -83,11 +84,13 @@ const FILTER_SECTIONS: Array<{
 export default function HomeScreen() {
   const { clothes, deleteClothes } = useCloset();
   const router = useRouter();
+  const { width } = useWindowDimensions();
 
   const [selectedType, setSelectedType] = useState<'전체' | Category>('전체');
   const [showFilter, setShowFilter] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ClothesItem | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [currentFilterPage, setCurrentFilterPage] = useState(0);
 
   const [filter, setFilter] = useState<FilterType>({
     style: '',
@@ -288,96 +291,136 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
-  const ListHeader = () => (
-    <View>
-      <View style={styles.headerRow}>
-        <View style={styles.headerTextBox}>
-          <Text style={styles.title}>내 옷장</Text>
-          <Text style={styles.subtitle}>등록한 옷을 확인하고 관리해보세요.</Text>
-        </View>
+  const ListHeader = () => {
+    const sliderWidth = width - 32;
+    const cardWidth = sliderWidth - 8;
 
-        <TouchableOpacity style={styles.moveRecommendBtn} onPress={goRecommend}>
-          <Text style={styles.moveRecommendText}>추천</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.actionRow}>
-        <TouchableOpacity
-          style={[styles.primaryActionBtn, showFilter && styles.primaryActionBtnActive]}
-          onPress={() => setShowFilter((prev) => !prev)}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.primaryActionText}>
-            {showFilter ? '필터 닫기' : '필터 열기'}
-          </Text>
-        </TouchableOpacity>
-
-        {activeFilterCount > 0 && (
-          <TouchableOpacity
-            style={styles.secondaryActionBtn}
-            onPress={resetFilters}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.secondaryActionText}>초기화 {activeFilterCount}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.typeScrollContent}
-        style={styles.typeScroll}
-      >
-        {CATEGORY_ORDER.map((type) => {
-          const isSelected = selectedType === type;
-
-          return (
-            <TouchableOpacity
-              key={type}
-              style={[styles.typeBtn, isSelected && styles.typeBtnSelected]}
-              onPress={() => setSelectedType(type)}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.typeText, isSelected && styles.typeTextSelected]}>
-                {type}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {showFilter && (
-        <View style={styles.filterPanel}>
-          <View style={styles.filterPanelHeader}>
-            <View style={styles.filterPanelHeaderText}>
-              <Text style={styles.filterPanelTitle}>상세 필터</Text>
-              <Text style={styles.filterPanelSubtitle}>
-                원하는 조건을 골라 옷을 빠르게 찾아보세요.
-              </Text>
-            </View>
-            <View style={styles.filterCountBadge}>
-              <Text style={styles.filterCountBadgeText}>{activeFilterCount}개 선택</Text>
-            </View>
+    return (
+      <View>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTextBox}>
+            <Text style={styles.title}>내 옷장</Text>
+            <Text style={styles.subtitle}>등록한 옷을 확인하고 관리해보세요.</Text>
           </View>
 
-          {FILTER_SECTIONS.map((section) => (
-            <View key={section.title} style={styles.filterSectionCard}>
-              <Text style={styles.filterSectionTitle}>{section.title}</Text>
-              {section.items.map((sectionItem) =>
-                renderSection(sectionItem.label, sectionItem.key, sectionItem.options)
-              )}
-            </View>
-          ))}
+          <TouchableOpacity style={styles.moveRecommendBtn} onPress={goRecommend}>
+            <Text style={styles.moveRecommendText}>추천</Text>
+          </TouchableOpacity>
         </View>
-      )}
 
-      <View style={styles.resultHeader}>
-        <Text style={styles.resultTitle}>옷 목록</Text>
-        <Text style={styles.resultCount}>{filteredClothes.length}개</Text>
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.primaryActionBtn, showFilter && styles.primaryActionBtnActive]}
+            onPress={() => setShowFilter((prev) => !prev)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.primaryActionText}>
+              {showFilter ? '필터 닫기' : '필터 열기'}
+            </Text>
+          </TouchableOpacity>
+
+          {activeFilterCount > 0 && (
+            <TouchableOpacity
+              style={styles.secondaryActionBtn}
+              onPress={resetFilters}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.secondaryActionText}>초기화 {activeFilterCount}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.typeScrollContent}
+          style={styles.typeScroll}
+        >
+          {CATEGORY_ORDER.map((type) => {
+            const isSelected = selectedType === type;
+
+            return (
+              <TouchableOpacity
+                key={type}
+                style={[styles.typeBtn, isSelected && styles.typeBtnSelected]}
+                onPress={() => setSelectedType(type)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.typeText, isSelected && styles.typeTextSelected]}>
+                  {type}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {showFilter && (
+          <View style={styles.filterPanel}>
+            <View style={styles.filterPanelHeader}>
+              <View style={styles.filterPanelHeaderText}>
+                <Text style={styles.filterPanelTitle}>상세 필터</Text>
+                <Text style={styles.filterPanelSubtitle}>
+                  좌우로 넘기면서 그룹별로 필터를 볼 수 있어요.
+                </Text>
+              </View>
+              <View style={styles.filterCountBadge}>
+                <Text style={styles.filterCountBadgeText}>{activeFilterCount}개 선택</Text>
+              </View>
+            </View>
+
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToInterval={sliderWidth}
+              snapToAlignment="start"
+              disableIntervalMomentum
+              onMomentumScrollEnd={(e) => {
+                const page = Math.round(
+                  e.nativeEvent.contentOffset.x / sliderWidth
+                );
+                setCurrentFilterPage(page);
+              }}
+              contentContainerStyle={styles.filterSliderContent}
+            >
+              {FILTER_SECTIONS.map((section) => (
+                <View
+                  key={section.title}
+                  style={[
+                    styles.filterSectionCard,
+                    { width: cardWidth, marginRight: 8 },
+                  ]}
+                >
+                  <Text style={styles.filterSectionTitle}>{section.title}</Text>
+                  {section.items.map((sectionItem) =>
+                    renderSection(sectionItem.label, sectionItem.key, sectionItem.options)
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.paginationWrap}>
+              {FILTER_SECTIONS.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.paginationDot,
+                    currentFilterPage === index && styles.paginationDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        <View style={styles.resultHeader}>
+          <Text style={styles.resultTitle}>옷 목록</Text>
+          <Text style={styles.resultCount}>{filteredClothes.length}개</Text>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -521,7 +564,6 @@ const styles = StyleSheet.create({
 
   typeScrollContent: {
     paddingRight: 8,
-    gap: 8,
   },
 
   typeBtn: {
@@ -592,13 +634,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
+  filterSliderContent: {
+    paddingRight: 8,
+  },
+
   filterSectionCard: {
     backgroundColor: '#fafafa',
     borderWidth: 1,
     borderColor: '#ededed',
     borderRadius: 18,
     padding: 14,
-    marginBottom: 10,
   },
 
   filterSectionTitle: {
@@ -683,6 +728,26 @@ const styles = StyleSheet.create({
 
   optionChipTextSelected: {
     color: '#fff',
+  },
+
+  paginationWrap: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 6,
+  },
+
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#d5d5d5',
+  },
+
+  paginationDotActive: {
+    width: 20,
+    backgroundColor: '#111',
   },
 
   resultHeader: {
