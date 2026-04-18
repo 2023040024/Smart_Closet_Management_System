@@ -1,4 +1,4 @@
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -6,7 +6,6 @@ import {
   FlatList,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -45,27 +44,12 @@ type HistoryApiItem = {
   };
 };
 
-const filterOptions = [
-  '전체',
-  '데일리',
-  '비즈니스',
-  '면접',
-  '결혼식',
-  '장례식',
-  '운동',
-  '데이트',
-  '모임',
-  '여행',
-];
+const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여행', '운동', '모임'];
 
 /**
- * 환경에 맞게 꼭 수정
- *
- * - Android 에뮬레이터: http://10.0.2.2:8000
- * - iOS 시뮬레이터: http://localhost:8000
- * - 실제 폰(Expo Go): http://내PC_IP주소:8000
+ * 실제 폰(Expo Go) 테스트 시 PC IPv4 주소로 수정
  */
-const API_BASE_URL = 'http://10.0.2.2:8000';
+const API_BASE_URL = 'http://192.168.1.122:8000';
 
 function formatDate(dateString?: string) {
   if (!dateString) return '날짜 없음';
@@ -90,10 +74,6 @@ function mapApiHistoryToUi(item: HistoryApiItem): WearHistoryItem {
 }
 
 export default function HistoryScreen() {
-  const params = useLocalSearchParams<{
-    newItem?: string;
-  }>();
-
   const [selectedFilter, setSelectedFilter] = useState('전체');
   const [historyList, setHistoryList] = useState<WearHistoryItem[]>([]);
   const [clothesMap, setClothesMap] = useState<Record<string, ClothingItem>>({});
@@ -101,6 +81,12 @@ export default function HistoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const getClothesByIds = (ids: string[]) => {
+    return ids
+      .map((id) => clothesMap[id])
+      .filter(Boolean) as ClothingItem[];
+  };
 
   const fetchHistoryList = useCallback(async (isRefresh = false) => {
     try {
@@ -179,10 +165,6 @@ export default function HistoryScreen() {
     return historyList.filter((item) => item.tpo === selectedFilter);
   }, [historyList, selectedFilter]);
 
-  const getClothesByIds = (ids: string[]) => {
-    return ids.map((id) => clothesMap[id]).filter(Boolean) as ClothingItem[];
-  };
-
   const deleteHistoryByApi = async (id: string) => {
     const numericId = Number(id);
 
@@ -206,11 +188,11 @@ export default function HistoryScreen() {
     }
 
     if (!response.ok) {
-      const errorMessage =
+      const message =
         responseData?.detail ||
         responseData?.message ||
         `삭제 실패 (${response.status})`;
-      throw new Error(errorMessage);
+      throw new Error(message);
     }
 
     return responseData;
@@ -227,18 +209,10 @@ export default function HistoryScreen() {
         onPress: async () => {
           try {
             setDeletingId(id);
-
-            const result = await deleteHistoryByApi(id);
-
+            await deleteHistoryByApi(id);
             setHistoryList((prev) => prev.filter((item) => item.id !== id));
-
-            Alert.alert(
-              '삭제 완료',
-              result?.message || '착용 기록이 삭제되었습니다.'
-            );
           } catch (error) {
             console.error('삭제 실패:', error);
-
             Alert.alert(
               '삭제 실패',
               error instanceof Error
@@ -276,7 +250,6 @@ export default function HistoryScreen() {
 
   const renderItem = ({ item }: { item: WearHistoryItem }) => {
     const clothes = getClothesByIds(item.clothesIds);
-    const isDeleting = deletingId === item.id;
 
     return (
       <View style={styles.card}>
@@ -295,7 +268,7 @@ export default function HistoryScreen() {
           ) : (
             <View style={styles.clothBox}>
               <Text style={styles.clothCategory}>옷 정보</Text>
-              <Text style={styles.clothName}>연결된 옷 정보 없음</Text>
+              <Text style={styles.clothName}>표시할 옷 정보 없음</Text>
             </View>
           )}
         </View>
@@ -309,22 +282,18 @@ export default function HistoryScreen() {
           <Pressable
             style={styles.actionButton}
             onPress={() => handleDetailPress(item)}
-            disabled={isDeleting}
+            disabled={deletingId === item.id}
           >
             <Text style={styles.actionButtonText}>상세보기</Text>
           </Pressable>
 
           <Pressable
-            style={[
-              styles.actionButton,
-              styles.deleteButton,
-              isDeleting && styles.disabledButton,
-            ]}
+            style={[styles.actionButton, styles.deleteButton]}
             onPress={() => handleDelete(item.id)}
-            disabled={isDeleting}
+            disabled={deletingId === item.id}
           >
             <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-              {isDeleting ? '삭제 중...' : '삭제'}
+              {deletingId === item.id ? '삭제 중...' : '삭제'}
             </Text>
           </Pressable>
         </View>
@@ -338,6 +307,10 @@ export default function HistoryScreen() {
       <Text style={styles.emptyDescription}>
         다른 필터를 선택하거나 새 기록을 추가해보세요.
       </Text>
+
+      <Pressable style={styles.emptyAddButton} onPress={handleCreatePress}>
+        <Text style={styles.emptyAddButtonText}>기록 추가</Text>
+      </Pressable>
     </View>
   );
 
@@ -345,7 +318,7 @@ export default function HistoryScreen() {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>착용 기록 불러오는 중...</Text>
+        <Text style={styles.emptyDescription}>착용 기록 불러오는 중...</Text>
       </SafeAreaView>
     );
   }
@@ -353,67 +326,65 @@ export default function HistoryScreen() {
   if (errorMessage && historyList.length === 0) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <Text style={styles.errorTitle}>기록을 불러오지 못했습니다</Text>
-        <Text style={styles.errorDescription}>{errorMessage}</Text>
+        <Text style={styles.emptyTitle}>기록을 불러오지 못했습니다</Text>
+        <Text style={styles.emptyDescription}>{errorMessage}</Text>
 
-        <Pressable
-          style={styles.retryButton}
-          onPress={() => fetchHistoryList()}
-        >
-          <Text style={styles.retryButtonText}>다시 시도</Text>
-        </Pressable>
+        <View style={styles.errorButtonRow}>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => fetchHistoryList()}
+          >
+            <Text style={styles.actionButtonText}>다시 시도</Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.actionButton, styles.headerAddButton]}
+            onPress={handleCreatePress}
+          >
+            <Text style={[styles.actionButtonText, styles.headerAddButtonText]}>
+              기록 추가
+            </Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.headerRow}>
+      <View style={styles.header}>
         <Text style={styles.title}>착용 기록</Text>
 
-        <Pressable style={styles.addButton} onPress={handleCreatePress}>
-          <Text style={styles.addButtonText}>+ 추가</Text>
+        <Pressable style={styles.headerAddButton} onPress={handleCreatePress}>
+          <Text style={styles.headerAddButtonText}>기록 추가</Text>
         </Pressable>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterScrollContent}
-        style={styles.filterScroll}
-      >
-        <View style={styles.filterRow}>
-          {filterOptions.map((filter) => {
-            const isSelected = selectedFilter === filter;
+      <View style={styles.filterRow}>
+        {filterOptions.map((filter) => {
+          const isSelected = selectedFilter === filter;
 
-            return (
-              <Pressable
-                key={filter}
+          return (
+            <Pressable
+              key={filter}
+              style={[
+                styles.filterChip,
+                isSelected && styles.filterChipSelected,
+              ]}
+              onPress={() => setSelectedFilter(filter)}
+            >
+              <Text
                 style={[
-                  styles.filterChip,
-                  isSelected && styles.filterChipSelected,
+                  styles.filterChipText,
+                  isSelected && styles.filterChipTextSelected,
                 ]}
-                onPress={() => setSelectedFilter(filter)}
               >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    isSelected && styles.filterChipTextSelected,
-                  ]}
-                >
-                  {filter}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </ScrollView>
-
-      {errorMessage ? (
-        <View style={styles.inlineErrorBox}>
-          <Text style={styles.inlineErrorText}>{errorMessage}</Text>
-        </View>
-      ) : null}
+                {filter}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
       <FlatList
         data={filteredHistoryData}
@@ -439,73 +410,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
   },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 15,
-    color: '#555',
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#222',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  errorDescription: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#111',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  headerRow: {
+  header: {
+    marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: '#111',
   },
-  addButton: {
+  headerAddButton: {
     backgroundColor: '#111',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
   },
-  addButtonText: {
+  headerAddButtonText: {
     color: '#fff',
     fontSize: 13,
-    fontWeight: '600',
-  },
-  filterScroll: {
-    marginBottom: 16,
-  },
-  filterScrollContent: {
-    paddingRight: 8,
+    fontWeight: '700',
   },
   filterRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 16,
   },
   filterChip: {
     backgroundColor: '#f1f1f1',
@@ -523,19 +454,6 @@ const styles = StyleSheet.create({
   },
   filterChipTextSelected: {
     color: '#fff',
-  },
-  inlineErrorBox: {
-    backgroundColor: '#fff4f4',
-    borderWidth: 1,
-    borderColor: '#f1caca',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
-  },
-  inlineErrorText: {
-    color: '#b23b3b',
-    fontSize: 13,
   },
   listContent: {
     paddingBottom: 24,
@@ -614,9 +532,6 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: '#c0392b',
   },
-  disabledButton: {
-    opacity: 0.6,
-  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -633,5 +548,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#777',
     textAlign: 'center',
+  },
+  emptyAddButton: {
+    marginTop: 16,
+    backgroundColor: '#111',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  emptyAddButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  errorButtonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
   },
 });
