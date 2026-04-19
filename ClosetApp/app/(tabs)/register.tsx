@@ -1,9 +1,19 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-import { ClothesItem, ClothesTags, EMPTY_TAGS, TAG_OPTIONS, useCloset } from '../_closetStore';
+import { ClothesTags, EMPTY_TAGS, TAG_OPTIONS } from '../_closetStore';
+
+const API_BASE_URL = 'http://192.168.1.122:8000';
 
 function Chip({
   label,
@@ -15,14 +25,93 @@ function Chip({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity onPress={onPress} style={[styles.chip, selected && styles.chipSelected]}>
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.chip, selected && styles.chipSelected]}
+    >
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
 
+function getImageMimeType(uri: string) {
+  const lowerUri = uri.toLowerCase();
+
+  if (lowerUri.endsWith('.png')) return 'image/png';
+  if (lowerUri.endsWith('.heic')) return 'image/heic';
+  if (lowerUri.endsWith('.webp')) return 'image/webp';
+
+  return 'image/jpeg';
+}
+
+function getImageFileName(uri: string) {
+  const parts = uri.split('/');
+  const lastPart = parts[parts.length - 1];
+
+  if (lastPart && lastPart.includes('.')) {
+    return lastPart;
+  }
+
+  return `clothes_${Date.now()}.jpg`;
+}
+
+function getClothesName(selected: ClothesTags) {
+  const parts: string[] = [];
+
+  if (selected.color) parts.push(selected.color);
+
+  if (selected.category === '상의' && selected.topFit) {
+    parts.push(selected.topFit);
+  }
+
+  if (selected.category === '하의' && selected.bottomFit) {
+    parts.push(selected.bottomFit);
+  }
+
+  if (selected.category) parts.push(selected.category);
+
+  if (parts.length === 0) {
+    return '이름없는 옷';
+  }
+
+  return parts.join(' ');
+}
+
+function getFitValue(selected: ClothesTags) {
+  if (selected.category === '상의') return selected.topFit;
+  if (selected.category === '하의') return selected.bottomFit;
+  return '';
+}
+
+function stringifyErrorDetail(responseData: any, status: number) {
+  if (typeof responseData?.detail === 'string') {
+    return responseData.detail;
+  }
+
+  if (Array.isArray(responseData?.detail)) {
+    return responseData.detail
+      .map((item: any) => {
+        if (typeof item === 'string') return item;
+        if (item?.msg) return item.msg;
+        return JSON.stringify(item);
+      })
+      .join('\n');
+  }
+
+  if (responseData?.detail && typeof responseData.detail === 'object') {
+    return JSON.stringify(responseData.detail);
+  }
+
+  if (typeof responseData?.message === 'string') {
+    return responseData.message;
+  }
+
+  return `등록 실패 (${status})`;
+}
+
 export default function RegisterScreen() {
-  const { addClothes } = useCloset();
   const [image, setImage] = useState<string | null>(null);
   const [selected, setSelected] = useState<ClothesTags>(EMPTY_TAGS);
   const [loading, setLoading] = useState(false);
@@ -75,7 +164,63 @@ export default function RegisterScreen() {
     });
   };
 
-    const handleSave = () => {
+  const saveClothesToApi = async () => {
+    if (!image) {
+      throw new Error('이미지가 없습니다.');
+    }
+
+    const formData = new FormData();
+
+    const generatedName = getClothesName(selected);
+    const fitValue = getFitValue(selected);
+
+    formData.append('name', generatedName);
+    formData.append('category', selected.category || '');
+    formData.append('color', selected.color || '');
+    formData.append('season', selected.season || '');
+    formData.append('style', selected.style || '');
+
+    if (selected.material) {
+      formData.append('material', selected.material);
+    }
+
+    if (selected.thickness) {
+      formData.append('thickness', selected.thickness);
+    }
+
+    if (fitValue) {
+      formData.append('fit', fitValue);
+    }
+
+    formData.append('image', {
+      uri: image,
+      name: getImageFileName(image),
+      type: getImageMimeType(image),
+    } as any);
+
+    const response = await fetch(`${API_BASE_URL}/clothes`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    let responseData: any = null;
+
+    try {
+      responseData = await response.json();
+    } catch {
+      responseData = null;
+    }
+
+    console.log('clothes register response:', responseData);
+
+    if (!response.ok) {
+      throw new Error(stringifyErrorDetail(responseData, response.status));
+    }
+
+    return responseData;
+  };
+
+  const handleSave = async () => {
     if (!image) {
       Alert.alert('입력 확인', '이미지를 먼저 선택해주세요.');
       return;
@@ -96,21 +241,46 @@ export default function RegisterScreen() {
       return;
     }
 
-    setLoading(true);
+    if (!selected.color) {
+      Alert.alert('입력 확인', '색을 선택해주세요.');
+      return;
+    }
 
-    const newItem: ClothesItem = {
-      id: Date.now().toString(),
-      image,
-      createdAt: new Date().toISOString(),
-      tags: selected,
-    };
+    if (!selected.season) {
+      Alert.alert('입력 확인', '계절을 선택해주세요.');
+      return;
+    }
 
-    addClothes(newItem);
+    if (!selected.style) {
+      Alert.alert('입력 확인', '스타일을 선택해주세요.');
+      return;
+    }
 
-    setTimeout(() => {
+    try {
+      setLoading(true);
+
+      await saveClothesToApi();
+
+      Alert.alert('등록 완료', '옷이 서버에 등록되었습니다.', [
+        {
+          text: '확인',
+          onPress: () => {
+            setImage(null);
+            setSelected(EMPTY_TAGS);
+            router.replace('/(tabs)');
+          },
+        },
+      ]);
+    } catch (error) {
+      console.error('옷 등록 실패:', error);
+
+      Alert.alert(
+        '등록 실패',
+        error instanceof Error ? error.message : '옷 등록 중 오류가 발생했습니다.'
+      );
+    } finally {
       setLoading(false);
-      router.replace('/(tabs)');
-    }, 150);
+    }
   };
 
   const renderChips = <K extends keyof ClothesTags>(items: readonly string[], key: K) => (

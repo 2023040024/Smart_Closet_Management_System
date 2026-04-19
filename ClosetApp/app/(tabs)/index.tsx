@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -15,7 +16,9 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Category, ClothesItem, TAG_OPTIONS, useCloset } from '../_closetStore';
+import { Category, ClothesItem, EMPTY_TAGS, TAG_OPTIONS } from '../_closetStore';
+
+const API_BASE_URL = 'http://192.168.1.122:8000';
 
 const CATEGORY_ORDER: Array<'전체' | Category> = ['전체', ...TAG_OPTIONS.category];
 
@@ -31,6 +34,28 @@ type FilterType = {
   season: string;
   tone: string;
   tpo: string;
+};
+
+type ClothesApiItem = {
+  clothes_id?: number;
+  id?: number;
+  name?: string;
+  category?: string;
+  color?: string;
+  season?: string;
+  tone?: string;
+  style?: string;
+  mood?: string;
+  material?: string;
+  thickness?: string;
+  point?: string;
+  tpo?: string;
+  situation?: string;
+  fit?: string;
+  top_fit?: string | null;
+  bottom_fit?: string | null;
+  image?: string;
+  image_url?: string;
 };
 
 const FILTER_OPTIONS = {
@@ -83,17 +108,120 @@ const FILTER_SECTIONS: Array<{
   },
 ];
 
+function normalizeCategory(category?: string): Category {
+  const value = (category || '').trim().toLowerCase();
+
+  if (value === '상의' || value === 'top' || value === 'tops' || value === 'shirt') {
+    return '상의';
+  }
+
+  if (value === '하의' || value === 'bottom' || value === 'bottoms' || value === 'pants') {
+    return '하의';
+  }
+
+  if (value === '아우터' || value === 'outer' || value === 'outerwear' || value === 'jacket') {
+    return '아우터';
+  }
+
+  if (value === '신발' || value === 'shoe' || value === 'shoes' || value === 'sneakers') {
+    return '신발';
+  }
+
+  return '악세사리';
+}
+
+function resolveImageUri(image?: string) {
+  if (!image) return '';
+
+  if (
+    image.startsWith('http://') ||
+    image.startsWith('https://') ||
+    image.startsWith('file://')
+  ) {
+    return image;
+  }
+
+  if (image.startsWith('/')) {
+    return `${API_BASE_URL}${image}`;
+  }
+
+  return `${API_BASE_URL}/${image}`;
+}
+
+function pickValidTag<T extends readonly string[]>(
+  options: T,
+  value?: string | null
+): T[number] | '' {
+  if (!value) return '';
+
+  return options.includes(value) ? (value as T[number]) : '';
+}
+
+function mapApiItemToClothesItem(item: ClothesApiItem): ClothesItem | null {
+  const rawId = item.clothes_id ?? item.id;
+
+  if (!rawId) return null;
+
+  const category = normalizeCategory(item.category);
+  const fitValue = item.fit ?? item.top_fit ?? item.bottom_fit ?? '';
+
+  const color = pickValidTag(TAG_OPTIONS.color, item.color);
+  const season = pickValidTag(TAG_OPTIONS.season, item.season);
+  const tone = pickValidTag(TAG_OPTIONS.tone, item.tone);
+  const style = pickValidTag(TAG_OPTIONS.style, item.style);
+  const mood = pickValidTag(TAG_OPTIONS.mood, item.mood);
+  const material = pickValidTag(TAG_OPTIONS.material, item.material);
+  const thickness = pickValidTag(TAG_OPTIONS.thickness, item.thickness);
+  const point = pickValidTag(TAG_OPTIONS.point, item.point);
+  const tpo = pickValidTag(TAG_OPTIONS.tpo, item.tpo ?? item.situation);
+
+  const topFit =
+    category === '상의'
+      ? pickValidTag(TAG_OPTIONS.topFit, fitValue)
+      : '';
+
+  const bottomFit =
+    category === '하의'
+      ? pickValidTag(TAG_OPTIONS.bottomFit, fitValue)
+      : '';
+
+  return {
+    id: String(rawId),
+    image: resolveImageUri(item.image_url ?? item.image),
+    createdAt: new Date().toISOString(),
+    tags: {
+      ...EMPTY_TAGS,
+      category,
+      color,
+      season,
+      tone,
+      style,
+      mood,
+      material,
+      thickness,
+      point,
+      tpo,
+      topFit,
+      bottomFit,
+    },
+  };
+}
+
 export default function HomeScreen() {
-  const { clothes, deleteClothes } = useCloset();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const filterScrollRef = useRef<ScrollView | null>(null);
+
+  const [clothes, setClothes] = useState<ClothesItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const [selectedType, setSelectedType] = useState<'전체' | Category>('전체');
   const [showFilter, setShowFilter] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ClothesItem | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [currentFilterPage, setCurrentFilterPage] = useState(0);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [filter, setFilter] = useState<FilterType>({
     style: '',
@@ -122,6 +250,52 @@ export default function HomeScreen() {
     tone: false,
     tpo: true,
   });
+
+  const fetchClothes = useCallback(async () => {
+    try {
+      setLoading(true);
+      setErrorMessage('');
+
+      const response = await fetch(`${API_BASE_URL}/clothes`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      let data: ClothesApiItem[] = [];
+
+      try {
+        data = await response.json();
+      } catch {
+        data = [];
+      }
+
+      if (!response.ok) {
+        throw new Error(`옷 목록 조회 실패 (${response.status})`);
+      }
+
+      const mapped = data
+        .map(mapApiItemToClothesItem)
+        .filter(Boolean) as ClothesItem[];
+
+      setClothes(mapped);
+    } catch (error) {
+      console.error('옷 목록 불러오기 실패:', error);
+      setErrorMessage(
+        error instanceof Error ? error.message : '옷 목록을 불러오지 못했습니다.'
+      );
+      setClothes([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchClothes();
+    }, [fetchClothes])
+  );
 
   const activeFilterCount = useMemo(() => {
     return Object.values(filter).filter(Boolean).length;
@@ -191,22 +365,63 @@ export default function HomeScreen() {
 
   const goDetail = () => {
     if (!selectedItem) return;
+
     const id = selectedItem.id;
     closeMenu();
     router.push({ pathname: '/detail', params: { id } });
   };
 
   const handleDelete = () => {
-    if (!selectedItem) return;
+    if (!selectedItem || deletingId) return;
 
     Alert.alert('삭제 확인', '이 옷을 삭제할까요?', [
       { text: '취소', style: 'cancel' },
       {
         text: '삭제',
         style: 'destructive',
-        onPress: () => {
-          deleteClothes(selectedItem.id);
-          closeMenu();
+        onPress: async () => {
+          try {
+            setDeletingId(selectedItem.id);
+
+            const response = await fetch(
+              `${API_BASE_URL}/clothes/${Number(selectedItem.id)}`,
+              {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+
+            let responseData: any = null;
+
+            try {
+              responseData = await response.json();
+            } catch {
+              responseData = null;
+            }
+
+            if (!response.ok) {
+              const message =
+                responseData?.detail ||
+                responseData?.message ||
+                `삭제 실패 (${response.status})`;
+              throw new Error(message);
+            }
+
+            closeMenu();
+            await fetchClothes();
+          } catch (error) {
+            console.error('옷 삭제 실패:', error);
+            Alert.alert(
+              '삭제 실패',
+              error instanceof Error
+                ? error.message
+                : '옷을 삭제하지 못했습니다.'
+            );
+          } finally {
+            setDeletingId(null);
+          }
         },
       },
     ]);
@@ -292,11 +507,18 @@ export default function HomeScreen() {
       delayLongPress={250}
     >
       <View style={styles.cardImageWrap}>
-        <Image
-          source={{ uri: item.image }}
-          style={styles.cardImage}
-          resizeMode="contain"
-        />
+        {item.image ? (
+          <Image
+            source={{ uri: item.image }}
+            style={styles.cardImage}
+            resizeMode="contain"
+          />
+        ) : (
+          <View style={styles.imageFallback}>
+            <Ionicons name="image-outline" size={28} color="#888" />
+            <Text style={styles.imageFallbackText}>이미지 없음</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.cardBody}>
@@ -315,6 +537,15 @@ export default function HomeScreen() {
 
   const pageWidth = width - 32;
   const innerCardWidth = pageWidth - 4;
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.loadingText}>옷 목록 불러오는 중...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -443,7 +674,14 @@ export default function HomeScreen() {
           <Text style={styles.resultCount}>{filteredClothes.length}개</Text>
         </View>
 
-        {filteredClothes.length === 0 ? (
+        {errorMessage ? (
+          <View style={styles.messageBox}>
+            <Text style={styles.errorText}>{errorMessage}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={fetchClothes}>
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredClothes.length === 0 ? (
           <Text style={styles.emptyText}>조건에 맞는 옷이 없습니다.</Text>
         ) : (
           <View style={styles.grid}>
@@ -469,8 +707,11 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={[styles.modalButton, styles.deleteMenuButton]}
               onPress={handleDelete}
+              disabled={!!deletingId}
             >
-              <Text style={styles.deleteMenuText}>삭제하기</Text>
+              <Text style={styles.deleteMenuText}>
+                {deletingId ? '삭제 중...' : '삭제하기'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.cancelButton} onPress={closeMenu}>
@@ -837,6 +1078,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#f2f2f2',
   },
 
+  imageFallback: {
+    width: '100%',
+    height: 180,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f2f2f2',
+    gap: 6,
+  },
+
+  imageFallbackText: {
+    fontSize: 12,
+    color: '#777',
+    fontWeight: '600',
+  },
+
   cardBody: {
     padding: 12,
   },
@@ -877,6 +1133,47 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     paddingVertical: 40,
+  },
+
+  messageBox: {
+    paddingVertical: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  errorText: {
+    color: '#c0392b',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+
+  retryButton: {
+    backgroundColor: '#111',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#777',
   },
 
   modalOverlay: {
