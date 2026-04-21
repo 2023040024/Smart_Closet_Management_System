@@ -42,6 +42,7 @@ const tpoOptions = [
 const fitOptions = ['슬림', '레귤러', '오버핏'];
 const temperatureOptions = ['추움', '적당함', '더움'];
 
+
 /**
  * 실제 폰(Expo Go) 테스트 시 PC IPv4 주소로 수정
  */
@@ -252,13 +253,13 @@ export default function HistoryCreateScreen() {
 
   const saveHistory = async () => {
     const payload = selectedClothes.map((clothesId) => ({
-      clothes_id: Number(clothesId),
+      clothes_id: Number(selectedClothes[0]),
       worn_date: today,
       // 백엔드가 추가 필드를 받는 구조면 아래 주석 해제해서 테스트
-      // tpo: tpo || null,
-      // style: fit || null,
-      // mood: temperature || null,
-      // memo: memo.trim() || null,
+      //feedback_tpo: tpo || null,
+      //feedback_fit: fit || null,
+      //feedback_temperature: temperature || null,
+      memo: memo.trim() || null,
     }));
 
     console.log('history save payload:', payload);
