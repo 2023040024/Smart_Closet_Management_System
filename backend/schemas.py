@@ -22,7 +22,9 @@ def map_korean_to_enum_logic(v: Any, info: Any) -> Any:
         'style': StyleEnum, 'top_fit': TopFitEnum, 'bottom_fit': BottomFitEnum,
         'tone': ToneEnum, 'mood': MoodEnum, 'material': MaterialEnum,
         'point': PointEnum, 'thickness': ThicknessEnum, 
-        'situation': SituationEnum, 'status': StatusEnum , 'preferred_style': StyleEnum
+        'situation': SituationEnum, 'status': StatusEnum , 'preferred_style': StyleEnum,
+        'feedback_temperature': FeedbackTempEnum, 'feedback_fit': FeedbackFitEnum,
+        'feedback_tpo': FeedbackTpoEnum
     }
     
     target_enum = enum_map.get(info.field_name)
@@ -63,7 +65,6 @@ class StyleUpdate(BaseModel):
     @field_validator('preferred_style', mode='before')
     @classmethod
     def validate_enums(cls, v: Any, info: Any) -> Any:
-        print(f"--- 검증기 진입: 필드명={info.field_name}, 값={v} ---")
         return map_korean_to_enum_logic(v, info)
 
 
@@ -163,6 +164,14 @@ class WearHistoryCreate(BaseModel):
     feedback_fit:         Optional[FeedbackFitEnum]  = None
     feedback_tpo:         Optional[FeedbackTpoEnum]  = None
     memo:                 Optional[str]              = None
+
+    @field_validator('feedback_temperature', 'feedback_fit', 'feedback_tpo', mode='before')
+    @classmethod
+    def validate_enums(cls, v: Any, info: Any) -> Any:
+        return map_korean_to_enum_logic(v, info)
+
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class WearHistoryResponse(BaseModel):
     history_id:           int

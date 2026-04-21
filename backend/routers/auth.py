@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from dotenv import load_dotenv
 
 from database import get_db
@@ -23,6 +23,7 @@ TOKEN_EXPIRE_HOURS = 24
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 def hash_password(password: str) -> str:
     # 1. 문자열을 바이트로 변환
@@ -43,7 +44,8 @@ def create_token(user_id: int) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS)
     return jwt.encode({"sub": str(user_id), "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def get_current_user(token: str = Depends(api_key_header), 
+    db: Session = Depends(get_db)):
     """
     JWT 토큰을 검증하고 현재 로그인한 사용자 객체를 반환합니다.
     """
@@ -53,6 +55,10 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
+    if not token:
+        raise credentials_exception
+    if token.startswith("Bearer "):
+        token = token.replace("Bearer ", "")
     try:
         # 1. 토큰 복호화
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -80,16 +86,17 @@ def signup(body: UserSignup, db: Session = Depends(get_db)):
 
     new_user = User(
         email         = body.email,
-        password_hash = bcrypt.hashpw(body.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        password_hash = hash_password(body.password)
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
-    return TokenResponse(
-        access_token = create_token(new_user.id),
-        user         = UserResponse.model_validate(new_user)
-    )
+    return {
+        "access_token": create_token(new_user.id),
+        "token_type": "bearer",
+        "user": UserResponse.model_validate(new_user).model_dump()
+    }
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -98,24 +105,25 @@ def login(body: UserLogin, db: Session = Depends(get_db)):
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다")
 
-    return TokenResponse(
-        access_token = create_token(user.id),
-        user         = UserResponse.model_validate(user)
-    )
+    return {
+        "access_token": create_token(user.id),
+        "token_type": "bearer",
+        "user": UserResponse.model_validate(user).model_dump()
+    }
 
-
+TEMP_USER_ID = 1
 @router.put("/me/style", response_model=UserResponse)
 def update_style(body: StyleUpdate, 
                  db: Session = Depends(get_db),
-                 current_user: User = Depends(get_current_user)):
+                 ):
     """
     선호 스타일 업데이트
     """
     try:
-        current_user.preferred_style = body.preferred_style
+        TEMP_USER_ID.preferred_style = body.preferred_style
         db.commit()
-        db.refresh(current_user)
-        return UserResponse.model_validate(current_user)
+        db.refresh(TEMP_USER_ID)
+        return UserResponse.model_validate(TEMP_USER_ID)
     except Exception as e:
         db.rollback()
         raise HTTPException(
