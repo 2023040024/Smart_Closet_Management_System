@@ -1,14 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException 
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Union
+
 from database import get_db
-from models import Clothes, WearHistory
+from models import Clothes, WearHistory, User
 from schemas import WearHistoryCreate, WearHistoryResponse
+from .auth import get_current_user
 
 router = APIRouter(prefix="/history", tags=["착용 기록"])
 
-@router.post("", response_model=List[WearHistoryResponse])
-def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session = Depends(get_db)):
+@router.post("", response_model=Union[WearHistoryResponse, List[WearHistoryResponse]], status_code=status.HTTP_201_CREATED)
+def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryCreate]],
+                        db: Session = Depends(get_db),
+                        current_user: User = Depends(get_current_user)):
+    is_single = isinstance(history_data, WearHistoryCreate)
+    history_data_list = [history_data] if is_single else history_data
+    
+    if not history_data_list:
+        raise HTTPException(status_code=400, detail="기록할 옷 데이터가 비어있습니다.")
     
     seen = set()
     for data in history_data_list:
@@ -17,17 +26,12 @@ def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session 
             raise HTTPException(status_code=400, detail="요청 내에 중복된 기록이 포함되어 있습니다.")
         seen.add(key)
 
-    if not history_data_list:
-        raise HTTPException(status_code=400, detail="기록할 옷 데이터가 비어있습니다.")
-    
-    current_user_id = 1 #TODO: 인증 모듈 완료 후 JWT에서 실제 user_id 추출 필요
-
     created_histories = []
     try:
         for history_data in history_data_list:
             cloth = db.query(Clothes).filter(
                 Clothes.clothes_id == history_data.clothes_id,
-                Clothes.user_id == current_user_id
+                Clothes.user_id == current_user.id
             ).first()
             if not cloth:
                 raise HTTPException(status_code=404, detail=f"해당 ID({history_data.clothes_id})의 옷을 찾을 수 없습니다.")
@@ -39,7 +43,7 @@ def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session 
                 raise HTTPException(status_code=400, detail=f"ID({history_data.clothes_id}) 옷은 오늘 이미 기록되었습니다.")
 
             new_history = WearHistory(
-                user_id=cloth.user_id,
+                user_id=current_user.id,
                 clothes_id=history_data.clothes_id,
                 worn_date=history_data.worn_date,
                 feedback_temperature=history_data.feedback_temperature,
@@ -52,14 +56,13 @@ def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session 
             if cloth.last_worn_date is None or history_data.worn_date > cloth.last_worn_date:
                 cloth.last_worn_date = history_data.worn_date
             db.add(new_history)
-            db.add(cloth)
             created_histories.append(new_history)
     
         db.commit()
         for h in created_histories:
             db.refresh(h)
-        
-        return created_histories
+        return created_histories[0] if is_single else created_histories
+    
     except Exception as e: 
         db.rollback()
         if isinstance(e, HTTPException):
@@ -67,14 +70,21 @@ def create_wear_history(history_data_list: List[WearHistoryCreate], db: Session 
         raise HTTPException(status_code=500, detail="서버 오류로 인해 기록에 실패했습니다.")
 
 @router.get("", response_model=List[WearHistoryResponse])
-def get_wear_histories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    histories = db.query(WearHistory).order_by(WearHistory.worn_date.desc()).offset(skip).limit(limit).all()
+def get_wear_histories(skip: int = 0, limit: int = 100, 
+                       db: Session = Depends(get_db),
+                       current_user: User = Depends(get_current_user)):
+    histories = db.query(WearHistory).filter(WearHistory.user_id == current_user.id)\
+        .order_by(WearHistory.worn_date.desc()).offset(skip).limit(limit).all()
     return histories
 
 @router.delete("/{history_id}")
-def delete_wear_history(history_id: int, db: Session = Depends(get_db)):
+def delete_wear_history(history_id: int, 
+                        db: Session = Depends(get_db),
+                        current_user: User = Depends(get_current_user)):
     # 1. 삭제할 기록 찾기
-    history = db.query(WearHistory).filter(WearHistory.history_id == history_id).first()
+    history = db.query(WearHistory).filter(
+        WearHistory.history_id == history_id,
+        WearHistory.user_id == current_user.id).first()
     
     if not history:
         raise HTTPException(status_code=404, detail="삭제할 기록을 찾을 수 없습니다.")
@@ -93,7 +103,6 @@ def delete_wear_history(history_id: int, db: Session = Depends(get_db)):
             .order_by(WearHistory.worn_date.desc()).first()
         
         cloth.last_worn_date = remaining_last_history.worn_date if remaining_last_history else None
-        db.add(cloth)
 
     # 3. DB에서 실제 삭제
     db.delete(history)
