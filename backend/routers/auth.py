@@ -111,19 +111,19 @@ def login(body: UserLogin, db: Session = Depends(get_db)):
         "user": UserResponse.model_validate(user).model_dump()
     }
 
-
+TEMP_USER_ID = 1
 @router.put("/me/style", response_model=UserResponse)
 def update_style(body: StyleUpdate, 
                  db: Session = Depends(get_db),
-                 current_user: User = Depends(get_current_user)):
+                 ):
     """
     선호 스타일 업데이트
     """
     try:
-        current_user.preferred_style = body.preferred_style
+        TEMP_USER_ID.preferred_style = body.preferred_style
         db.commit()
-        db.refresh(current_user)
-        return UserResponse.model_validate(current_user)
+        db.refresh(TEMP_USER_ID)
+        return UserResponse.model_validate(TEMP_USER_ID)
     except Exception as e:
         db.rollback()
         raise HTTPException(
