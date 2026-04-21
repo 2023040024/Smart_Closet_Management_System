@@ -36,6 +36,9 @@ type HistoryApiItem = {
   mood?: string;
   tpo?: string;
   memo?: string;
+  feedback_fit?: string;
+  feedback_temperature?: string;
+  feedback_tpo?: string;
   clothes?: {
     clothes_id?: number;
     name?: string;
@@ -66,9 +69,9 @@ function mapApiHistoryToUi(item: HistoryApiItem): WearHistoryItem {
     id: item.history_id.toString(),
     date: formatDate(item.worn_date),
     clothesIds: clothesId ? [clothesId] : [],
-    style: item.style ?? '',
-    mood: item.mood ?? '',
-    tpo: item.tpo ?? '',
+    style: item.style ?? item.feedback_fit ?? '',
+    mood: item.mood ?? item.feedback_temperature ?? '',
+    tpo: item.tpo ?? item.feedback_tpo ?? '',
     memo: item.memo ?? '',
   };
 }
