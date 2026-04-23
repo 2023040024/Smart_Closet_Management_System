@@ -47,11 +47,19 @@ type HistoryApiItem = {
   };
 };
 
+type GroupedWearHistoryItem = {
+  id: string;
+  date: string;
+  clothesIds: string[];
+  historyIds: string[];
+  style?: string;
+  mood?: string;
+  tpo?: string;
+  memo?: string;
+};
+
 const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여행', '운동', '모임'];
 
-/**
- * 실제 폰(Expo Go) 테스트 시 PC IPv4 주소로 수정
- */
 const API_BASE_URL = 'http://192.168.1.122:8000';
 
 function formatDate(dateString?: string) {
@@ -86,7 +94,9 @@ export default function HistoryScreen() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const getClothesByIds = (ids: string[]) => {
-    return ids
+    const uniqueIds = Array.from(new Set(ids));
+
+    return uniqueIds
       .map((id) => clothesMap[id])
       .filter(Boolean) as ClothingItem[];
   };
@@ -160,12 +170,52 @@ export default function HistoryScreen() {
     }, [fetchHistoryList])
   );
 
-  const filteredHistoryData = useMemo(() => {
-    if (selectedFilter === '전체') {
-      return historyList;
-    }
+  const groupedHistoryData = useMemo(() => {
+    const filtered =
+      selectedFilter === '전체'
+        ? historyList
+        : historyList.filter((item) => item.tpo === selectedFilter);
 
-    return historyList.filter((item) => item.tpo === selectedFilter);
+    const groupedMap: Record<string, GroupedWearHistoryItem> = {};
+
+    filtered.forEach((item) => {
+      const key = item.date;
+
+      if (!groupedMap[key]) {
+        groupedMap[key] = {
+          id: key,
+          date: item.date,
+          clothesIds: [...item.clothesIds],
+          historyIds: [item.id],
+          style: item.style || '',
+          mood: item.mood || '',
+          tpo: item.tpo || '',
+          memo: item.memo || '',
+        };
+        return;
+      }
+
+      groupedMap[key].clothesIds.push(...item.clothesIds);
+      groupedMap[key].historyIds.push(item.id);
+
+      if (!groupedMap[key].style && item.style) {
+        groupedMap[key].style = item.style;
+      }
+
+      if (!groupedMap[key].mood && item.mood) {
+        groupedMap[key].mood = item.mood;
+      }
+
+      if (!groupedMap[key].tpo && item.tpo) {
+        groupedMap[key].tpo = item.tpo;
+      }
+
+      if (!groupedMap[key].memo && item.memo) {
+        groupedMap[key].memo = item.memo;
+      }
+    });
+
+    return Object.values(groupedMap).sort((a, b) => b.date.localeCompare(a.date));
   }, [historyList, selectedFilter]);
 
   const deleteHistoryByApi = async (id: string) => {
@@ -201,19 +251,25 @@ export default function HistoryScreen() {
     return responseData;
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (group: GroupedWearHistoryItem) => {
     if (deletingId) return;
 
-    Alert.alert('기록 삭제', '이 착용 기록을 삭제할까요?', [
+    Alert.alert('기록 삭제', '이 날짜의 착용 기록을 모두 삭제할까요?', [
       { text: '취소', style: 'cancel' },
       {
         text: '삭제',
         style: 'destructive',
         onPress: async () => {
           try {
-            setDeletingId(id);
-            await deleteHistoryByApi(id);
-            setHistoryList((prev) => prev.filter((item) => item.id !== id));
+            setDeletingId(group.id);
+
+            for (const historyId of group.historyIds) {
+              await deleteHistoryByApi(historyId);
+            }
+
+            setHistoryList((prev) =>
+              prev.filter((item) => !group.historyIds.includes(item.id))
+            );
           } catch (error) {
             console.error('삭제 실패:', error);
             Alert.alert(
@@ -230,18 +286,18 @@ export default function HistoryScreen() {
     ]);
   };
 
-  const handleDetailPress = (item: WearHistoryItem) => {
-    const clothes = getClothesByIds(item.clothesIds);
+  const handleDetailPress = (group: GroupedWearHistoryItem) => {
+    const clothes = getClothesByIds(group.clothesIds);
 
     router.push({
       pathname: '/history-detail',
       params: {
-        id: item.id,
-        date: item.date,
-        style: item.style ?? '',
-        mood: item.mood ?? '',
-        tpo: item.tpo ?? '',
-        memo: item.memo ?? '',
+        id: group.id,
+        date: group.date,
+        style: group.style ?? '',
+        mood: group.mood ?? '',
+        tpo: group.tpo ?? '',
+        memo: group.memo ?? '',
         clothes: JSON.stringify(clothes),
       },
     });
@@ -251,21 +307,19 @@ export default function HistoryScreen() {
     router.push('/history-create');
   };
 
-  const renderItem = ({ item }: { item: WearHistoryItem }) => {
+  const renderItem = ({ item }: { item: GroupedWearHistoryItem }) => {
     const clothes = getClothesByIds(item.clothesIds);
 
     return (
       <View style={styles.card}>
         <Text style={styles.date}>{item.date}</Text>
 
-        <View style={styles.clothesRow}>
+        <View style={styles.clothesColumn}>
           {clothes.length > 0 ? (
             clothes.map((cloth) => (
               <View key={cloth.id} style={styles.clothBox}>
                 <Text style={styles.clothCategory}>{cloth.category}</Text>
-                <Text style={styles.clothName} numberOfLines={1}>
-                  {cloth.name}
-                </Text>
+                <Text style={styles.clothName}>{cloth.name}</Text>
               </View>
             ))
           ) : (
@@ -292,7 +346,7 @@ export default function HistoryScreen() {
 
           <Pressable
             style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDelete(item.id)}
+            onPress={() => handleDelete(item)}
             disabled={deletingId === item.id}
           >
             <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
@@ -390,14 +444,14 @@ export default function HistoryScreen() {
       </View>
 
       <FlatList
-        data={filteredHistoryData}
+        data={groupedHistoryData}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         onRefresh={() => fetchHistoryList(true)}
         refreshing={refreshing}
         contentContainerStyle={[
           styles.listContent,
-          filteredHistoryData.length === 0 && styles.emptyListContent,
+          groupedHistoryData.length === 0 && styles.emptyListContent,
         ]}
         ListEmptyComponent={<EmptyState />}
         showsVerticalScrollIndicator={false}
@@ -476,17 +530,15 @@ const styles = StyleSheet.create({
     color: '#111',
     marginBottom: 10,
   },
-  clothesRow: {
-    flexDirection: 'row',
+  clothesColumn: {
     gap: 8,
     marginBottom: 10,
   },
   clothBox: {
-    flex: 1,
     minHeight: 72,
     backgroundColor: '#fff',
     borderRadius: 10,
-    padding: 8,
+    padding: 12,
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#eee',
