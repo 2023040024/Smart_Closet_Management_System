@@ -124,14 +124,9 @@ class SituationEnum(str, enum.Enum):
     travel   = "여행"
 
 class FeedbackTempEnum(str, enum.Enum):
-    hot      = "더웠음"
-    good     = "적당"
-    cold     = "추웠음"
-
-class FeedbackFitEnum(str, enum.Enum):
-    comfy    = "편했음"
-    normal   = "보통"
-    bad      = "불편했음"
+    hot      = "더움"
+    good     = "적당함"
+    cold     = "추움"
 
 class FeedbackTpoEnum(str, enum.Enum):
     good     = "잘맞음"
@@ -183,7 +178,7 @@ class Clothes(Base):
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
 
     owner        = relationship("User", back_populates="clothes")
-    wear_history = relationship("WearHistory", back_populates="clothes")
+    wear_history = relationship("WearHistory", back_populates="clothes", cascade="all, delete-orphan")
     outfit_items = relationship("OutfitClothes", back_populates="clothes")
 
     @property
@@ -203,8 +198,10 @@ class WearHistory(Base):
     user_id              = Column(Integer, ForeignKey("users.id"), nullable=False)
     clothes_id           = Column(Integer, ForeignKey("clothes.clothes_id"), nullable=False)
     worn_date            = Column(Date, nullable=False)
+    tpo                  = Column(Enum(SituationEnum), nullable=True)
+    style                = Column(Enum(StyleEnum), nullable=True)
+    mood                 = Column(Enum(MoodEnum), nullable=True)
     feedback_temperature = Column(Enum(FeedbackTempEnum), nullable=True)
-    feedback_fit         = Column(Enum(FeedbackFitEnum), nullable=True)
     feedback_tpo         = Column(Enum(FeedbackTpoEnum), nullable=True)
     memo                 = Column(String(200), nullable=True)
     created_at           = Column(DateTime(timezone=True), server_default=func.now())
