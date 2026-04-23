@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Union
 
 from database import get_db
@@ -48,8 +48,10 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
                 user_id=TEMP_USER_ID,
                 clothes_id=history_data.clothes_id,
                 worn_date=history_data.worn_date,
+                tpo=data.tpo,
+                style=data.style,
+                mood=data.mood,
                 feedback_temperature=history_data.feedback_temperature,
-                feedback_fit=history_data.feedback_fit,
                 feedback_tpo=history_data.feedback_tpo,
                 memo=history_data.memo
             )
@@ -75,8 +77,11 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
 def get_wear_histories(skip: int = 0, limit: int = 100, 
                        db: Session = Depends(get_db),
                        ):
-    histories = db.query(WearHistory).filter(WearHistory.user_id == TEMP_USER_ID)\
-        .order_by(WearHistory.worn_date.desc()).offset(skip).limit(limit).all()
+    histories = db.query(WearHistory)\
+        .options(joinedload(WearHistory.clothes))\
+            .filter(WearHistory.user_id == TEMP_USER_ID)\
+        .order_by(WearHistory.worn_date.desc()).offset(skip).limit(limit)\
+            .all()
     return histories
 
 @router.delete("/{history_id}")

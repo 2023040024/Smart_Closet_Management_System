@@ -4,7 +4,7 @@ from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field
 from models import (
     CategoryEnum, TopFitEnum, BottomFitEnum, ColorEnum, SeasonEnum,
     ToneEnum, StyleEnum, MoodEnum, MaterialEnum, ThicknessEnum, PointEnum,
-    StatusEnum, SituationEnum, FeedbackTempEnum, FeedbackFitEnum, FeedbackTpoEnum
+    StatusEnum, SituationEnum, FeedbackTempEnum, FeedbackTpoEnum
 )
 
 # 1. 클래스 외부에서는 순수 함수로 정의 (데코레이터 제거)
@@ -23,8 +23,7 @@ def map_korean_to_enum_logic(v: Any, info: Any) -> Any:
         'tone': ToneEnum, 'mood': MoodEnum, 'material': MaterialEnum,
         'point': PointEnum, 'thickness': ThicknessEnum, 
         'situation': SituationEnum, 'status': StatusEnum , 'preferred_style': StyleEnum,
-        'feedback_temperature': FeedbackTempEnum, 'feedback_fit': FeedbackFitEnum,
-        'feedback_tpo': FeedbackTpoEnum
+        'feedback_temperature': FeedbackTempEnum, 'feedback_tpo': FeedbackTpoEnum
     }
     
     target_enum = enum_map.get(info.field_name)
@@ -73,8 +72,8 @@ class StyleUpdate(BaseModel):
 # ──────────────────────────────────────────────
 
 class ClothesCreate(BaseModel):
-    name:           Optional[str] = None
-    category:       Optional[CategoryEnum] = None
+    name:           str
+    category:       CategoryEnum
     top_fit:        Optional[TopFitEnum] = None
     bottom_fit:     Optional[BottomFitEnum] = None
     color:          Optional[ColorEnum] = None
@@ -99,8 +98,8 @@ class ClothesCreate(BaseModel):
         return map_korean_to_enum_logic(v, info)
     
 class ClothesUpdate(BaseModel):
-    name:           Optional[str] = None
-    category:       Optional[CategoryEnum] = None
+    name:           str
+    category:       CategoryEnum
     top_fit:        Optional[TopFitEnum] = None
     bottom_fit:     Optional[BottomFitEnum] = None
     color:          Optional[ColorEnum] = None
@@ -129,8 +128,8 @@ class ClothesStatusUpdate(BaseModel):
 
 class ClothesResponse(BaseModel):
     clothes_id:     int
-    name:           Optional[str] = None
-    category:       Optional[CategoryEnum] = None
+    name:           str
+    category:       CategoryEnum
     top_fit:        Optional[TopFitEnum] = None
     bottom_fit:     Optional[BottomFitEnum] = None
     color:          Optional[ColorEnum] = None
@@ -160,12 +159,15 @@ class ClothesResponse(BaseModel):
 class WearHistoryCreate(BaseModel):
     clothes_id:           int
     worn_date:            date
+    tpo:                  Optional[SituationEnum] = None
+    style:                Optional[StyleEnum] = None
+    mood:                 Optional[MoodEnum] = None
     feedback_temperature: Optional[FeedbackTempEnum] = None
-    feedback_fit:         Optional[FeedbackFitEnum]  = None
     feedback_tpo:         Optional[FeedbackTpoEnum]  = None
     memo:                 Optional[str]              = None
 
-    @field_validator('feedback_temperature', 'feedback_fit', 'feedback_tpo', mode='before')
+    @field_validator('tpo', 'style', 'mood', 
+                     'feedback_temperature', 'feedback_tpo', mode='before')
     @classmethod
     def validate_enums(cls, v: Any, info: Any) -> Any:
         return map_korean_to_enum_logic(v, info)
@@ -177,10 +179,13 @@ class WearHistoryResponse(BaseModel):
     history_id:           int
     clothes_id:           int
     worn_date:            date
+    tpo:                  Optional[SituationEnum]
+    style:                Optional[StyleEnum]
+    mood:                 Optional[MoodEnum]
     feedback_temperature: Optional[FeedbackTempEnum]
-    feedback_fit:         Optional[FeedbackFitEnum]
     feedback_tpo:         Optional[FeedbackTpoEnum]
     memo:                 Optional[str]
     created_at:           datetime
+    clothes:              Optional[ClothesResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
