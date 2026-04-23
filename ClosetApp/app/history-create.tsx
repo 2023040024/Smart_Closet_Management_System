@@ -255,40 +255,45 @@ useEffect(() => {
     );
   };
 
-  const saveHistory = async () => {
-    const payload = selectedClothes.map((clothesId) => ({
-  clothes_id: Number(clothesId),
-  worn_date: today,
-  memo: memo.trim() || null,
-}));
+const saveHistory = async () => {
+  const payload = selectedClothes.map((clothesId) => ({
+    clothes_id: Number(clothesId),
+    worn_date: today,
+    tpo: tpo || null,
+    style: null,
+    mood: null,
+    feedback_temperature: temperature || null, // 추움 / 적당함 / 더움
+    feedback_tpo: fit || null,                 // 잘맞음 / 보통 / 안맞음
+    memo: memo.trim() || null,
+  }));
 
-    console.log('history save payload:', payload);
+  console.log('history save payload:', payload);
 
-    const response = await fetch(`${API_BASE_URL}/history`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+  const response = await fetch(`${API_BASE_URL}/history`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
 
-    let responseData: any = null;
+  let responseData: any = null;
 
-    try {
-      responseData = await response.json();
-    } catch {
-      responseData = null;
-    }
+  try {
+    responseData = await response.json();
+  } catch {
+    responseData = null;
+  }
 
-    console.log('history save response:', responseData);
+  console.log('history save response:', responseData);
 
-    if (!response.ok) {
-      const message = stringifyErrorDetail(responseData, response.status);
-      throw new Error(message);
-    }
+  if (!response.ok) {
+    const message = stringifyErrorDetail(responseData, response.status);
+    throw new Error(message);
+  }
 
-    return responseData;
-  };
+  return responseData;
+};
 
   const handleSave = async () => {
     if (isUsingMockData) {
