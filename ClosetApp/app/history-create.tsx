@@ -46,7 +46,7 @@ const temperatureOptions = ['추움', '적당함', '더움'];
 /**
  * 실제 폰(Expo Go) 테스트 시 PC IPv4 주소로 수정
  */
-const API_BASE_URL = 'http://10.181.197.59:8000';
+const API_BASE_URL = 'http://192.168.1.122:8000';
 
 const MOCK_CLOTHES_IDS = ['1', '2', '3', '4'];
 
@@ -126,63 +126,53 @@ export default function HistoryCreateScreen() {
   const [saving, setSaving] = useState(false);
   const [isUsingMockData, setIsUsingMockData] = useState(false);
 
-  useEffect(() => {
-    const fetchClothes = async () => {
+useEffect(() => {
+  const fetchClothes = async () => {
+    try {
+      setLoadingClothes(true);
+      console.log('API 주소:', `${API_BASE_URL}/clothes`);
+
+      const response = await fetch(`${API_BASE_URL}/clothes`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('status:', response.status);
+
+      let data: ClothesApiItem[] = [];
+
       try {
-        setLoadingClothes(true);
+        data = await response.json();
+        console.log('clothes api data:', data);
+      } catch (jsonError) {
+        data = [];
+      }
 
-        const response = await fetch(`${API_BASE_URL}/clothes`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+      if (!response.ok) {
+        throw new Error(`옷 목록 조회 실패 (${response.status})`);
+      }
 
-        let data: ClothesApiItem[] = [];
+      const mapped: ClothingItem[] = data
+        .map((item, index) => {
+          const rawId = item.clothes_id ?? item.id;
 
-        try {
-          data = await response.json();
-          console.log('clothes api data:', data);
-        } catch {
-          data = [];
-        }
+          if (rawId === undefined || rawId === null) {
+            return null;
+          }
 
-        if (!response.ok) {
-          throw new Error(`옷 목록 조회 실패 (${response.status})`);
-        }
+          return {
+            id: String(rawId),
+            name: item.name?.trim() || `옷 ${index + 1}`,
+            category: normalizeCategory(item.category),
+            color: item.color ?? '',
+          };
+        })
+        .filter(Boolean) as ClothingItem[];
 
-        const mapped: ClothingItem[] = data
-          .map((item, index) => {
-            const rawId = item.clothes_id ?? item.id;
 
-            if (rawId === undefined || rawId === null) {
-              return null;
-            }
-
-            return {
-              id: String(rawId),
-              name: item.name?.trim() || `옷 ${index + 1}`,
-              category: normalizeCategory(item.category),
-              color: item.color ?? '',
-            };
-          })
-          .filter(Boolean) as ClothingItem[];
-
-        if (mapped.length === 0) {
-          setIsUsingMockData(true);
-          setClothesList([
-            { id: '1', name: '블랙 셔츠', category: '상의' },
-            { id: '2', name: '베이지 슬랙스', category: '하의' },
-            { id: '3', name: '화이트 스니커즈', category: '신발' },
-            { id: '4', name: '네이비 자켓', category: '아우터' },
-          ]);
-        } else {
-          setIsUsingMockData(false);
-          setClothesList(mapped);
-        }
-      } catch (error) {
-        console.error('옷 목록 불러오기 실패:', error);
-
+      if (mapped.length === 0) {
         setIsUsingMockData(true);
         setClothesList([
           { id: '1', name: '블랙 셔츠', category: '상의' },
@@ -190,18 +180,32 @@ export default function HistoryCreateScreen() {
           { id: '3', name: '화이트 스니커즈', category: '신발' },
           { id: '4', name: '네이비 자켓', category: '아우터' },
         ]);
-
-        Alert.alert(
-          '안내',
-          '옷 목록 API를 불러오지 못해 임시 데이터로 표시합니다.'
-        );
-      } finally {
-        setLoadingClothes(false);
+      } else {
+        setIsUsingMockData(false);
+        setClothesList(mapped);
       }
-    };
+    } catch (error) {
+      console.error('옷 목록 불러오기 실패:', error);
 
-    fetchClothes();
-  }, []);
+      setIsUsingMockData(true);
+      setClothesList([
+        { id: '1', name: '블랙 셔츠', category: '상의' },
+        { id: '2', name: '베이지 슬랙스', category: '하의' },
+        { id: '3', name: '화이트 스니커즈', category: '신발' },
+        { id: '4', name: '네이비 자켓', category: '아우터' },
+      ]);
+
+      Alert.alert(
+        '안내',
+        '옷 목록 API를 불러오지 못해 임시 데이터로 표시합니다.'
+      );
+    } finally {
+      setLoadingClothes(false);
+    }
+  };
+
+  fetchClothes();
+}, []);
 
   const groupedClothes = useMemo(() => {
     return {
@@ -253,14 +257,10 @@ export default function HistoryCreateScreen() {
 
   const saveHistory = async () => {
     const payload = selectedClothes.map((clothesId) => ({
-      clothes_id: Number(selectedClothes[0]),
-      worn_date: today,
-      // 백엔드가 추가 필드를 받는 구조면 아래 주석 해제해서 테스트
-      //feedback_tpo: tpo || null,
-      //feedback_fit: fit || null,
-      //feedback_temperature: temperature || null,
-      memo: memo.trim() || null,
-    }));
+  clothes_id: Number(clothesId),
+  worn_date: today,
+  memo: memo.trim() || null,
+}));
 
     console.log('history save payload:', payload);
 
