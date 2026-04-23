@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from database import get_db
-from models import Clothes, CategoryEnum, StatusEnum, User
+from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum, MaterialEnum
 from routers.auth import get_current_user
 from tpo_rules import get_tpo_prompt_text
 
@@ -69,9 +69,9 @@ def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_cond
             continue
         # 기온 기반 두께 필터
         if temperature is not None:
-            if temperature >= 25 and c.thickness == "thick":
+            if temperature >= 25 and c.thickness == ThicknessEnum.thick:
                 continue
-            if temperature <= 14 and c.thickness == "thin":
+            if temperature <= 14 and c.thickness == ThicknessEnum.thin:
                 continue
         # 비·눈 날씨 가죽·스웨이드 제외
         if weather_condition in ("rainy", "snowy"):
