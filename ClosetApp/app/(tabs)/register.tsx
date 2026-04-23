@@ -13,7 +13,7 @@ import {
 
 import { ClothesTags, EMPTY_TAGS, TAG_OPTIONS } from '../_closetStore';
 
-const API_BASE_URL = 'http://192.168.1.122:8000';
+const API_BASE_URL = 'http://10.181.197.59:8000';
 
 function Chip({
   label,

@@ -473,11 +473,11 @@ export default function HomeScreen() {
 
       {expanded[key] && (
         <View style={styles.optionWrap}>
-          {options.map((item) => {
+          {options.map((item, index) => {
             const isSelected = filter[key] === item;
             return (
               <TouchableOpacity
-                key={item}
+                key={`${key}-${item}-${index}`}
                 style={[styles.optionChip, isSelected && styles.optionChipSelected]}
                 onPress={() => toggleFilter(key, item)}
                 activeOpacity={0.85}
@@ -638,9 +638,9 @@ export default function HomeScreen() {
               onMomentumScrollEnd={handleFilterPageChange}
               style={styles.filterSlider}
             >
-              {FILTER_SECTIONS.map((section) => (
+              {FILTER_SECTIONS.map((section, index) => (
                 <View
-                  key={section.title}
+                  key={`${section.title}-${index}`}
                   style={[styles.filterSlide, { width: pageWidth }]}
                 >
                   <View style={[styles.filterSectionCard, { width: innerCardWidth }]}>

@@ -171,7 +171,11 @@ export default function DetailScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {imageUri ? (
-        <Image source={{ uri: imageUri }} style={styles.image} />
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.image} 
+          resizeMode="contain"
+          />
       ) : (
         <View style={styles.imageFallback}>
           <Text style={styles.imageFallbackText}>이미지가 없습니다.</Text>

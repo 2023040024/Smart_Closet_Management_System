@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -98,15 +98,20 @@ function createOutfits(items: ClothesItem[]): OutfitSet[] {
   const shoes = items.filter((item) => item.tags.category === '신발');
 
   const outfits: OutfitSet[] = [];
-  const maxCount = Math.min(3, tops.length, bottoms.length);
 
-  for (let i = 0; i < maxCount; i++) {
-    outfits.push({
-      outer: outers[i],
-      top: tops[i],
-      bottom: bottoms[i],
-      shoes: shoes[i],
-    });
+  for (let i = 0; i < tops.length; i++) {
+    for (let j = 0; j < bottoms.length; j++) {
+      if (outfits.length >= 3) break;
+
+      outfits.push({
+        outer: outers.length > 0 ? outers[(i + j) % outers.length] : undefined,
+        top: tops[i],
+        bottom: bottoms[j],
+        shoes: shoes.length > 0 ? shoes[(i + j) % shoes.length] : undefined,
+      });
+    }
+
+    if (outfits.length >= 3) break;
   }
 
   return outfits;
