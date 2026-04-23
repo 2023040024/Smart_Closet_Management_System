@@ -13,7 +13,7 @@ import {
 
 import { ClothesTags, EMPTY_TAGS, TAG_OPTIONS } from '../_closetStore';
 
-const API_BASE_URL = 'http://10.181.197.59:8000';
+const API_BASE_URL = 'http://192.168.1.122:8000';
 
 function Chip({
   label,
@@ -165,6 +165,8 @@ export default function RegisterScreen() {
   };
 
   const saveClothesToApi = async () => {
+     console.log('POST /clothes 요청 시작')
+
     if (!image) {
       throw new Error('이미지가 없습니다.');
     }
@@ -221,6 +223,10 @@ export default function RegisterScreen() {
   };
 
   const handleSave = async () => {
+      console.log('등록 버튼 눌림');
+      console.log('selected:', selected);
+      console.log('image:', image);
+
     if (!image) {
       Alert.alert('입력 확인', '이미지를 먼저 선택해주세요.');
       return;
@@ -258,6 +264,7 @@ export default function RegisterScreen() {
 
     try {
       setLoading(true);
+      console.log('saveClothesToApi 호출 직전');
 
       await saveClothesToApi();
 
@@ -279,6 +286,7 @@ export default function RegisterScreen() {
         error instanceof Error ? error.message : '옷 등록 중 오류가 발생했습니다.'
       );
     } finally {
+      console.log('loading false');
       setLoading(false);
     }
   };
