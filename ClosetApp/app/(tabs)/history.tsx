@@ -310,6 +310,11 @@ export default function HistoryScreen() {
   const renderItem = ({ item }: { item: GroupedWearHistoryItem }) => {
     const clothes = getClothesByIds(item.clothesIds);
 
+    const tagText =
+  [item.style, item.mood, item.tpo]
+    .filter((value) => value && value.trim() !== '')
+    .join(' · ') || '태그 없음';
+
     return (
       <View style={styles.card}>
         <Text style={styles.date}>{item.date}</Text>
@@ -330,9 +335,7 @@ export default function HistoryScreen() {
           )}
         </View>
 
-        <Text style={styles.tags}>
-          {item.style || '-'} · {item.mood || '-'} · {item.tpo || '-'}
-        </Text>
+        <Text style={styles.tags}>{tagText}</Text>
         <Text style={styles.memo}>{item.memo || '메모 없음'}</Text>
 
         <View style={styles.actionRow}>
