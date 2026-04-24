@@ -251,6 +251,10 @@ export default function HomeScreen() {
     tpo: true,
   });
 
+  const [showAllOptions, setShowAllOptions] = useState<
+    Partial<Record<keyof FilterType, boolean>>
+  >({});
+
   const fetchClothes = useCallback(async () => {
     try {
       setLoading(true);
@@ -453,50 +457,76 @@ export default function HomeScreen() {
     label: string,
     key: keyof FilterType,
     options: string[]
-  ) => (
-    <View style={styles.filterItemBlock}>
-      <TouchableOpacity
-        style={styles.filterItemHeader}
-        onPress={() => toggleExpand(key)}
-        activeOpacity={0.85}
-      >
-        <View style={styles.filterItemHeaderLeft}>
-          <Text style={styles.filterItemLabel}>{label}</Text>
-          {!!filter[key] && (
-            <View style={styles.activeBadge}>
-              <Text style={styles.activeBadgeText}>선택됨</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.arrowText}>{expanded[key] ? '▲' : '▼'}</Text>
-      </TouchableOpacity>
+  ) => {
+    const visibleOptions = showAllOptions[key] ? options : options.slice(0, 5);
 
-      {expanded[key] && (
-        <View style={styles.optionWrap}>
-          {options.map((item, index) => {
-            const isSelected = filter[key] === item;
-            return (
+    return (
+      <View style={styles.filterItemBlock}>
+        <TouchableOpacity
+          style={styles.filterItemHeader}
+          onPress={() => toggleExpand(key)}
+          activeOpacity={0.85}
+        >
+          <View style={styles.filterItemHeaderLeft}>
+            <Text style={styles.filterItemLabel}>{label}</Text>
+            {!!filter[key] && (
+              <View style={styles.activeBadge}>
+                <Text style={styles.activeBadgeText}>선택됨</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.arrowText}>{expanded[key] ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+
+        {expanded[key] && (
+          <View>
+            <View style={styles.optionWrap}>
+              {visibleOptions.map((item, index) => {
+                const isSelected = filter[key] === item;
+                return (
+                  <TouchableOpacity
+                    key={`${key}-${item}-${index}`}
+                    style={[
+                      styles.optionChip,
+                      isSelected && styles.optionChipSelected,
+                    ]}
+                    onPress={() => toggleFilter(key, item)}
+                    activeOpacity={0.85}
+                  >
+                    <Text
+                      style={[
+                        styles.optionChipText,
+                        isSelected && styles.optionChipTextSelected,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {options.length > 5 && (
               <TouchableOpacity
-                key={`${key}-${item}-${index}`}
-                style={[styles.optionChip, isSelected && styles.optionChipSelected]}
-                onPress={() => toggleFilter(key, item)}
+                style={styles.moreButton}
+                onPress={() =>
+                  setShowAllOptions((prev) => ({
+                    ...prev,
+                    [key]: !prev[key],
+                  }))
+                }
                 activeOpacity={0.85}
               >
-                <Text
-                  style={[
-                    styles.optionChipText,
-                    isSelected && styles.optionChipTextSelected,
-                  ]}
-                >
-                  {item}
+                <Text style={styles.moreButtonText}>
+                  {showAllOptions[key] ? '접기' : `더보기 +${options.length - 5}`}
                 </Text>
               </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-    </View>
-  );
+            )}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   const renderCard = (item: ClothesItem) => (
     <TouchableOpacity
@@ -645,9 +675,11 @@ export default function HomeScreen() {
                 >
                   <View style={[styles.filterSectionCard, { width: innerCardWidth }]}>
                     <Text style={styles.filterSectionTitle}>{section.title}</Text>
-                    {section.items.map((sectionItem) =>
-                      renderSection(sectionItem.label, sectionItem.key, sectionItem.options)
-                    )}
+                    {section.items.map((sectionItem, index) => (
+                      <View key={`${section.title}-${sectionItem.key}-${index}`}>
+                        {renderSection(sectionItem.label, sectionItem.key, sectionItem.options)}
+                      </View>
+                    ))}
                   </View>
                 </View>
               ))}
@@ -795,7 +827,7 @@ const styles = StyleSheet.create({
   },
 
   primaryActionBtnActive: {
-    opacity: 0.94,
+    backgroundColor: '#333',
   },
 
   primaryActionIcon: {
@@ -990,7 +1022,7 @@ const styles = StyleSheet.create({
   },
 
   optionChipSelected: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#111',
     borderColor: '#111',
     borderWidth: 1.5,
   },
@@ -1002,8 +1034,21 @@ const styles = StyleSheet.create({
   },
 
   optionChipTextSelected: {
-    color: '#111',
+    color: '#fff',
     fontWeight: '800',
+  },
+
+  moreButton: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+
+  moreButtonText: {
+    fontSize: 12,
+    color: '#555',
+    fontWeight: '700',
   },
 
   paginationWrap: {

@@ -23,6 +23,8 @@ export default function HistoryDetailScreen() {
     ? JSON.parse(params.clothes)
     : [];
 
+  const feedbackTags = [params.style, params.mood, params.tpo].filter(Boolean);
+
   return (
     <>
       <Stack.Screen options={{ title: '착용 기록 상세' }} />
@@ -37,7 +39,7 @@ export default function HistoryDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>피드백 태그</Text>
             <Text style={styles.sectionValue}>
-              {params.style || '-'} · {params.mood || '-'} · {params.tpo || '-'}
+              {feedbackTags.length > 0 ? feedbackTags.join(' · ') : '없음'}
             </Text>
           </View>
 
