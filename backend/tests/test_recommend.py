@@ -1,8 +1,8 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from conftest import make_clothes
+from conftest import make_clothes, make_user
 from models import StatusEnum, CategoryEnum, ThicknessEnum, MaterialEnum
-from routers.recommend import filter_clothes, get_unworn_days
+from routers.recommend import filter_clothes, get_unworn_days, get_user_profile_text
 from datetime import date, timedelta
 
 class TestFilterClothes:
@@ -63,3 +63,35 @@ class TestGetUnwornDays:
     def test_30일전착용(self):
         c = make_clothes(last_worn_date=date.today() - timedelta(days=30))
         assert get_unworn_days(c) == 30
+
+
+class TestGetUserProfileText:
+    def test_민감도0_아우터기준14(self):
+        u = make_user(temp_sensitivity=0.0)
+        _, _, _, outer = get_user_profile_text(u, 20.0)
+        assert outer == 14
+
+    def test_민감도2_아우터기준16(self):
+        u = make_user(temp_sensitivity=2.0)
+        _, _, _, outer = get_user_profile_text(u, 20.0)
+        assert outer == 16
+
+    def test_민감도마이너스2_아우터기준12(self):
+        u = make_user(temp_sensitivity=-2.0)
+        _, _, _, outer = get_user_profile_text(u, 20.0)
+        assert outer == 12
+
+    def test_체감기온계산(self):
+        u = make_user(temp_sensitivity=2.0)
+        _, _, felt_temp, _ = get_user_profile_text(u, 20.0)
+        assert felt_temp == 16.0
+
+    def test_선호스타일없으면_캐주얼기본값(self):
+        u = make_user(preferred_style=None)
+        _, preferred_style, _, _ = get_user_profile_text(u, 20.0)
+        assert preferred_style == "캐주얼"
+
+    def test_선호스타일있으면_해당값반환(self):
+        u = make_user(preferred_style="미니멀")
+        _, preferred_style, _, _ = get_user_profile_text(u, 20.0)
+        assert preferred_style == "미니멀"
