@@ -107,10 +107,10 @@ WEATHER_RULES = {
         "very_cold": {"min": -99, "max": 4,   "thickness": ["두꺼움"],         "desc": "매우 추움 (4도 이하)"},
     },
     "condition": {
-        "rainy":  {"avoid_materials": ["레더", "suede", "silk"],          "desc": "비 오는 날 - 가죽/스웨이드/실크 소재 피하기"},
-        "snowy":  {"avoid_materials": ["레더", "suede", "silk", "linen"], "desc": "눈 오는 날 - 방수 소재 우선"},
-        "sunny":  {"avoid_materials": [],                                  "desc": "맑은 날 - 제한 없음"},
-        "cloudy": {"avoid_materials": [],                                  "desc": "흐린 날 - 제한 없음"},
+        "rainy":  {"avoid_materials": ["레더"], "desc": "비 오는 날 - 가죽 소재 피하기"},
+        "snowy":  {"avoid_materials": ["레더"], "desc": "눈 오는 날 - 방수 소재 우선"},
+        "sunny":  {"avoid_materials": [],       "desc": "맑은 날 - 제한 없음"},
+        "cloudy": {"avoid_materials": [],       "desc": "흐린 날 - 제한 없음"},
     }
 }
 
@@ -127,10 +127,23 @@ COLOR_RULES = {
     ]
 }
 
+_EN_TO_KR = {
+    "daily":     "데일리",
+    "business":  "비즈니스",
+    "interview": "면접",
+    "wedding":   "결혼식",
+    "funeral":   "장례식",
+    "exercise":  "운동",
+    "date":      "데이트",
+    "meeting":   "모임",
+    "travel":    "여행",
+    "school":    "데일리",
+    "cafe":      "데일리",
+}
 
 def get_tpo_rule(situation: str) -> dict:
-    return TPO_RULES.get(situation, TPO_RULES["데일리"])
-
+    key = _EN_TO_KR.get(situation, situation)
+    return TPO_RULES.get(key, TPO_RULES["데일리"])
 
 def get_temperature_level(temperature: float) -> str:
     for level, rule in WEATHER_RULES["temperature"].items():
