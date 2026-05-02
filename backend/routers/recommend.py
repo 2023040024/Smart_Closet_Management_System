@@ -286,14 +286,24 @@ def recommend_custom(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    temperature       = body.temperature
+    weather_condition = body.weather_condition
+
+    if body.address:
+        fetched = fetch_weather(body.address)
+        temperature       = temperature       or fetched["temperature"]
+        weather_condition = weather_condition or fetched["condition"]
+
+    temperature       = temperature       or 20.0
+    weather_condition = weather_condition or "sunny"
+
     user_id = current_user.user_id
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered = filter_clothes(all_clothes, body.temperature or 20.0, body.weather_condition or "sunny")
-    prompt = build_prompt(filtered, body.situation or "daily", body.temperature or 20.0, body.weather_condition or "sunny", current_user)
+    filtered = filter_clothes(all_clothes, temperature, weather_condition)
+    prompt = build_prompt(filtered, body.situation or "daily", temperature, weather_condition, current_user)
     return call_gemini(prompt)
-
 
 @router.get("/weekly")
 def recommend_weekly(
