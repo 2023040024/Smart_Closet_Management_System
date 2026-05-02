@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import httpx
 from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,6 +21,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "여기에_API_키_입력")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
+WEATHER_BASE_URL = os.getenv("WEATHER_BASE_URL", "http://localhost:8000")
 
 class RecommendRequest(BaseModel):
     situation: Optional[str] = None
@@ -45,6 +47,45 @@ class RecommendResponse(BaseModel):
     ai_message: str
 
 
+def fetch_weather(address: str) -> dict:
+    """
+    B파트 /weather/address 호출
+    실패 시 기본값(기온 20, 맑음) 반환하여 추천 중단 방지
+    """
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            resp = client.get(
+                f"{WEATHER_BASE_URL}/weather/address",
+                params={"address": address}
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        if data.get("status") != "success":
+            return {"temperature": 20.0, "condition": "sunny"}
+
+        weather = data["weather"]
+        temp_str = weather.get("현재 기온", "20°C").replace("°C", "").strip()
+        temperature = float(temp_str)
+
+        sky  = weather.get("하늘 상태", "맑음")
+        rain = weather.get("강수 형태", "없음")
+
+        if rain in ("비", "소나기", "비/눈"):
+            condition = "rainy"
+        elif rain == "눈":
+            condition = "snowy"
+        elif sky == "맑음":
+            condition = "sunny"
+        else:
+            condition = "cloudy"
+
+        return {"temperature": temperature, "condition": condition}
+
+    except Exception as e:
+        print(f"[날씨 연동 실패, 기본값 사용] {e}")
+        return {"temperature": 20.0, "condition": "sunny"}
+    
 # ──────────────────────────────────────────────
 # 사용자 프로필 텍스트 생성
 # ──────────────────────────────────────────────
