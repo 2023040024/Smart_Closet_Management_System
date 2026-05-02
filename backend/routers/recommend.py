@@ -81,7 +81,7 @@ def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_cond
             if temperature <= 14 and c.thickness == ThicknessEnum.thin:
                 continue
         if weather_condition in ("rainy", "snowy"):
-            if c.material == MaterialEnum.레더:
+            if c.material == MaterialEnum.leather:
                 continue
         result.append(c)
     return result
