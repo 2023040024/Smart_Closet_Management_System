@@ -117,21 +117,20 @@ def build_prompt(
 ) -> str:
     # 영어 → 한국어 변환 (tpo_rules.py 키와 동기화)
     situation_map = {
-        "daily":    "데일리",
-        "business": "비즈니스",
-        "interview":"면접",
-        "wedding":  "결혼식",
-        "funeral":  "장례식",
-        "exercise": "운동",
-        "date":     "데이트",
-        "meeting":  "모임",
-        "travel":   "여행",
-        # 구버전 프론트 호환
-        "school":   "데일리",
-        "cafe":     "데일리",
+    "daily":    "데일리",
+    "business": "비즈니스",
+    "interview":"면접",
+    "wedding":  "결혼식",
+    "funeral":  "장례식",
+    "exercise": "운동",
+    "date":     "데이트",
+    "meeting":  "모임",
+    "travel":   "여행",
+    "school":   "데일리",
+    "cafe":     "데일리",
     }
-    situation_kr = situation_map.get(situation, "데일리")
-
+    situation_kr = situation_map.get(situation or "daily", "데일리")
+    
     # tpo_rules에 한국어 키로 넘겨야 함
     context = get_tpo_prompt_text(situation_kr, temperature, weather_condition)
 
@@ -264,12 +263,13 @@ def recommend_today(
 
     # 3단계: Gemini API 호출
 
+    # /today
     prompt = build_prompt(
-        filtered,
-        situation or "데일리",
-        temperature or 20.0,
-        weather_condition or "sunny",
-        preferred_style
+    filtered,
+    situation or "daily",   # "cafe" → "daily"로 확정
+    temperature or 20.0,
+    weather_condition or "sunny",
+    current_user
     )
 
     result = call_gemini(prompt)
@@ -305,12 +305,13 @@ def recommend_custom(
 
     preferred_style = current_user.preferred_style or "캐주얼"
 
+     # /custom
     prompt = build_prompt(
-        filtered,
-        body.situation or "데일리",
-        body.temperature or 20.0,
-        body.weather_condition or "sunny",
-        preferred_style
+    filtered,
+    body.situation or "daily",
+    body.temperature or 20.0,
+    body.weather_condition or "sunny",
+    current_user
     )
 
     result = call_gemini(prompt)
