@@ -2,7 +2,8 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from conftest import make_clothes
 from models import StatusEnum, CategoryEnum, ThicknessEnum, MaterialEnum
-from routers.recommend import filter_clothes
+from routers.recommend import filter_clothes, get_unworn_days
+from datetime import date, timedelta
 
 class TestFilterClothes:
     def test_세탁중_제외(self):
@@ -44,3 +45,21 @@ class TestFilterClothes:
 
     def test_빈리스트(self):
         assert filter_clothes([], 20.0, "sunny") == []
+
+
+class TestGetUnwornDays:
+    def test_착용기록없음_999반환(self):
+        c = make_clothes(last_worn_date=None)
+        assert get_unworn_days(c) == 999
+
+    def test_오늘착용_0반환(self):
+        c = make_clothes(last_worn_date=date.today())
+        assert get_unworn_days(c) == 0
+
+    def test_7일전착용(self):
+        c = make_clothes(last_worn_date=date.today() - timedelta(days=7))
+        assert get_unworn_days(c) == 7
+
+    def test_30일전착용(self):
+        c = make_clothes(last_worn_date=date.today() - timedelta(days=30))
+        assert get_unworn_days(c) == 30
