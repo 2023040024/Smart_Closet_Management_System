@@ -27,6 +27,7 @@ class RecommendRequest(BaseModel):
     situation: Optional[str] = None
     temperature: Optional[float] = None
     weather_condition: Optional[str] = None
+    address: Optional[str] = None 
 
 
 class OutfitItem(BaseModel):
@@ -85,7 +86,6 @@ def fetch_weather(address: str) -> dict:
     except Exception as e:
         print(f"[날씨 연동 실패, 기본값 사용] {e}")
         return {"temperature": 20.0, "condition": "sunny"}
-    
 # ──────────────────────────────────────────────
 # 사용자 프로필 텍스트 생성
 # ──────────────────────────────────────────────
