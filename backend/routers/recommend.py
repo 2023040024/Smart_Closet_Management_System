@@ -184,7 +184,6 @@ def build_prompt(
 """
     return prompt
 
-
 def call_gemini(prompt: str, retries: int = 2) -> dict:
     """Gemini API 호출 및 JSON 파싱 (최대 2회 재시도)"""
     last_error = None
