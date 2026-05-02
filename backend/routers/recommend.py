@@ -257,20 +257,28 @@ def call_gemini(prompt: str, retries: int = 2) -> dict:
 def recommend_today(
     situation: Optional[str] = None,
     temperature: Optional[float] = None,
-    weather_condition: Optional[str] = "sunny",
+    weather_condition: Optional[str] = None,   # ← "sunny" 제거
+    address: Optional[str] = None,              # ← 추가
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if address:
+        fetched = fetch_weather(address)
+        temperature       = temperature       or fetched["temperature"]
+        weather_condition = weather_condition or fetched["condition"]
+
+    temperature       = temperature       or 20.0
+    weather_condition = weather_condition or "sunny"
+
     user_id = current_user.user_id
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered = filter_clothes(all_clothes, temperature or 20.0, weather_condition or "sunny")
+    filtered = filter_clothes(all_clothes, temperature, weather_condition)
     if len(filtered) < 2:
         raise HTTPException(status_code=400, detail="날씨·상태 조건에 맞는 옷이 부족합니다")
-    prompt = build_prompt(filtered, situation or "daily", temperature or 20.0, weather_condition or "sunny", current_user)
+    prompt = build_prompt(filtered, situation or "daily", temperature, weather_condition, current_user)
     return call_gemini(prompt)
-
 
 @router.post("/custom")
 def recommend_custom(
