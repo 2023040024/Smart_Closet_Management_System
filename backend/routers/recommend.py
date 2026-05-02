@@ -309,10 +309,19 @@ def recommend_custom(
 def recommend_weekly(
     situation: Optional[str] = None,
     temperature: Optional[float] = None,
-    weather_condition: Optional[str] = "sunny",
+    weather_condition: Optional[str] = None,   # ← "sunny" 제거
+    address: Optional[str] = None,              # ← 추가
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if address:
+        fetched = fetch_weather(address)
+        temperature       = temperature       or fetched["temperature"]
+        weather_condition = weather_condition or fetched["condition"]
+
+    temperature       = temperature       or 20.0
+    weather_condition = weather_condition or "sunny"
+
     user_id = current_user.user_id
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     filtered = [c for c in all_clothes if c.status == StatusEnum.wearable]
@@ -325,8 +334,8 @@ def recommend_weekly(
 당신은 패션 코디 전문가입니다.
 아래 옷장에서 월~금 5일치 코디를 짜주세요. (옷 돌려막기 스타일)
 [오늘 날씨]
-- 기온: {temperature or 20.0}°C
-- 날씨: {weather_condition or 'sunny'}
+- 기온: {temperature}°C
+- 날씨: {weather_condition}
 [목표]
 - 같은 옷을 연속으로 입지 않기
 - 상의 하나로 여러 코디 만들기
