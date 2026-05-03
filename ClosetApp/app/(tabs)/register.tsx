@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput, // TextInput 추가
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -114,6 +115,7 @@ function stringifyErrorDetail(responseData: any, status: number) {
 export default function RegisterScreen() {
   const [image, setImage] = useState<string | null>(null);
   const [selected, setSelected] = useState<ClothesTags>(EMPTY_TAGS);
+  const [price, setPrice] = useState<string>(''); // 구매가 상태 추가
   const [loading, setLoading] = useState(false);
 
   const fitLabel = useMemo(() => {
@@ -165,8 +167,6 @@ export default function RegisterScreen() {
   };
 
   const saveClothesToApi = async () => {
-     console.log('POST /clothes 요청 시작')
-
     if (!image) {
       throw new Error('이미지가 없습니다.');
     }
@@ -192,6 +192,11 @@ export default function RegisterScreen() {
 
     if (fitValue) {
       formData.append('fit', fitValue);
+    }
+
+    // 구매가 데이터 추가 (입력된 값이 있을 경우에만 전송)
+    if (price) {
+      formData.append('price', price); 
     }
 
     formData.append('image', {
@@ -223,9 +228,9 @@ export default function RegisterScreen() {
   };
 
   const handleSave = async () => {
-      console.log('등록 버튼 눌림');
-      console.log('selected:', selected);
-      console.log('image:', image);
+    console.log('selected:', selected);
+    console.log('image:', image);
+    console.log('price:', price);
 
     if (!image) {
       Alert.alert('입력 확인', '이미지를 먼저 선택해주세요.');
@@ -274,6 +279,7 @@ export default function RegisterScreen() {
           onPress: () => {
             setImage(null);
             setSelected(EMPTY_TAGS);
+            setPrice(''); // 등록 성공 시 가격 초기화
             router.replace('/(tabs)');
           },
         },
@@ -354,8 +360,25 @@ export default function RegisterScreen() {
       <Text style={styles.sectionTitle}>TPO</Text>
       {renderChips(TAG_OPTIONS.tpo, 'tpo')}
 
-      <TouchableOpacity style={styles.resetButton} onPress={() => setSelected(EMPTY_TAGS)}>
-        <Text style={styles.resetButtonText}>태그 초기화</Text>
+      {/* 구매가 입력 폼 추가 */}
+      <Text style={styles.sectionTitle}>구매가</Text>
+      <TextInput
+        style={styles.priceInput}
+        value={price}
+        onChangeText={setPrice}
+        placeholder="가격을 입력해주세요 (예: 50000)"
+        keyboardType="numeric"
+        placeholderTextColor="#9ca3af"
+      />
+
+      <TouchableOpacity 
+        style={styles.resetButton} 
+        onPress={() => {
+          setSelected(EMPTY_TAGS);
+          setPrice(''); // 초기화 버튼 클릭 시 가격도 초기화
+        }}
+      >
+        <Text style={styles.resetButtonText}>태그 및 정보 초기화</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -401,6 +424,17 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: '#111827' },
   chipText: { color: '#111827' },
   chipTextSelected: { color: '#fff' },
+  // 구매가 입력 인풋 스타일 추가
+  priceInput: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    backgroundColor: '#f9fafb',
+    color: '#111827',
+    marginBottom: 16,
+  },
   resetButton: {
     marginTop: 16,
     paddingVertical: 14,
