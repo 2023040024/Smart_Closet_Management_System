@@ -121,33 +121,40 @@ export default function DetailScreen() {
     fetchDetail();
   }, [id]);
 
- const visibleTags = useMemo(() => {
-  if (!item) return [];
+  const visibleTags = useMemo(() => {
+    if (!item) return [];
 
-  const fitValue = item.fit ?? item.top_fit ?? item.bottom_fit ?? '';
-  const tpoValue = item.tpo ?? item.situation ?? '';
+    const fitValue = item.fit ?? item.top_fit ?? item.bottom_fit ?? '';
+    const tpoValue = item.tpo ?? item.situation ?? '';
+    
+    // 백엔드 응답이 price일 수도, purchase_price일 수도 있으므로 둘 다 체크
+    const rawPrice = (item as any).price ?? item.purchase_price;
+    const priceValue = rawPrice != null && rawPrice !== ''
+      ? `${Number(rawPrice).toLocaleString()}원` 
+      : '';
 
-  return [
-    { label: '이름', value: item.name },
-    { label: '카테고리', value: item.category },
-    { label: '색상', value: item.color },
-    { label: '계절', value: item.season },
-    { label: '톤', value: item.tone },
-    { label: '스타일', value: item.style },
-    { label: '분위기', value: item.mood },
-    { label: '핏', value: fitValue },
-    { label: '소재', value: item.material },
-    { label: '두께', value: item.thickness },
-    { label: '포인트', value: item.point },
-    { label: 'TPO', value: tpoValue },
-    { label: '마지막 착용일', value: item.last_worn_date },
-  ].filter(
-    (tag) =>
-      tag.value !== undefined &&
-      tag.value !== null &&
-      String(tag.value).trim() !== ''
-  );
-}, [item]);
+    return [
+      { label: '이름', value: item.name },
+      { label: '카테고리', value: item.category },
+      { label: '색상', value: item.color },
+      { label: '계절', value: item.season },
+      { label: '톤', value: item.tone },
+      { label: '스타일', value: item.style },
+      { label: '분위기', value: item.mood },
+      { label: '핏', value: fitValue },
+      { label: '소재', value: item.material },
+      { label: '두께', value: item.thickness },
+      { label: '포인트', value: item.point },
+      { label: 'TPO', value: tpoValue },
+      { label: '구매가', value: priceValue }, // 구매가 추가
+      { label: '마지막 착용일', value: item.last_worn_date },
+    ].filter(
+      (tag) =>
+        tag.value !== undefined &&
+        tag.value !== null &&
+        String(tag.value).trim() !== ''
+    );
+  }, [item]);
 
   if (loading) {
     return (
@@ -201,7 +208,11 @@ export default function DetailScreen() {
 
       <TouchableOpacity
         style={styles.button}
-        onPress={() => router.push({ pathname: '/edit', params: { id: String(id) } })}
+        // 수정된 부분: URL 파라미터 id 대신, 서버에서 받아온 확실한 item.clothes_id (또는 item.id) 사용
+        onPress={() => router.push({ 
+          pathname: '/edit', 
+          params: { id: String(item?.clothes_id ?? item?.id) } 
+        })}
       >
         <Text style={styles.buttonText}>수정하기</Text>
       </TouchableOpacity>
