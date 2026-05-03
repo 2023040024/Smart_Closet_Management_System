@@ -5,15 +5,14 @@ from typing import List, Union
 from database import get_db
 from models import Clothes, WearHistory, User
 from schemas import WearHistoryCreate, WearHistoryResponse
+from .auth import get_current_user
 
 router = APIRouter(prefix="/history", tags=["착용 기록"])
-
-#프론트엔드 로그인 기능 구현 시 TEMP_USER_ID을 유저 아이디로 변경
-TEMP_USER_ID = 1
 
 @router.post("", response_model=Union[WearHistoryResponse, List[WearHistoryResponse]], status_code=status.HTTP_201_CREATED)
 def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryCreate]],
                         db: Session = Depends(get_db),
+                        current_user: User = Depends(get_current_user)
                         ):
     is_single = isinstance(history_data, WearHistoryCreate)
     history_data_list = [history_data] if is_single else history_data
@@ -76,6 +75,7 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
 @router.get("", response_model=List[WearHistoryResponse])
 def get_wear_histories(skip: int = 0, limit: int = 100, 
                        db: Session = Depends(get_db),
+                       current_user: User = Depends(get_current_user)
                        ):
     histories = db.query(WearHistory)\
         .options(joinedload(WearHistory.clothes))\
@@ -87,6 +87,7 @@ def get_wear_histories(skip: int = 0, limit: int = 100,
 @router.delete("/{history_id}")
 def delete_wear_history(history_id: int, 
                         db: Session = Depends(get_db),
+                        current_user: User = Depends(get_current_user)
                         ):
     # 1. 삭제할 기록 찾기
     history = db.query(WearHistory).filter(
