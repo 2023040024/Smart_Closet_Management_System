@@ -1,14 +1,13 @@
 import os
 import uuid
-from datetime import date
-from typing import Optional, List
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Clothes, User, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum
 from schemas import ClothesUpdate, ClothesStatusUpdate, ClothesResponse
-from auth import get_current_user
+from .auth import get_current_user
 
 router = APIRouter(prefix="/clothes", tags=["옷장"])
 
