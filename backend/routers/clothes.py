@@ -8,6 +8,7 @@ from database import get_db
 from models import Clothes, User, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum
 from schemas import ClothesUpdate, ClothesStatusUpdate, ClothesResponse
 from .auth import get_current_user
+from schemas import ClothesCreate
 
 router = APIRouter(prefix="/clothes", tags=["옷장"])
 
@@ -25,6 +26,22 @@ MATERIAL_TIPS = {
     "데님":  "뒤집어서 세탁, 건조기 금지, 옷걸이 보관",
     "가죽":  "물 닿지 않게 주의, 전용 크림 관리, 통풍 좋은 곳 보관",
 }
+
+def get_material_tip(material_name: Optional[str]):
+    if not material_name:
+        return "소재 정보가 없습니다. 옷 정보를 수정해서 소재를 입력해주세요."
+    
+    # 공백 제거 및 정확한 매칭 시도
+    cleaned_material = material_name.strip()
+    tip = MATERIAL_TIPS.get(cleaned_material)
+    
+    if not tip:
+        # 유사 단어 포함 여부 체크 (예: "면 100%" -> "면" 팁 반환)
+        for key, value in MATERIAL_TIPS.items():
+            if key in cleaned_material:
+                return value
+        return f"'{cleaned_material}' 소재에 대한 팁이 아직 없습니다."
+    return tip
 
 
 # ──────────────────────────────────────────────
