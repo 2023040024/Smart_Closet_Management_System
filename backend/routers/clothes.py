@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Clothes, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum
-from schemas import ClothesCreate, ClothesUpdate, ClothesStatusUpdate, ClothesResponse
+from schemas import ClothesUpdate, ClothesStatusUpdate, ClothesResponse
 
 router = APIRouter(prefix="/clothes", tags=["옷장"])
 
@@ -41,7 +41,7 @@ async def create_clothes(
     style:          StyleEnum         = Form(...),
     material:       Optional[str]     = Form(None),
     thickness:      Optional[ThicknessEnum] = Form(None),
-    purchase_price: Optional[int]     = Form(None),
+    price:          Optional[int]     = Form(None),
     image:          Optional[UploadFile] = File(None),
     db:             Session           = Depends(get_db),
 ):
@@ -70,7 +70,7 @@ async def create_clothes(
         style          = style,
         material       = material,
         thickness      = thickness,
-        purchase_price = purchase_price,
+        price          = price,
         image_url      = image_url,
     )
     db.add(clothes)
