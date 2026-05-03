@@ -55,9 +55,12 @@ def get_disposal_recommendation(db: Session = Depends(get_db)):
         db.query(Clothes)
         .filter(
             Clothes.user_id == current_user_id,
+            # 💡 [추가 1] 1. 최근 90일 동안 입지 않은 옷
             (Clothes.last_worn_date <= ninety_days_ago_date) | 
             (
-                ((Clothes.wear_count == 0) | (Clothes.wear_count == None)) & 
+                # 💡 [추가 2] 2. 한 번도 입지 않았고, 등록된 지 90일이 지난 옷
+                # 💡 [수정 3, 4] == None을 SQLAlchemy 권장 방식인 is_(None)으로 교체
+                ((Clothes.wear_count == 0) | Clothes.wear_count.is_(None)) & 
                 (Clothes.created_at <= ninety_days_ago_datetime) 
             )
         )
