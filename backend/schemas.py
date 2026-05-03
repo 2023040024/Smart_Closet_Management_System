@@ -84,7 +84,7 @@ class ClothesCreate(BaseModel):
     material:       Optional[MaterialEnum] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
-    purchase_price: Optional[int] = None
+    price:          Optional[int] = 0
     status:         Optional[StatusEnum] = None
     situation:      Optional[SituationEnum] = None
 
@@ -110,7 +110,7 @@ class ClothesUpdate(BaseModel):
     material:       Optional[MaterialEnum] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
-    purchase_price: Optional[int] = None
+    price:          Optional[int] = 0
     status:         Optional[StatusEnum] = None
     situation:      Optional[SituationEnum] = None
 
@@ -140,7 +140,7 @@ class ClothesResponse(BaseModel):
     material:       Optional[MaterialEnum] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
-    purchase_price: Optional[int] = None
+    price:          Optional[int] = 0
     situation:      Optional[SituationEnum] = None
     image_url:      Optional[str] = None
     status:         Optional[StatusEnum] = None
