@@ -1,13 +1,14 @@
 import os
 import uuid
 from datetime import date
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Clothes, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum
 from schemas import ClothesUpdate, ClothesStatusUpdate, ClothesResponse
+from auth import get_current_user
 
 router = APIRouter(prefix="/clothes", tags=["옷장"])
 
@@ -44,9 +45,8 @@ async def create_clothes(
     price:          Optional[int]     = Form(None),
     image:          Optional[UploadFile] = File(None),
     db:             Session           = Depends(get_db),
+    current_user:   User = Depends(get_current_user)
 ):
-    # TODO: JWT에서 user_id 추출 (미들웨어 연결 후)
-    user_id = 1  # 임시
 
     # 이미지 저장
     image_url = None
@@ -62,7 +62,7 @@ async def create_clothes(
         image_url = f"/images/{filename}"
 
     clothes = Clothes(
-        user_id        = user_id,
+        user_id        = current_user.id,
         name           = name,
         category       = category,
         color          = color,
@@ -90,11 +90,10 @@ def get_clothes(
     style:    Optional[StyleEnum]    = None,
     status:   Optional[StatusEnum]   = None,
     db:       Session                = Depends(get_db),
+    current_user: User               = Depends(get_current_user)
 ):
-    # TODO: JWT에서 user_id 추출
-    user_id = 1
 
-    query = db.query(Clothes).filter(Clothes.user_id == user_id)
+    query = db.query(Clothes).filter(Clothes.user_id == current_user.id)
 
     if category: query = query.filter(Clothes.category == category)
     if season:   query = query.filter(Clothes.season == season)
@@ -109,9 +108,9 @@ def get_clothes(
 # ──────────────────────────────────────────────
 
 @router.get("/{clothes_id}", response_model=ClothesResponse)
-def get_clothes_detail(clothes_id: int, db: Session = Depends(get_db)):
-    user_id = 1  # TODO: JWT
-    clothes = _get_clothes_or_404(db, clothes_id, user_id)
+def get_clothes_detail(clothes_id: int, db: Session = Depends(get_db)
+                       , current_user: User = Depends(get_current_user)):
+    clothes = _get_clothes_or_404(db, clothes_id, current_user.id)
     return clothes
 
 
