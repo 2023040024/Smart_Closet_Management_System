@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Clothes, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum
+from models import Clothes, User, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum
 from schemas import ClothesUpdate, ClothesStatusUpdate, ClothesResponse
 from auth import get_current_user
 
@@ -119,9 +119,9 @@ def get_clothes_detail(clothes_id: int, db: Session = Depends(get_db)
 # ──────────────────────────────────────────────
 
 @router.put("/{clothes_id}", response_model=ClothesResponse)
-def update_clothes(clothes_id: int, body: ClothesUpdate, db: Session = Depends(get_db)):
-    user_id = 1  # TODO: JWT
-    clothes = _get_clothes_or_404(db, clothes_id, user_id)
+def update_clothes(clothes_id: int, body: ClothesUpdate, db: Session = Depends(get_db)
+                   , current_user: User = Depends(get_current_user)):
+    clothes = _get_clothes_or_404(db, clothes_id, current_user.id)
 
     update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -137,9 +137,9 @@ def update_clothes(clothes_id: int, body: ClothesUpdate, db: Session = Depends(g
 # ──────────────────────────────────────────────
 
 @router.patch("/{clothes_id}/status", response_model=ClothesResponse)
-def update_status(clothes_id: int, body: ClothesStatusUpdate, db: Session = Depends(get_db)):
-    user_id = 1  # TODO: JWT
-    clothes = _get_clothes_or_404(db, clothes_id, user_id)
+def update_status(clothes_id: int, body: ClothesStatusUpdate, db: Session = Depends(get_db)
+                  , current_user: User = Depends(get_current_user)):
+    clothes = _get_clothes_or_404(db, clothes_id, current_user.id)
     clothes.status = body.status
     db.commit()
     db.refresh(clothes)
@@ -151,9 +151,9 @@ def update_status(clothes_id: int, body: ClothesStatusUpdate, db: Session = Depe
 # ──────────────────────────────────────────────
 
 @router.delete("/{clothes_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_clothes(clothes_id: int, db: Session = Depends(get_db)):
-    user_id = 1  # TODO: JWT
-    clothes = _get_clothes_or_404(db, clothes_id, user_id)
+def delete_clothes(clothes_id: int, db: Session = Depends(get_db)
+                   , current_user: User = Depends(get_current_user)):
+    clothes = _get_clothes_or_404(db, clothes_id, current_user.id)
     db.delete(clothes)
     db.commit()
 
@@ -163,9 +163,9 @@ def delete_clothes(clothes_id: int, db: Session = Depends(get_db)):
 # ──────────────────────────────────────────────
 
 @router.get("/{clothes_id}/tips")
-def get_care_tips(clothes_id: int, db: Session = Depends(get_db)):
-    user_id = 1  # TODO: JWT
-    clothes = _get_clothes_or_404(db, clothes_id, user_id)
+def get_care_tips(clothes_id: int, db: Session = Depends(get_db),
+                  current_user: User = Depends(get_current_user)):
+    clothes = _get_clothes_or_404(db, clothes_id, current_user.id)
 
     if not clothes.material:
         return {"tip": "소재 정보가 없습니다. 옷 정보를 수정해서 소재를 입력해주세요."}
