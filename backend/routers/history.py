@@ -32,7 +32,7 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
         for history_data in history_data_list:
             cloth = db.query(Clothes).filter(
                 Clothes.clothes_id == history_data.clothes_id,
-                Clothes.user_id == TEMP_USER_ID
+                Clothes.user_id == current_user.id
             ).first()
             if not cloth:
                 raise HTTPException(status_code=404, detail=f"해당 ID({history_data.clothes_id})의 옷을 찾을 수 없습니다.")
@@ -44,7 +44,7 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
                 raise HTTPException(status_code=400, detail=f"ID({history_data.clothes_id}) 옷은 오늘 이미 기록되었습니다.")
 
             new_history = WearHistory(
-                user_id=TEMP_USER_ID,
+                user_id=current_user.id,
                 clothes_id=history_data.clothes_id,
                 worn_date=history_data.worn_date,
                 tpo=history_data.tpo,
@@ -79,7 +79,7 @@ def get_wear_histories(skip: int = 0, limit: int = 100,
                        ):
     histories = db.query(WearHistory)\
         .options(joinedload(WearHistory.clothes))\
-            .filter(WearHistory.user_id == TEMP_USER_ID)\
+            .filter(WearHistory.user_id == current_user.id)\
         .order_by(WearHistory.worn_date.desc()).offset(skip).limit(limit)\
             .all()
     return histories
@@ -92,7 +92,7 @@ def delete_wear_history(history_id: int,
     # 1. 삭제할 기록 찾기
     history = db.query(WearHistory).filter(
         WearHistory.history_id == history_id,
-        WearHistory.user_id == TEMP_USER_ID).first()
+        WearHistory.user_id == current_user.id).first()
     
     if not history:
         raise HTTPException(status_code=404, detail="삭제할 기록을 찾을 수 없습니다.")
