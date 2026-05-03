@@ -152,9 +152,9 @@ class ClothesResponse(BaseModel):
     @model_validator(mode='after')
     def calculate_cpw(self) -> 'ClothesResponse':
         """
-        구매가(purchase_price)를 착용 횟수(wear_count)로 나누어 1회 착용당 비용을 산출
+        구매가(price)를 착용 횟수(wear_count)로 나누어 1회 착용당 비용을 산출
         """
-        price = self.purchase_price or 0
+        price = self.price or 0
         count = self.wear_count or 0
 
         if count > 0:
