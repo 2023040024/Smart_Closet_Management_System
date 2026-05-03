@@ -52,10 +52,10 @@ def get_material_tip(material_name: Optional[str]):
 async def create_clothes(
     # Form 필드로 받기 (이미지 업로드와 함께 사용 시 multipart/form-data)
     name:           str               = Form(...),
-    category:       CategoryEnum      = Form(...),
+    category:       str               = Form(...),
     color:          str               = Form(...),
-    season:         SeasonEnum        = Form(...),
-    style:          StyleEnum         = Form(...),
+    season:         str               = Form(...),
+    style:          str               = Form(...),
     material:       Optional[str]     = Form(None),
     thickness:      Optional[ThicknessEnum] = Form(None),
     price:          Optional[int]     = Form(None),
@@ -67,7 +67,7 @@ async def create_clothes(
     # 이미지 저장
     image_url = None
     if image and image.filename:
-        ext       = image.filename.rsplit(".", 1)[-1].lower()
+        ext = image.filename.rsplit(".", 1)[-1].lower()
         if ext not in ("jpg", "jpeg", "png", "webp"):
             raise HTTPException(status_code=400, detail="jpg, png, webp만 가능합니다")
         filename  = f"{uuid.uuid4()}.{ext}"
@@ -75,6 +75,7 @@ async def create_clothes(
         content   = await image.read()
         with open(save_path, "wb") as f:
             f.write(content)
+        await image.close() # 리소스 해제
         image_url = f"/images/{filename}"
 
     clothes = Clothes(
@@ -84,7 +85,7 @@ async def create_clothes(
         color          = color,
         season         = season,
         style          = style,
-        material       = material,
+        material       = material.strip() if material else None,
         thickness      = thickness,
         price          = price,
         image_url      = image_url,
@@ -186,13 +187,11 @@ def get_care_tips(clothes_id: int, db: Session = Depends(get_db),
     if not clothes.material:
         return {"tip": "소재 정보가 없습니다. 옷 정보를 수정해서 소재를 입력해주세요."}
 
-    tip = MATERIAL_TIPS.get(clothes.material)
-    if not tip:
-        return {"tip": f"'{clothes.material}' 소재에 대한 팁이 아직 없습니다."}
+    tip = get_material_tip(clothes.material)
 
     return {
         "clothes_name": clothes.name,
-        "material":     clothes.material,
+        "material":     clothes.material or "미입력",
         "tip":          tip
     }
 
