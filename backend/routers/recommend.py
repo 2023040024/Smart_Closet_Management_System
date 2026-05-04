@@ -220,7 +220,7 @@ def recommend_today(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    user_id = current_user.user_id
+    user_id = current_user.id
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
@@ -237,7 +237,7 @@ def recommend_custom(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    user_id = current_user.user_id
+    user_id = current_user.id
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
@@ -254,7 +254,7 @@ def recommend_weekly(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    user_id = current_user.user_id
+    user_id = current_user.id
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     filtered = [c for c in all_clothes if c.status == StatusEnum.wearable]
     if len(filtered) < 4:
