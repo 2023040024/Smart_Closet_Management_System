@@ -1,62 +1,49 @@
+import * as Location from 'expo-location';
+import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  TouchableOpacity,
   View,
-  useWindowDimensions,
 } from 'react-native';
 
-import { ClothesItem, TAG_OPTIONS, useCloset } from '../_closetStore';
+// ✨ 방금 만든 똑똑한 통신 모듈 불러오기
+import api from '../_api';
+import { ClothesItem, useCloset } from '../_closetStore';
 
 type OutfitSet = {
-  outer?: ClothesItem;
   top?: ClothesItem;
   bottom?: ClothesItem;
+  outer?: ClothesItem;
   shoes?: ClothesItem;
+  accessory?: ClothesItem;
 };
 
-type RecommendFilterType = {
-  category: string[];
-  season: string[];
-  style: string[];
-  mood: string[];
-  tpo: string[];
-};
+function normalizeParam(value: string | string[] | undefined): string[] {
+  if (!value) return [];
 
-const FILTER_OPTIONS = {
-  category: [...TAG_OPTIONS.category],
-  season: [...TAG_OPTIONS.season],
-  style: [...TAG_OPTIONS.style],
-  mood: [...TAG_OPTIONS.mood],
-  tpo: [...TAG_OPTIONS.tpo],
-};
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((v) => v.split(','))
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
 
-const FILTER_LABELS: Record<keyof RecommendFilterType, string> = {
-  category: '카테고리',
-  season: '계절',
-  style: '스타일',
-  mood: '분위기',
-  tpo: 'TPO',
-};
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
-const INITIAL_FILTERS: RecommendFilterType = {
-  category: [],
-  season: [],
-  style: [],
-  mood: [],
-  tpo: [],
-};
-
-const INITIAL_EXPANDED: Record<keyof RecommendFilterType, boolean> = {
-  category: true,
-  season: true,
-  style: true,
-  mood: false,
-  tpo: true,
-};
+function displayText(values: string[]) {
+  return values.length > 0 ? values.join(', ') : '선택되지 않음';
+}
 
 function includesAny(source?: string, targets?: string[]) {
   if (!targets || targets.length === 0) return true;
@@ -64,30 +51,31 @@ function includesAny(source?: string, targets?: string[]) {
   return targets.includes(source);
 }
 
-function filterItems(items: ClothesItem[], filters: RecommendFilterType) {
+function filterItems(
+  items: ClothesItem[],
+  categoryFilters: string[],
+  seasonFilters: string[],
+  tpoFilters: string[],
+  styleFilters: string[],
+  moodFilters: string[]
+) {
   return items.filter((item) => {
     const categoryMatch =
-      filters.category.length === 0 || filters.category.includes(item.tags.category);
+      categoryFilters.length === 0 || categoryFilters.includes(item.tags.category);
 
     const seasonMatch =
-      filters.season.length === 0 || includesAny(item.tags.season, filters.season);
-
-    const styleMatch =
-      filters.style.length === 0 || includesAny(item.tags.style, filters.style);
-
-    const moodMatch =
-      filters.mood.length === 0 || includesAny(item.tags.mood, filters.mood);
+      seasonFilters.length === 0 || includesAny(item.tags.season, seasonFilters);
 
     const tpoMatch =
-      filters.tpo.length === 0 || includesAny(item.tags.tpo, filters.tpo);
+      tpoFilters.length === 0 || includesAny(item.tags.tpo, tpoFilters);
 
-    return (
-      categoryMatch &&
-      seasonMatch &&
-      styleMatch &&
-      moodMatch &&
-      tpoMatch
-    );
+    const styleMatch =
+      styleFilters.length === 0 || includesAny(item.tags.style, styleFilters);
+
+    const moodMatch =
+      moodFilters.length === 0 || includesAny(item.tags.mood, moodFilters);
+
+    return categoryMatch && seasonMatch && tpoMatch && styleMatch && moodMatch;
   });
 }
 
@@ -96,22 +84,19 @@ function createOutfits(items: ClothesItem[]): OutfitSet[] {
   const bottoms = items.filter((item) => item.tags.category === '하의');
   const outers = items.filter((item) => item.tags.category === '아우터');
   const shoes = items.filter((item) => item.tags.category === '신발');
+  const accessories = items.filter((item) => item.tags.category === '악세사리');
 
   const outfits: OutfitSet[] = [];
+  const maxCount = Math.min(3, tops.length, bottoms.length);
 
-  for (let i = 0; i < tops.length; i++) {
-    for (let j = 0; j < bottoms.length; j++) {
-      if (outfits.length >= 3) break;
-
-      outfits.push({
-        outer: outers.length > 0 ? outers[(i + j) % outers.length] : undefined,
-        top: tops[i],
-        bottom: bottoms[j],
-        shoes: shoes.length > 0 ? shoes[(i + j) % shoes.length] : undefined,
-      });
-    }
-
-    if (outfits.length >= 3) break;
+  for (let i = 0; i < maxCount; i++) {
+    outfits.push({
+      top: tops[i],
+      bottom: bottoms[i],
+      outer: outers[i],
+      shoes: shoes[i],
+      accessory: accessories[i],
+    });
   }
 
   return outfits;
@@ -128,32 +113,10 @@ function getItemTitle(item: ClothesItem) {
   return `${color} ${category}`;
 }
 
-function buildRecommendReason(filters: RecommendFilterType, outfit: OutfitSet) {
-  const reasons: string[] = [];
-
-  if (filters.season.length > 0) {
-    reasons.push(`선택한 계절(${filters.season.join(', ')}) 조건을 반영했습니다`);
-  }
-
-  if (filters.style.length > 0) {
-    reasons.push(`선택한 스타일(${filters.style.join(', ')})에 맞는 조합을 우선 고려했습니다`);
-  }
-
-  if (filters.mood.length > 0) {
-    reasons.push(`선택한 분위기(${filters.mood.join(', ')})와 어울리는 아이템을 반영했습니다`);
-  }
-
-  if (filters.tpo.length > 0) {
-    reasons.push(`TPO(${filters.tpo.join(', ')})에 맞는 코디를 기준으로 추천했습니다`);
-  }
-
-  if (outfit.outer) {
-    reasons.push('아우터부터 보기 쉬운 순서로 정리했습니다');
-  } else {
-    reasons.push('현재 보유한 옷 기준으로 자연스러운 조합을 구성했습니다');
-  }
-
-  return reasons.join('. ') + '.';
+function getFitText(item: ClothesItem) {
+  if (item.tags.category === '상의') return item.tags.topFit;
+  if (item.tags.category === '하의') return item.tags.bottomFit;
+  return '';
 }
 
 function OutfitItemCard({
@@ -165,6 +128,8 @@ function OutfitItemCard({
 }) {
   if (!item) return null;
 
+  const fitText = getFitText(item);
+
   return (
     <View style={styles.itemCard}>
       <View style={styles.itemHeaderRow}>
@@ -172,13 +137,7 @@ function OutfitItemCard({
       </View>
 
       {item.image ? (
-        <View style={styles.imageBox}>
-          <Image
-            source={{ uri: item.image }}
-            style={styles.itemImage}
-            resizeMode="contain"
-          />
-        </View>
+        <Image source={{ uri: item.image }} style={styles.itemImage} />
       ) : (
         <View style={styles.imagePlaceholder}>
           <Text style={styles.imagePlaceholderText}>이미지 없음</Text>
@@ -191,139 +150,200 @@ function OutfitItemCard({
         <TagChip text={item.tags.style} />
         <TagChip text={item.tags.mood} />
         <TagChip text={item.tags.tpo} />
+        <TagChip text={fitText} />
       </View>
     </View>
   );
 }
 
 export default function RecommendScreen() {
+  const params = useLocalSearchParams();
   const { clothes } = useCloset();
-  const { width } = useWindowDimensions();
 
-  const [filters, setFilters] = useState<RecommendFilterType>(INITIAL_FILTERS);
-  const [expanded, setExpanded] =
-    useState<Record<keyof RecommendFilterType, boolean>>(INITIAL_EXPANDED);
-  const [recommendedOutfits, setRecommendedOutfits] = useState<OutfitSet[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
+  // --- 날씨 및 상황 기반 API 추천 상태 ---
+  const [situation, setSituation] = useState('');
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiRecommendations, setApiRecommendations] = useState<OutfitSet[] | null>(null);
 
-  const toggleExpand = (key: keyof RecommendFilterType) => {
-    setExpanded((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+  // --- 기존 조건 기반 필터링 상태 ---
+  const categoryFilters = useMemo(
+    () => normalizeParam(params.category as string | string[] | undefined),
+    [params.category]
+  );
+  const seasonFilters = useMemo(
+    () => normalizeParam(params.season as string | string[] | undefined),
+    [params.season]
+  );
+  const tpoFilters = useMemo(
+    () => normalizeParam(params.tpo as string | string[] | undefined),
+    [params.tpo]
+  );
+  const styleFilters = useMemo(
+    () => normalizeParam(params.style as string | string[] | undefined),
+    [params.style]
+  );
+  const moodFilters = useMemo(
+    () => normalizeParam(params.mood as string | string[] | undefined),
+    [params.mood]
+  );
+
+  const filteredItems = useMemo(() => {
+    return filterItems(
+      clothes,
+      categoryFilters,
+      seasonFilters,
+      tpoFilters,
+      styleFilters,
+      moodFilters
+    );
+  }, [clothes, categoryFilters, seasonFilters, tpoFilters, styleFilters, moodFilters]);
+
+  const outfitResults = useMemo(() => {
+    return createOutfits(filteredItems);
+  }, [filteredItems]);
+
+  // --- 날씨 API 추천 함수 ---
+  const fetchTodayRecommendation = async () => {
+    if (!situation.trim()) {
+      Alert.alert('입력 필요', '상황(예: 데이트, 출근)을 입력해주세요.');
+      return;
+    }
+
+    try {
+      setApiLoading(true);
+
+      // 1. 위치 권한 요청
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('권한 필요', '날씨 기반 추천을 위해 위치 권한이 필요합니다.');
+        setApiLoading(false);
+        return;
+      }
+
+      // 2. 현재 좌표 획득
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      // 3. 좌표 -> 주소 변환 (Reverse Geocoding)
+      const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+      let address = '알 수 없는 위치';
+      if (geocode.length > 0) {
+        const place = geocode[0];
+        address = `${place.region || ''} ${place.city || place.district || ''}`.trim();
+      }
+
+      console.log(`요청 주소: ${address}, 상황: ${situation}`);
+
+      // 4. 백엔드 추천 API 호출 (fetch 대신 ✨ api.get 사용)
+      const response = await api.get(
+        `/recommend/today?situation=${encodeURIComponent(
+          situation
+        )}&address=${encodeURIComponent(address)}`
+      );
+      
+      // Axios는 response.data 안에 결과물을 바로 담아줍니다.
+      setApiRecommendations(response.data);
+
+    } catch (error) {
+      console.error('API 호출 에러:', error);
+      Alert.alert('오류', '추천 코디를 불러오는 중 문제가 발생했습니다.');
+    } finally {
+      setApiLoading(false);
+    }
   };
-
-  const toggleFilter = (key: keyof RecommendFilterType, value: string) => {
-    setFilters((prev) => {
-      const exists = prev[key].includes(value);
-
-      return {
-        ...prev,
-        [key]: exists
-          ? prev[key].filter((item) => item !== value)
-          : [...prev[key], value],
-      };
-    });
-  };
-
-  const selectedSummary = useMemo(() => {
-    const allSelected = Object.values(filters).flat();
-    return allSelected.length > 0 ? allSelected.join(', ') : '선택된 조건이 없습니다';
-  }, [filters]);
-
-  const handleRecommend = () => {
-    const filteredItems = filterItems(clothes, filters);
-    const outfits = createOutfits(filteredItems);
-
-    setRecommendedOutfits(outfits);
-    setHasSearched(true);
-  };
-
-  const resetFilters = () => {
-    setFilters(INITIAL_FILTERS);
-    setRecommendedOutfits([]);
-    setHasSearched(false);
-  };
-
-  const pageWidth = width - 64;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>코디 추천</Text>
       <Text style={styles.subtitle}>
-        추천 조건을 직접 선택하고 코디를 추천받아보세요.
+        상황에 맞는 코디를 추천해드릴게요.
       </Text>
 
-      <View style={styles.summaryBox}>
-        <Text style={styles.summaryLabel}>현재 선택 조건</Text>
-        <Text style={styles.summaryText}>{selectedSummary}</Text>
+      {/* --- NEW: 오늘의 날씨/상황 기반 추천 --- */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
+        <Text style={styles.descriptionText}>
+          현재 위치의 날씨와 입력하신 상황을 고려해 코디를 제안합니다.
+        </Text>
+
+        <View style={styles.inputBox}>
+          <Text style={styles.inputLabel}>어떤 상황인가요?</Text>
+          <TextInput
+            style={styles.textInput}
+            value={situation}
+            onChangeText={setSituation}
+            placeholder="예: 중요한 미팅, 한강 데이트, 가벼운 산책"
+            placeholderTextColor="#9CA3AF"
+          />
+        </View>
+
+        <TouchableOpacity 
+          style={[styles.actionButton, apiLoading && styles.disabledButton]} 
+          onPress={fetchTodayRecommendation}
+          disabled={apiLoading}
+        >
+          <Text style={styles.actionButtonText}>
+            {apiLoading ? '추천 불러오는 중...' : '코디 추천받기'}
+          </Text>
+        </TouchableOpacity>
+
+        {apiLoading && <ActivityIndicator size="large" color="#111827" style={{ marginTop: 20 }} />}
+
+        {/* API 추천 결과 렌더링 */}
+        {!apiLoading && apiRecommendations && apiRecommendations.length > 0 && (
+          <View style={{ marginTop: 24 }}>
+            <Text style={styles.sectionTitle}>AI 추천 결과</Text>
+            {apiRecommendations.map((outfit, index) => (
+              <View key={`api-outfit-${index}`} style={styles.outfitCard}>
+                <Text style={styles.outfitTitle}>AI 추천 코디 {index + 1}</Text>
+                <Text style={styles.outfitDescription}>
+                  현재 날씨와 '{situation}' 상황에 맞춘 추천입니다.
+                </Text>
+                <OutfitItemCard label="상의" item={outfit.top} />
+                <OutfitItemCard label="하의" item={outfit.bottom} />
+                <OutfitItemCard label="아우터" item={outfit.outer} />
+                <OutfitItemCard label="신발" item={outfit.shoes} />
+                <OutfitItemCard label="악세사리" item={outfit.accessory} />
+              </View>
+            ))}
+          </View>
+        )}
       </View>
 
+      {/* --- 기존: 조건 기반 필터링 --- */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>추천 조건</Text>
+        <Text style={styles.sectionTitle}>선택한 옷장 조건</Text>
 
-        {(Object.keys(FILTER_OPTIONS) as Array<keyof RecommendFilterType>).map((key) => (
-          <View key={key} style={styles.filterSection}>
-            <Pressable
-              style={styles.filterHeader}
-              onPress={() => toggleExpand(key)}
-            >
-              <Text style={styles.filterTitle}>{FILTER_LABELS[key]}</Text>
-              <Text style={styles.arrowText}>{expanded[key] ? '▲' : '▼'}</Text>
-            </Pressable>
+        <View style={styles.inputBox}>
+          <Text style={styles.inputLabel}>카테고리</Text>
+          <Text style={styles.valueText}>{displayText(categoryFilters)}</Text>
+        </View>
 
-            {expanded[key] && (
-              <View style={styles.filterChipWrap}>
-                {FILTER_OPTIONS[key].map((option) => {
-                  const isSelected = filters[key].includes(option);
+        <View style={styles.inputBox}>
+          <Text style={styles.inputLabel}>계절</Text>
+          <Text style={styles.valueText}>{displayText(seasonFilters)}</Text>
+        </View>
 
-                  return (
-                    <Pressable
-                      key={option}
-                      style={[
-                        styles.filterChip,
-                        isSelected && styles.filterChipSelected,
-                      ]}
-                      onPress={() => toggleFilter(key, option)}
-                    >
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          isSelected && styles.filterChipTextSelected,
-                        ]}
-                      >
-                        {option}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-        ))}
+        <View style={styles.inputBox}>
+          <Text style={styles.inputLabel}>TPO</Text>
+          <Text style={styles.valueText}>{displayText(tpoFilters)}</Text>
+        </View>
 
-        <View style={styles.actionRow}>
-          <Pressable style={styles.resetButton} onPress={resetFilters}>
-            <Text style={styles.resetButtonText}>초기화</Text>
-          </Pressable>
+        <View style={styles.inputBox}>
+          <Text style={styles.inputLabel}>스타일</Text>
+          <Text style={styles.valueText}>{displayText(styleFilters)}</Text>
+        </View>
 
-          <Pressable style={styles.recommendButton} onPress={handleRecommend}>
-            <Text style={styles.recommendButtonText}>추천 받기</Text>
-          </Pressable>
+        <View style={styles.inputBox}>
+          <Text style={styles.inputLabel}>분위기</Text>
+          <Text style={styles.valueText}>{displayText(moodFilters)}</Text>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>추천 결과</Text>
+        <Text style={styles.sectionTitle}>조건 기반 추천 결과</Text>
 
-        {!hasSearched ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>아직 추천 결과가 없습니다</Text>
-            <Text style={styles.emptyText}>
-              추천 조건을 선택한 뒤 추천 받기를 눌러주세요.
-            </Text>
-          </View>
-        ) : recommendedOutfits.length === 0 ? (
+        {outfitResults.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyTitle}>추천 결과가 없습니다</Text>
             <Text style={styles.emptyText}>
@@ -334,41 +354,20 @@ export default function RecommendScreen() {
             </Text>
           </View>
         ) : (
-          <>
-            <Text style={styles.swipeHint}>
-              좌우로 넘겨서 다른 추천 코디를 확인하세요.
-            </Text>
+          outfitResults.map((outfit, index) => (
+            <View key={index} style={styles.outfitCard}>
+              <Text style={styles.outfitTitle}>조건 추천 코디 {index + 1}</Text>
+              <Text style={styles.outfitDescription}>
+                선택한 조건을 반영한 코디 조합입니다.
+              </Text>
 
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              nestedScrollEnabled
-              decelerationRate="fast"
-              snapToInterval={pageWidth}
-              snapToAlignment="start"
-              contentContainerStyle={styles.outfitSliderContent}
-            >
-              {recommendedOutfits.map((outfit, index) => (
-                <View
-                  key={index}
-                  style={[styles.outfitSlide, { width: pageWidth }]}
-                >
-                  <View style={styles.outfitCard}>
-                    <Text style={styles.outfitTitle}>추천 코디 {index + 1}</Text>
-                    <Text style={styles.outfitDescription}>
-                      {buildRecommendReason(filters, outfit)}
-                    </Text>
-
-                    <OutfitItemCard label="아우터" item={outfit.outer} />
-                    <OutfitItemCard label="상의" item={outfit.top} />
-                    <OutfitItemCard label="하의" item={outfit.bottom} />
-                    <OutfitItemCard label="신발" item={outfit.shoes} />
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          </>
+              <OutfitItemCard label="상의" item={outfit.top} />
+              <OutfitItemCard label="하의" item={outfit.bottom} />
+              <OutfitItemCard label="아우터" item={outfit.outer} />
+              <OutfitItemCard label="신발" item={outfit.shoes} />
+              <OutfitItemCard label="악세사리" item={outfit.accessory} />
+            </View>
+          ))
         )}
       </View>
     </ScrollView>
@@ -396,24 +395,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 22,
   },
-  summaryBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 20,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#4B5563',
-    marginBottom: 6,
-  },
-  summaryText: {
-    fontSize: 15,
-    color: '#111827',
-    lineHeight: 22,
-    fontWeight: '600',
-  },
   section: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
@@ -426,96 +407,58 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 16,
   },
-  filterSection: {
-    marginBottom: 12,
+  descriptionText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  inputBox: {
     backgroundColor: '#F9FAFB',
     borderRadius: 14,
     padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#EEF2F7',
   },
-  filterHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  filterTitle: {
-    fontSize: 15,
+  inputLabel: {
+    fontSize: 14,
     fontWeight: '700',
+    color: '#4B5563',
+    marginBottom: 6,
+  },
+  textInput: {
+    fontSize: 15,
     color: '#111827',
+    padding: 0,
+    marginTop: 4,
   },
-  arrowText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  filterChipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 10,
-    gap: 8,
-  },
-  filterChip: {
-    backgroundColor: '#EEF2F7',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  filterChipSelected: {
-    backgroundColor: '#111827',
-  },
-  filterChipText: {
-    fontSize: 13,
-    color: '#374151',
+  valueText: {
+    fontSize: 15,
+    color: '#111827',
+    lineHeight: 22,
     fontWeight: '600',
   },
-  filterChipTextSelected: {
-    color: '#FFFFFF',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 10,
+  actionButton: {
+    backgroundColor: '#111827',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
     marginTop: 8,
   },
-  resetButton: {
-    flex: 1,
-    backgroundColor: '#E5E7EB',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
+  disabledButton: {
+    opacity: 0.6,
   },
-  resetButtonText: {
-    color: '#374151',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  recommendButton: {
-    flex: 1,
-    backgroundColor: '#111827',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  recommendButtonText: {
+  actionButtonText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-  },
-  swipeHint: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 12,
-    fontWeight: '600',
-  },
-  outfitSliderContent: {
-    paddingRight: 8,
-  },
-  outfitSlide: {
-    marginRight: 12,
   },
   outfitCard: {
     backgroundColor: '#F8FAFC',
     borderRadius: 18,
     padding: 14,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
@@ -553,23 +496,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  imageBox: {
-    width: '100%',
-    height: 220,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-    marginBottom: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
   itemImage: {
     width: '100%',
-    height: '100%',
+    height: 180,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 12,
+    resizeMode: 'cover',
   },
   imagePlaceholder: {
     width: '100%',
-    height: 220,
+    height: 180,
     borderRadius: 12,
     backgroundColor: '#E5E7EB',
     alignItems: 'center',
