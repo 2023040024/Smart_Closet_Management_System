@@ -7,14 +7,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput, // TextInput 추가
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 
 import { ClothesTags, EMPTY_TAGS, TAG_OPTIONS } from '../_closetStore';
-
-const API_BASE_URL = 'http://192.168.1.122:8000';
+// ✅ 전역 api 모듈 불러오기
+import api from '../_api';
 
 function Chip({
   label,
@@ -115,7 +115,7 @@ function stringifyErrorDetail(responseData: any, status: number) {
 export default function RegisterScreen() {
   const [image, setImage] = useState<string | null>(null);
   const [selected, setSelected] = useState<ClothesTags>(EMPTY_TAGS);
-  const [price, setPrice] = useState<string>(''); // 구매가 상태 추가
+  const [price, setPrice] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
   const fitLabel = useMemo(() => {
@@ -194,9 +194,8 @@ export default function RegisterScreen() {
       formData.append('fit', fitValue);
     }
 
-    // 구매가 데이터 추가 (입력된 값이 있을 경우에만 전송)
     if (price) {
-      formData.append('price', price); 
+      formData.append('price', price);
     }
 
     formData.append('image', {
@@ -205,33 +204,18 @@ export default function RegisterScreen() {
       type: getImageMimeType(image),
     } as any);
 
-    const response = await fetch(`${API_BASE_URL}/clothes`, {
-      method: 'POST',
-      body: formData,
+    // ✅ fetch 대신 자동 토큰이 포함되는 api.post 사용
+    const response = await api.post('/clothes', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
 
-    let responseData: any = null;
-
-    try {
-      responseData = await response.json();
-    } catch {
-      responseData = null;
-    }
-
-    console.log('clothes register response:', responseData);
-
-    if (!response.ok) {
-      throw new Error(stringifyErrorDetail(responseData, response.status));
-    }
-
-    return responseData;
+    console.log('clothes register response:', response.data);
+    return response.data;
   };
 
   const handleSave = async () => {
-    console.log('selected:', selected);
-    console.log('image:', image);
-    console.log('price:', price);
-
     if (!image) {
       Alert.alert('입력 확인', '이미지를 먼저 선택해주세요.');
       return;
@@ -269,8 +253,6 @@ export default function RegisterScreen() {
 
     try {
       setLoading(true);
-      console.log('saveClothesToApi 호출 직전');
-
       await saveClothesToApi();
 
       Alert.alert('등록 완료', '옷이 서버에 등록되었습니다.', [
@@ -279,20 +261,25 @@ export default function RegisterScreen() {
           onPress: () => {
             setImage(null);
             setSelected(EMPTY_TAGS);
-            setPrice(''); // 등록 성공 시 가격 초기화
+            setPrice('');
             router.replace('/(tabs)');
           },
         },
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('옷 등록 실패:', error);
 
-      Alert.alert(
-        '등록 실패',
-        error instanceof Error ? error.message : '옷 등록 중 오류가 발생했습니다.'
-      );
+      // ✅ Axios 에러 응답 형태에 맞게 에러 메시지 추출
+      let errorMessage = '옷 등록 중 오류가 발생했습니다.';
+      
+      if (error.response && error.response.data) {
+        errorMessage = stringifyErrorDetail(error.response.data, error.response.status);
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      Alert.alert('등록 실패', errorMessage);
     } finally {
-      console.log('loading false');
       setLoading(false);
     }
   };
@@ -360,7 +347,6 @@ export default function RegisterScreen() {
       <Text style={styles.sectionTitle}>TPO</Text>
       {renderChips(TAG_OPTIONS.tpo, 'tpo')}
 
-      {/* 구매가 입력 폼 추가 */}
       <Text style={styles.sectionTitle}>구매가</Text>
       <TextInput
         style={styles.priceInput}
@@ -375,7 +361,7 @@ export default function RegisterScreen() {
         style={styles.resetButton} 
         onPress={() => {
           setSelected(EMPTY_TAGS);
-          setPrice(''); // 초기화 버튼 클릭 시 가격도 초기화
+          setPrice(''); 
         }}
       >
         <Text style={styles.resetButtonText}>태그 및 정보 초기화</Text>
@@ -424,7 +410,6 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: '#111827' },
   chipText: { color: '#111827' },
   chipTextSelected: { color: '#fff' },
-  // 구매가 입력 인풋 스타일 추가
   priceInput: {
     borderWidth: 1,
     borderColor: '#e5e7eb',
