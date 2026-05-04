@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import httpx
 from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,11 +21,13 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "여기에_API_키_입력")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
+WEATHER_BASE_URL = os.getenv("WEATHER_BASE_URL", "http://localhost:8000")
 
 class RecommendRequest(BaseModel):
     situation: Optional[str] = None
     temperature: Optional[float] = None
     weather_condition: Optional[str] = None
+    address: Optional[str] = None 
 
 
 class OutfitItem(BaseModel):
@@ -45,6 +48,44 @@ class RecommendResponse(BaseModel):
     ai_message: str
 
 
+def fetch_weather(address: str) -> dict:
+    """
+    B파트 /weather/address 호출
+    실패 시 기본값(기온 20, 맑음) 반환하여 추천 중단 방지
+    """
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            resp = client.get(
+                f"{WEATHER_BASE_URL}/weather/address",
+                params={"address": address}
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        if data.get("status") != "success":
+            return {"temperature": 20.0, "condition": "sunny"}
+
+        weather = data["weather"]
+        temp_str = weather.get("현재 기온", "20°C").replace("°C", "").strip()
+        temperature = float(temp_str)
+
+        sky  = weather.get("하늘 상태", "맑음")
+        rain = weather.get("강수 형태", "없음")
+
+        if rain in ("비", "소나기", "비/눈"):
+            condition = "rainy"
+        elif rain == "눈":
+            condition = "snowy"
+        elif sky == "맑음":
+            condition = "sunny"
+        else:
+            condition = "cloudy"
+
+        return {"temperature": temperature, "condition": condition}
+
+    except Exception as e:
+        print(f"[날씨 연동 실패, 기본값 사용] {e}")
+        return {"temperature": 20.0, "condition": "sunny"}
 # ──────────────────────────────────────────────
 # 사용자 프로필 텍스트 생성
 # ──────────────────────────────────────────────
@@ -81,7 +122,7 @@ def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_cond
             if temperature <= 14 and c.thickness == ThicknessEnum.thin:
                 continue
         if weather_condition in ("rainy", "snowy"):
-            if c.material == MaterialEnum.레더:
+            if c.material == MaterialEnum.leather:
                 continue
         result.append(c)
     return result
@@ -216,20 +257,30 @@ def call_gemini(prompt: str, retries: int = 2) -> dict:
 def recommend_today(
     situation: Optional[str] = None,
     temperature: Optional[float] = None,
-    weather_condition: Optional[str] = "sunny",
+    weather_condition: Optional[str] = None,   # ← "sunny" 제거
+    address: Optional[str] = None,              # ← 추가
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    user_id = current_user.id
+
+    if address:
+        fetched = fetch_weather(address)
+        temperature       = temperature       or fetched["temperature"]
+        weather_condition = weather_condition or fetched["condition"]
+
+    temperature       = temperature       or 20.0
+    weather_condition = weather_condition or "sunny"
+
+    user_id = current_user.user_id
+
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered = filter_clothes(all_clothes, temperature or 20.0, weather_condition or "sunny")
+    filtered = filter_clothes(all_clothes, temperature, weather_condition)
     if len(filtered) < 2:
         raise HTTPException(status_code=400, detail="날씨·상태 조건에 맞는 옷이 부족합니다")
-    prompt = build_prompt(filtered, situation or "daily", temperature or 20.0, weather_condition or "sunny", current_user)
+    prompt = build_prompt(filtered, situation or "daily", temperature, weather_condition, current_user)
     return call_gemini(prompt)
-
 
 @router.post("/custom")
 def recommend_custom(
@@ -237,24 +288,51 @@ def recommend_custom(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+<<<<<<< HEAD
     user_id = current_user.id
+=======
+    temperature       = body.temperature
+    weather_condition = body.weather_condition
+
+    if body.address:
+        fetched = fetch_weather(body.address)
+        temperature       = temperature       or fetched["temperature"]
+        weather_condition = weather_condition or fetched["condition"]
+
+    temperature       = temperature       or 20.0
+    weather_condition = weather_condition or "sunny"
+
+    user_id = current_user.user_id
+>>>>>>> b1e616d913dd20b28db65e3ffb1342c43dd9ef0e
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered = filter_clothes(all_clothes, body.temperature or 20.0, body.weather_condition or "sunny")
-    prompt = build_prompt(filtered, body.situation or "daily", body.temperature or 20.0, body.weather_condition or "sunny", current_user)
+    filtered = filter_clothes(all_clothes, temperature, weather_condition)
+    prompt = build_prompt(filtered, body.situation or "daily", temperature, weather_condition, current_user)
     return call_gemini(prompt)
-
 
 @router.get("/weekly")
 def recommend_weekly(
     situation: Optional[str] = None,
     temperature: Optional[float] = None,
-    weather_condition: Optional[str] = "sunny",
+    weather_condition: Optional[str] = None,   # ← "sunny" 제거
+    address: Optional[str] = None,              # ← 추가
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+<<<<<<< HEAD
     user_id = current_user.id
+=======
+    if address:
+        fetched = fetch_weather(address)
+        temperature       = temperature       or fetched["temperature"]
+        weather_condition = weather_condition or fetched["condition"]
+
+    temperature       = temperature       or 20.0
+    weather_condition = weather_condition or "sunny"
+
+    user_id = current_user.user_id
+>>>>>>> b1e616d913dd20b28db65e3ffb1342c43dd9ef0e
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     filtered = [c for c in all_clothes if c.status == StatusEnum.wearable]
     if len(filtered) < 4:
@@ -266,8 +344,8 @@ def recommend_weekly(
 당신은 패션 코디 전문가입니다.
 아래 옷장에서 월~금 5일치 코디를 짜주세요. (옷 돌려막기 스타일)
 [오늘 날씨]
-- 기온: {temperature or 20.0}°C
-- 날씨: {weather_condition or 'sunny'}
+- 기온: {temperature}°C
+- 날씨: {weather_condition}
 [목표]
 - 같은 옷을 연속으로 입지 않기
 - 상의 하나로 여러 코디 만들기
