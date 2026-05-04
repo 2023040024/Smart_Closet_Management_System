@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import Optional, Any
-from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field
+from pydantic import BaseModel, EmailStr, field_validator, model_validator, ConfigDict, Field
 from models import (
     CategoryEnum, TopFitEnum, BottomFitEnum, ColorEnum, SeasonEnum,
     ToneEnum, StyleEnum, MoodEnum, MaterialEnum, ThicknessEnum, PointEnum,
@@ -84,7 +84,7 @@ class ClothesCreate(BaseModel):
     material:       Optional[MaterialEnum] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
-    purchase_price: Optional[int] = None
+    price:          Optional[int] = 0
     status:         Optional[StatusEnum] = None
     situation:      Optional[SituationEnum] = None
 
@@ -110,7 +110,7 @@ class ClothesUpdate(BaseModel):
     material:       Optional[MaterialEnum] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
-    purchase_price: Optional[int] = None
+    price:          Optional[int] = 0
     status:         Optional[StatusEnum] = None
     situation:      Optional[SituationEnum] = None
 
@@ -140,14 +140,31 @@ class ClothesResponse(BaseModel):
     material:       Optional[MaterialEnum] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
-    purchase_price: Optional[int] = None
+    price:          Optional[int] = 0
     situation:      Optional[SituationEnum] = None
     image_url:      Optional[str] = None
     status:         Optional[StatusEnum] = None
     wear_count:     int
     last_worn_date: Optional[date] = None
-    cost_per_wear:  Optional[float] = None  # 계산된 값 (wear_count=0이면 null)
+    cost_per_wear:  Optional[float] = 0.0  # 계산된 값 (wear_count=0이면 null)
     created_at:     datetime
+
+    @model_validator(mode='after')
+    def calculate_cpw(self) -> 'ClothesResponse':
+        """
+        구매가(price)를 착용 횟수(wear_count)로 나누어 1회 착용당 비용을 산출
+        """
+        price = self.price or 0
+        count = self.wear_count or 0
+
+        if count > 0:
+            # 소수점 둘째 자리까지 반올림하여 계산
+            self.cost_per_wear = round(price / count, 2)
+        else:
+            # 한 번도 입지 않았다면 구매가 전체를 현재 비용으로 표시하거나 0으로 표시
+            self.cost_per_wear = float(price)
+            
+        return self
 
     model_config = ConfigDict(from_attributes=True)
 
