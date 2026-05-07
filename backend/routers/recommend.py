@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from database import get_db
-from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum, MaterialEnum
+from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum
 from routers.auth import get_current_user
 from tpo_rules import get_tpo_prompt_text
 
@@ -122,7 +122,7 @@ def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_cond
             if temperature <= 14 and c.thickness == ThicknessEnum.thin:
                 continue
         if weather_condition in ("rainy", "snowy"):
-            if c.material == MaterialEnum.leather:
+            if c.material == "레더":   # material은 String 컬럼이므로 문자열 직접 비교
                 continue
         result.append(c)
     return result
