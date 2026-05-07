@@ -167,7 +167,7 @@ class Clothes(Base):
     style          = Column(Enum(StyleEnum), nullable=False)
     tone           = Column(Enum(ToneEnum), nullable=True)
     mood           = Column(Enum(MoodEnum), nullable=True)
-    material       = Column(Enum(MaterialEnum), nullable=True)   # 면, 폴리, 울, 니트 등
+    material       = Column(String, nullable=True)   # 면, 폴리, 울, 니트 등
     point          = Column(Enum(PointEnum), nullable=True)
     thickness      = Column(Enum(ThicknessEnum), nullable=True)
     price          = Column(Integer, default=0, nullable=True)       # 가성비 계산용 (0원 허용)
