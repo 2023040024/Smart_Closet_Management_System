@@ -13,6 +13,12 @@ def map_korean_to_enum_logic(v: Any, info: Any) -> Any:
     if v is None or (isinstance(v, str) and v.strip() == ""):
         return None
     
+    if info.field_name == 'material' and isinstance(v, str):
+        for m in MaterialEnum:
+            if m.value in v:  # 예: "면"이 "면 100%" 문자열 안에 포함되어 있다면
+                return m.value  # "면"(표준값)만 골라내어 반환
+        return v  # 일치하는 키워드가 없으면 입력한 문자열 그대로 저장 (에러 방지)
+    
     # 이미 Enum 객체라면 그대로 반환
     if not isinstance(v, str):
         return v
@@ -81,7 +87,7 @@ class ClothesCreate(BaseModel):
     tone:           Optional[ToneEnum] = None
     style:          Optional[StyleEnum] = None
     mood:           Optional[MoodEnum] = None
-    material:       Optional[MaterialEnum] = None
+    material:       Optional[str] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
     price:          Optional[int] = 0
@@ -107,7 +113,7 @@ class ClothesUpdate(BaseModel):
     tone:           Optional[ToneEnum] = None
     style:          Optional[StyleEnum] = None
     mood:           Optional[MoodEnum] = None
-    material:       Optional[MaterialEnum] = None
+    material:       Optional[str] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
     price:          Optional[int] = 0
@@ -137,7 +143,7 @@ class ClothesResponse(BaseModel):
     tone:           Optional[ToneEnum] = None
     style:          Optional[StyleEnum] = None
     mood:           Optional[MoodEnum] = None
-    material:       Optional[MaterialEnum] = None
+    material:       Optional[str] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
     price:          Optional[int] = 0
