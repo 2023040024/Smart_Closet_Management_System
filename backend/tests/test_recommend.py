@@ -31,7 +31,7 @@ class TestFilterClothes:
         assert filter_clothes([c], 10.0, "sunny") == []
 
     def test_비오는날_레더_제외(self):
-        c = make_clothes(material=MaterialEnum.레더)
+        c = make_clothes(material=MaterialEnum.leather)
         assert filter_clothes([c], 20.0, "rainy") == []
 
     def test_정상조건_포함(self):
