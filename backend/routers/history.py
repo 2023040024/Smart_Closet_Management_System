@@ -48,9 +48,9 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
                 user_id=TEMP_USER_ID,
                 clothes_id=history_data.clothes_id,
                 worn_date=history_data.worn_date,
-                tpo=data.tpo,
-                style=data.style,
-                mood=data.mood,
+                tpo=history_data.tpo,
+                style=history_data.style,
+                mood=history_data.mood,
                 feedback_temperature=history_data.feedback_temperature,
                 feedback_tpo=history_data.feedback_tpo,
                 memo=history_data.memo
