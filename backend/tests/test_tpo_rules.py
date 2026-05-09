@@ -1,5 +1,3 @@
-import check_color_conflict
-import get_tpo_prompt_text
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from tpo_rules import (
@@ -7,6 +5,8 @@ from tpo_rules import (
     get_recommended_thickness,
     get_tpo_rule,
     get_avoided_materials,
+    check_color_conflict,
+    get_tpo_prompt_text
 )
 
 class TestGetTemperatureLevel:
