@@ -101,7 +101,17 @@ def get_clothes(
     if style:    query = query.filter(Clothes.style == style)
     if status:   query = query.filter(Clothes.status == status)
 
-    return query.order_by(Clothes.created_at.desc()).all()
+    all_clothes = query.order_by(Clothes.created_at.desc()).all()
+
+    # 불량 DB 데이터(Enum 불일치 등) 1건이 전체 목록 응답을 막지 않도록 예외 처리
+    result = []
+    for c in all_clothes:
+        try:
+            result.append(ClothesResponse.model_validate(c))
+        except Exception:
+            continue
+
+    return result
 
 
 # ──────────────────────────────────────────────
