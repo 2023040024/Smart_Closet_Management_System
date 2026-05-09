@@ -62,3 +62,4 @@ def create_feedback(feedback_data: FeedbackCreate, db: Session = Depends(get_db)
         "message": "피드백 저장 및 사용자 온도 민감도 보정이 완료되었습니다.",
         "history_id": history.history_id,
         "new_temp_sensitivity": getattr(user, 'temp_sensitivity', None) if user else None
+    }
