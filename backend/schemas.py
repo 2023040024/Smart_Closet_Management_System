@@ -167,7 +167,7 @@ class WearHistoryCreate(BaseModel):
     memo:                 Optional[str]              = None
 
     @field_validator('tpo', 'style', 'mood', 
-                     'feedback_temperature', 'feedback_tpo', mode='before')
+    'feedback_temperature', 'feedback_tpo', mode='before')
     @classmethod
     def validate_enums(cls, v: Any, info: Any) -> Any:
         return map_korean_to_enum_logic(v, info)
@@ -189,3 +189,15 @@ class WearHistoryResponse(BaseModel):
     clothes:              Optional[ClothesResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class FeedbackCreate(BaseModel):
+    history_id:           int
+    feedback_temperature: Optional[FeedbackTempEnum] = None
+    feedback_tpo:         Optional[FeedbackTpoEnum]  = None
+    memo:                 Optional[str]              = None
+
+    @field_validator('feedback_temperature', 'feedback_tpo', mode='before')
+    @classmethod
+    def validate_enums(cls, v: Any, info: Any) -> Any:
+        return map_korean_to_enum_logic(v, info)
