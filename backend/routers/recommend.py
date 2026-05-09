@@ -19,7 +19,7 @@ import google.generativeai as genai
 
 GEMINI_API_KEY = "AIzaSyAlIBWhqky_9S0rMYt5Kx5WhxWfCGcfwyc"
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("models/gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 WEATHER_BASE_URL = os.getenv("WEATHER_BASE_URL", "http://localhost:8000")
 
@@ -270,7 +270,7 @@ def recommend_today(
     temperature       = temperature       or 20.0
     weather_condition = weather_condition or "sunny"
 
-    user_id = current_user.user_id
+    user_id = current_user.id
 
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     if len(all_clothes) < 3:
@@ -299,7 +299,7 @@ def recommend_custom(
     temperature       = temperature       or 20.0
     weather_condition = weather_condition or "sunny"
 
-    user_id = current_user.user_id
+    user_id = current_user.id
 
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     if len(all_clothes) < 3:
@@ -325,7 +325,7 @@ def recommend_weekly(
     temperature       = temperature       or 20.0
     weather_condition = weather_condition or "sunny"
 
-    user_id = current_user.user_id
+    user_id = current_user.id
     all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     filtered = [c for c in all_clothes if c.status == StatusEnum.wearable]
     if len(filtered) < 4:

@@ -124,7 +124,7 @@ function resolveImageUri(image?: string) {
   if (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('file://')) return image;
   
   // api.defaults.baseURL을 활용하거나 직접 base 경로 지정
-  const baseUrl = 'http://192.168.1.122:8000'; 
+  const baseUrl = 'http://192.168.0.25:8000'; 
   return image.startsWith('/') ? `${baseUrl}${image}` : `${baseUrl}/${image}`;
 }
 

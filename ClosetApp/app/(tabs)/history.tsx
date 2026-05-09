@@ -60,7 +60,7 @@ type GroupedWearHistoryItem = {
 
 const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여행', '운동', '모임'];
 
-const API_BASE_URL = 'http://192.168.1.122:8000';
+const API_BASE_URL = 'http://192.168.0.25:8000';
 
 function formatDate(dateString?: string) {
   if (!dateString) return '날짜 없음';
