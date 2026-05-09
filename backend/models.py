@@ -175,6 +175,7 @@ class Clothes(Base):
     status         = Column(Enum(StatusEnum), default=StatusEnum.wearable)
     wear_count     = Column(Integer, default=0)
     last_worn_date = Column(Date, nullable=True)
+    temp_offset    = Column(Float, default=0.0)
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
 
     owner        = relationship("User", back_populates="clothes")
