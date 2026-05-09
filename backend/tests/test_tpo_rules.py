@@ -1,4 +1,5 @@
-# 커밋 7 상태 (최종본)
+import check_color_conflict
+import get_tpo_prompt_text
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from tpo_rules import (
@@ -46,3 +47,18 @@ class TestGetAvoidedMaterials:
         assert get_avoided_materials("sunny") == []
     def test_흐린날_회피없음(self):
         assert get_avoided_materials("cloudy") == []
+
+class TestCheckColorConflict:
+    def test_면접_레드_60점감점(self):    assert check_color_conflict("레드", "블랙", "면접") == 60
+    def test_면접_핑크_60점감점(self):    assert check_color_conflict("핑크", "네이비", "면접") == 60
+    def test_고채도대비쌍_40점감점(self): assert check_color_conflict("레드", "올리브", "데일리") == 40
+    def test_역순대비쌍_40점감점(self):   assert check_color_conflict("올리브", "레드", "데일리") == 40
+    def test_안전조합_0점(self):          assert check_color_conflict("블랙", "화이트", "데일리") == 0
+    def test_면접_일반색상_0점(self):     assert check_color_conflict("블랙", "네이비", "면접") == 0
+
+class TestGetTpoPromptText:
+    def test_문자열반환(self):       assert isinstance(get_tpo_prompt_text("데일리", 20.0, "sunny"), str)
+    def test_상황명포함(self):       assert "면접" in get_tpo_prompt_text("면접", 15.0, "cloudy")
+    def test_기온포함(self):         assert "25" in get_tpo_prompt_text("데일리", 25.0, "sunny")
+    def test_비오는날_레더언급(self): assert "레더" in get_tpo_prompt_text("데일리", 20.0, "rainy")
+    def test_소재없음_표시(self):     assert "없음" in get_tpo_prompt_text("데일리", 20.0, "sunny")
