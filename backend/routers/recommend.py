@@ -271,8 +271,10 @@ def recommend_today(
     weather_condition = weather_condition or "sunny"
 
     user_id = current_user.id
-
-    all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
+    try:
+        all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
+    except LookupError as e:
+        raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
     filtered = filter_clothes(all_clothes, temperature, weather_condition)
@@ -300,8 +302,10 @@ def recommend_custom(
     weather_condition = weather_condition or "sunny"
 
     user_id = current_user.id
-
-    all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
+    try:
+        all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
+    except LookupError as e:
+        raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
     filtered = filter_clothes(all_clothes, temperature, weather_condition)
@@ -326,7 +330,10 @@ def recommend_weekly(
     weather_condition = weather_condition or "sunny"
 
     user_id = current_user.id
-    all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
+    try:
+        all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
+    except LookupError as e:
+        raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     filtered = [c for c in all_clothes if c.status == StatusEnum.wearable]
     if len(filtered) < 4:
         raise HTTPException(status_code=400, detail="주간 추천을 위해 최소 4벌 이상의 옷이 필요합니다")
