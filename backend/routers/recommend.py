@@ -1,4 +1,20 @@
 import os
+from dotenv import load_dotenv
+
+# 프로젝트 루트(backend) 폴더에 있는 .env를 명시적으로 찾습니다.
+current_dir = os.path.dirname(os.path.abspath(__file__)) # routers 폴더
+backend_dir = os.path.dirname(current_dir) # backend 폴더
+env_path = os.path.join(backend_dir, '.env')
+
+load_dotenv(dotenv_path=env_path) 
+
+# --- 확인용 코드 추가 ---
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print(f"❌ .env 로드 실패! 시도한 경로: {env_path}")
+else:
+    print(f"✅ .env 로드 성공! 키 확인: {GEMINI_API_KEY[:5]}***")
+
 import json
 import re
 import httpx
@@ -13,13 +29,17 @@ from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum
 from routers.auth import get_current_user
 from tpo_rules import get_tpo_prompt_text
 
+from dotenv import load_dotenv
+load_dotenv() # .env 파일의 내용을 환경변수로 불러옵니다.
+
 router = APIRouter(prefix="/recommend", tags=["코디 추천"])
 
 import google.generativeai as genai
 
-GEMINI_API_KEY = "AIzaSyAlIBWhqky_9S0rMYt5Kx5WhxWfCGcfwyc"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+
+model = genai.GenerativeModel("models/gemini-flash-latest")
 
 WEATHER_BASE_URL = os.getenv("WEATHER_BASE_URL", "http://localhost:8000")
 
@@ -223,30 +243,29 @@ def build_prompt(
 
 
 def call_gemini(prompt: str, retries: int = 2) -> dict:
-    last_error = None
     for attempt in range(retries + 1):
         try:
             response = model.generate_content(prompt)
+            # 1. AI가 실제로 뭐라고 대답하는지 터미널에 출력합니다.
+            print(f"--- AI 응답 원본 (시도 {attempt+1}) ---\n{response.text}\n----------------")
+            
             text = response.text.strip()
             match = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
             if match:
                 text = match.group(1).strip()
+            
             result = json.loads(text)
-            if "outfits" in result:
-                for outfit in result["outfits"]:
-                    if not outfit.get("items"):
-                        raise ValueError("Gemini가 빈 코디를 반환했습니다.")
-            return result
-        except (json.JSONDecodeError, ValueError) as e:
-            last_error = str(e)
-            if attempt < retries:
-                continue
-            raise HTTPException(
-                status_code=500,
-                detail=f"Gemini 응답 파싱 실패 ({retries + 1}회 시도): {last_error}"
-            )
+            
+            # 2. 리스트가 비어있는지 안전하게 검사합니다.
+            if "outfits" in result and len(result["outfits"]) > 0:
+                return result
+            else:
+                raise ValueError("AI가 추천 코디를 생성하지 못했습니다.")
+
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Gemini API 오류: {str(e)}")
+            print(f"❌ AI 호출/파싱 중 에러 발생: {str(e)}")
+            if attempt == retries:
+                raise HTTPException(status_code=500, detail=f"AI 추천 생성 실패: {str(e)}")
 
 
 # ──────────────────────────────────────────────
