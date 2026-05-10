@@ -55,7 +55,10 @@ def create_feedback(feedback_data: FeedbackCreate, db: Session = Depends(get_db)
             situation = history.tpo.value if hasattr(history.tpo, 'value') else history.tpo
             
             if situation and cloth:
-                pass
+                tpo_score_rec = db.query(TpoScore).filter(
+                    TpoScore.clothes_id == cloth.clothes_id,
+                    TpoScore.tpo_name == situation
+                ).first()  
 
     if feedback_data.memo is not None:
         history.memo = feedback_data.memo
