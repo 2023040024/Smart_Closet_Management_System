@@ -52,9 +52,13 @@ def create_feedback(feedback_data: FeedbackCreate, db: Session = Depends(get_db)
         history.feedback_tpo = feedback_data.feedback_tpo
         
         if feedback_data.feedback_tpo == FeedbackTpoEnum.BAD:
-            pass
+            situation = history.tpo.value if hasattr(history.tpo, 'value') else history.tpo
+            
+            if situation and cloth:
+                pass
 
     if feedback_data.memo is not None:
+        history.memo = feedback_data.memo
         
     # 4. DB에 변경사항 저장
     db.commit()
