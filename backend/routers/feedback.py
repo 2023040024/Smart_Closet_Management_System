@@ -49,9 +49,10 @@ def create_feedback(feedback_data: FeedbackCreate, db: Session = Depends(get_db)
                 
             # 적당함 -> 현재 민감도 유지
 
-    if feedback_data.feedback_tpo == FeedbackTpoEnum.BAD:
-    
-        pass
+    if feedback_data.feedback_tpo == FeedbackTpoEnum.BAD and history.tpo:
+        situation = history.tpo.value if hasattr(history.tpo, 'value') else history.tpo
+        if situation and cloth:
+            pass
         
     # 4. DB에 변경사항 저장
     db.commit()
