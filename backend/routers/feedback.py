@@ -65,9 +65,13 @@ def create_feedback(feedback_data: FeedbackCreate, db: Session = Depends(get_db)
                     new_score = TpoScore(
                         clothes_id=cloth.clothes_id,
                         tpo_name=situation,
-                        score=80
+                        score=100
                     )
                     db.add(new_score)
+                else:
+                    current_score = tpo_score_rec.score
+                    tpo_score_rec.score = max(0, current_score - 5)
+
 
     if feedback_data.memo is not None:
         history.memo = feedback_data.memo
