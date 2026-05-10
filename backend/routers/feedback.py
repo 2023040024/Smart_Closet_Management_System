@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from models import WearHistory, Clothes, User, TpoScore  
-from schemas import FeedbackCreate, FeedbackTempEnum, FeedbackTpoEnum 
+
 
 from database import get_db
-from models import WearHistory, Clothes, User  # User 모델 추가
-from schemas import FeedbackCreate, FeedbackTempEnum
+from models import WearHistory, Clothes, User, TpoScore  
+from schemas import FeedbackCreate, FeedbackTempEnum, FeedbackTpoEnum 
 
 router = APIRouter(prefix="/feedback", tags=["피드백"])
 
@@ -49,10 +48,13 @@ def create_feedback(feedback_data: FeedbackCreate, db: Session = Depends(get_db)
                 
             # 적당함 -> 현재 민감도 유지
 
-    if feedback_data.feedback_tpo == FeedbackTpoEnum.BAD and history.tpo:
-        situation = history.tpo.value if hasattr(history.tpo, 'value') else history.tpo
-        if situation and cloth:
+    if feedback_data.feedback_tpo is not None:
+        history.feedback_tpo = feedback_data.feedback_tpo
+        
+        if feedback_data.feedback_tpo == FeedbackTpoEnum.BAD:
             pass
+
+    if feedback_data.memo is not None:
         
     # 4. DB에 변경사항 저장
     db.commit()
