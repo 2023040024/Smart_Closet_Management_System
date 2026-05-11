@@ -111,19 +111,12 @@ def get_closet_overload(threshold: int = 3, db: Session = Depends(get_db)):
         .subquery()
     )
 
-    detailed_data = []
-    for group in overloaded_groups:
-        items = db.query(Clothes).filter(
-            Clothes.user_id == current_user_id,
-            Clothes.category == group.category,
-            Clothes.color == group.color
-        ).all()
-        detailed_data.append({
-            "category": group.category,
-            "color": group.color,
-            "count": group.count,
-            "items": items
-        })
+    overloaded_items = (
+        db.query(Clothes)
+        .join(subquery, (Clothes.category == subquery.c.category) & (Clothes.color == subquery.c.color))
+        .all()
+    )
+    detailed_data = [] # 임시 리스트 선언 (다음 커밋에서 데이터 조립)
 
 
     return {
