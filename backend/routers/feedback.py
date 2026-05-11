@@ -37,16 +37,18 @@ def create_feedback(feedback_data: FeedbackCreate, db: Session = Depends(get_db)
             # 기본값이 없으면 0.0으로 시작
             current_sensitivity = getattr(user, 'temp_sensitivity', 0.0) or 0.0
             
-            # 추웠다면 -> 추위를 타는 편 -> 민감도 증가 (+0.2 정도씩 미세 조정)
+            # 추웠다면 -> 추위를 타는 편 -> 민감도 증가 (+1)
             # 팀원 코드: 민감도가 높아지면 아우터 추천 기준 온도(outer_threshold)가 올라감!
-            if feedback_data.feedback_temperature == FeedbackTempEnum.COLD:
-                user.temp_sensitivity = current_sensitivity + 0.2
+            if feedback_data.feedback_temperature == FeedbackTempEnum.cold:
+                user.temp_sensitivity = current_sensitivity + 1
             
-            # 더웠다면 -> 더위를 타는 편 -> 민감도 감소 (-0.2)
-            elif feedback_data.feedback_temperature == FeedbackTempEnum.HOT:
-                user.temp_sensitivity = current_sensitivity - 0.2
+            # 더웠다면 -> 더위를 타는 편 -> 민감도 감소 (-1)
+            elif feedback_data.feedback_temperature == FeedbackTempEnum.hot:
+                user.temp_sensitivity = current_sensitivity - 1
                 
             # 적당함 -> 현재 민감도 유지
+            elif feedback_data.feedback_temperature == FeedbackTempEnum.good:
+                user.temp_sensitivity = current_sensitivity
 
     if feedback_data.feedback_tpo is not None:
         history.feedback_tpo = feedback_data.feedback_tpo
@@ -65,7 +67,7 @@ def create_feedback(feedback_data: FeedbackCreate, db: Session = Depends(get_db)
                     new_score = TpoScore(
                         clothes_id=cloth.clothes_id,
                         tpo_name=situation,
-                        score=100
+                        score=95
                     )
                     db.add(new_score)
                 else:
