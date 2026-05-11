@@ -116,8 +116,12 @@ def get_closet_overload(threshold: int = 3, db: Session = Depends(get_db)):
         .join(subquery, (Clothes.category == subquery.c.category) & (Clothes.color == subquery.c.color))
         .all()
     )
-    detailed_data = [] # 임시 리스트 선언 (다음 커밋에서 데이터 조립)
-
+    grouped_data = {}
+    for item in overloaded_items:
+        key = (item.category, item.color)
+        if key not in grouped_data:
+            grouped_data[key] = []
+        grouped_data[key].append(item)
 
     return {
         "message": f"과다 보유 리포트: {len(detailed_data)}건 발견",
