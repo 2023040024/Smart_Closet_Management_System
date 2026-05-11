@@ -87,16 +87,14 @@ def get_cost_efficiency(db: Session = Depends(get_db)):
         .all()
     )
 
-    sorted_clothes = sorted(clothes, key=lambda x: x.cost_per_wear)
-
-    worst_items = sorted_clothes[-3:] if len(sorted_clothes) > 3 else []
+    worst_items = clothes[-3:] if len(clothes) > 3 else []
 
     return {
         "message": "가성비 분석 완료",
-        "best_efficiency": sorted_clothes[:3], 
+        "best_efficiency": clothes[:3], 
         "worst_efficiency": worst_items, 
         "ai_summary": { 
-            "most_efficient_item": sorted_clothes[0].name if sorted_clothes else None,
+            "most_efficient_item": clothes[0].name if clothes else None,
             "total_investment_on_worst": sum(c.purchase_price for c in worst_items)
         }
     }
