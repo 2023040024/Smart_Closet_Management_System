@@ -123,6 +123,16 @@ def get_closet_overload(threshold: int = 3, db: Session = Depends(get_db)):
             grouped_data[key] = []
         grouped_data[key].append(item)
 
+    detailed_data = [
+        {
+            "category": key[0],
+            "color": key[1],
+            "count": len(items),
+            "items": items
+        }
+        for key, items in grouped_data.items()
+    ]
+
     return {
         "message": f"과다 보유 리포트: {len(detailed_data)}건 발견",
         "overload_details": detailed_data,
