@@ -75,12 +75,17 @@ def get_disposal_recommendation(db: Session = Depends(get_db)):
 def get_cost_efficiency(db: Session = Depends(get_db)):
     current_user_id = 1
     
-    # 가격 정보가 있고 한 번이라도 입은 옷 필터링
-    clothes = db.query(Clothes).filter(
-        Clothes.user_id == current_user_id,
-        Clothes.purchase_price > 0,
-        Clothes.wear_count > 0
-    ).all()
+    # DB 엔진에서 (가격 / 착용 횟수)를 직접 연산하여 오름차순으로 정렬 후 가져옴
+    clothes = (
+        db.query(Clothes)
+        .filter(
+            Clothes.user_id == current_user_id,
+            Clothes.purchase_price > 0,
+            Clothes.wear_count > 0
+        )
+        .order_by((Clothes.purchase_price / Clothes.wear_count).asc())
+        .all()
+    )
 
     sorted_clothes = sorted(clothes, key=lambda x: x.cost_per_wear)
 
