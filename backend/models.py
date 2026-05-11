@@ -167,10 +167,10 @@ class Clothes(Base):
     style          = Column(Enum(StyleEnum), nullable=False)
     tone           = Column(Enum(ToneEnum), nullable=True)
     mood           = Column(Enum(MoodEnum), nullable=True)
-    material       = Column(Enum(MaterialEnum), nullable=True)   # 면, 폴리, 울, 니트 등
+    material       = Column(String, nullable=True)   # 면, 폴리, 울, 니트 등
     point          = Column(Enum(PointEnum), nullable=True)
     thickness      = Column(Enum(ThicknessEnum), nullable=True)
-    purchase_price = Column(Integer, nullable=True)       # 가성비 계산용 (0원 허용)
+    price          = Column(Integer, default=0, nullable=True)       # 가성비 계산용 (0원 허용)
     image_url      = Column(String(255), nullable=True)
     status         = Column(Enum(StatusEnum), default=StatusEnum.wearable)
     wear_count     = Column(Integer, default=0)
@@ -184,11 +184,11 @@ class Clothes(Base):
     @property
     def cost_per_wear(self):
         """가성비 계산: wear_count=0이면 None 반환"""
-        if self.purchase_price is None:
+        if self.price is None:
             return None
         if self.wear_count == 0:
             return None  # "계산불가" 처리
-        return round(self.purchase_price / self.wear_count, 0)
+        return round(self.price / self.wear_count, 0)
 
 
 class WearHistory(Base):

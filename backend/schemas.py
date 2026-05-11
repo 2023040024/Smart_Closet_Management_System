@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import Optional, Any
-from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field
+from pydantic import BaseModel, EmailStr, field_validator, model_validator, ConfigDict, Field
 from models import (
     CategoryEnum, TopFitEnum, BottomFitEnum, ColorEnum, SeasonEnum,
     ToneEnum, StyleEnum, MoodEnum, MaterialEnum, ThicknessEnum, PointEnum,
@@ -12,6 +12,12 @@ def map_korean_to_enum_logic(v: Any, info: Any) -> Any:
     # 빈 값("")이 들어오면 None으로 반환하여 nullable 허용
     if v is None or (isinstance(v, str) and v.strip() == ""):
         return None
+    
+    if info.field_name == 'material' and isinstance(v, str):
+        for m in MaterialEnum:
+            if m.value in v:  # 예: "면"이 "면 100%" 문자열 안에 포함되어 있다면
+                return m.value  # "면"(표준값)만 골라내어 반환
+        return v  # 일치하는 키워드가 없으면 입력한 문자열 그대로 저장 (에러 방지)
     
     # 이미 Enum 객체라면 그대로 반환
     if not isinstance(v, str):
@@ -81,10 +87,10 @@ class ClothesCreate(BaseModel):
     tone:           Optional[ToneEnum] = None
     style:          Optional[StyleEnum] = None
     mood:           Optional[MoodEnum] = None
-    material:       Optional[MaterialEnum] = None
+    material:       Optional[str] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
-    purchase_price: Optional[int] = None
+    price:          Optional[int] = 0
     status:         Optional[StatusEnum] = None
     situation:      Optional[SituationEnum] = None
 
@@ -107,10 +113,10 @@ class ClothesUpdate(BaseModel):
     tone:           Optional[ToneEnum] = None
     style:          Optional[StyleEnum] = None
     mood:           Optional[MoodEnum] = None
-    material:       Optional[MaterialEnum] = None
+    material:       Optional[str] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
-    purchase_price: Optional[int] = None
+    price:          Optional[int] = 0
     status:         Optional[StatusEnum] = None
     situation:      Optional[SituationEnum] = None
 
@@ -137,17 +143,34 @@ class ClothesResponse(BaseModel):
     tone:           Optional[ToneEnum] = None
     style:          Optional[StyleEnum] = None
     mood:           Optional[MoodEnum] = None
-    material:       Optional[MaterialEnum] = None
+    material:       Optional[str] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
-    purchase_price: Optional[int] = None
+    price:          Optional[int] = 0
     situation:      Optional[SituationEnum] = None
     image_url:      Optional[str] = None
     status:         Optional[StatusEnum] = None
     wear_count:     int
     last_worn_date: Optional[date] = None
-    cost_per_wear:  Optional[float] = None  # 계산된 값 (wear_count=0이면 null)
+    cost_per_wear:  Optional[float] = 0.0  # 계산된 값 (wear_count=0이면 null)
     created_at:     datetime
+
+    @model_validator(mode='after')
+    def calculate_cpw(self) -> 'ClothesResponse':
+        """
+        구매가(price)를 착용 횟수(wear_count)로 나누어 1회 착용당 비용을 산출
+        """
+        price = self.price or 0
+        count = self.wear_count or 0
+
+        if count > 0:
+            # 소수점 둘째 자리까지 반올림하여 계산
+            self.cost_per_wear = round(price / count, 2)
+        else:
+            # 한 번도 입지 않았다면 구매가 전체를 현재 비용으로 표시하거나 0으로 표시
+            self.cost_per_wear = float(price)
+            
+        return self
 
     model_config = ConfigDict(from_attributes=True)
 
