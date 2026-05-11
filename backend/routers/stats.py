@@ -102,17 +102,13 @@ def get_cost_efficiency(db: Session = Depends(get_db)):
 def get_closet_overload(threshold: int = 3, db: Session = Depends(get_db)):
     current_user_id = 1
     
-    # 카테고리/색상별 그룹화 및 threshold 이상 중복 감지
-    overloaded_groups = (
-        db.query(
-            Clothes.category, 
-            Clothes.color, 
-            func.count(Clothes.clothes_id).label("count")
-        )
+    # 1. 서브쿼리로 중복 횟수가 threshold 이상인 카테고리와 색상 조합만 찾기
+    subquery = (
+        db.query(Clothes.category, Clothes.color)
         .filter(Clothes.user_id == current_user_id)
         .group_by(Clothes.category, Clothes.color)
         .having(func.count(Clothes.clothes_id) >= threshold)
-        .all()
+        .subquery()
     )
 
     detailed_data = []
