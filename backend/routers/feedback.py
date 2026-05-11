@@ -24,9 +24,14 @@ def create_feedback(feedback_data: FeedbackCreate, db: Session = Depends(get_db)
         
     # 2. 해당 기록과 연결된 옷(Clothes), 그리고 그 옷의 소유자(User) 조회
     cloth = db.query(Clothes).filter(Clothes.clothes_id == history.clothes_id).first()
-    user = None
-    if cloth:
-        user = db.query(User).filter(User.user_id == cloth.user_id).first() # 사용자 가져오기
+    if not cloth:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 기록에 연결된 옷 정보를 찾을 수 없습니다."
+        )
+    
+    # 옷 정보 가져오기.
+    user = db.query(User).filter(User.user_id == cloth.user_id).first()
     
     # 3. 데이터 업데이트
     if feedback_data.feedback_temperature is not None:
