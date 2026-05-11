@@ -53,7 +53,7 @@ def create_feedback(feedback_data: FeedbackCreate, db: Session = Depends(get_db)
     if feedback_data.feedback_tpo is not None:
         history.feedback_tpo = feedback_data.feedback_tpo
         
-        if feedback_data.feedback_tpo == FeedbackTpoEnum.BAD:
+        if feedback_data.feedback_tpo == FeedbackTpoEnum.bad:
             situation = history.tpo.value if hasattr(history.tpo, 'value') else history.tpo
             
             if situation and cloth:
