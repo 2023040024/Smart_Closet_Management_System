@@ -1,24 +1,10 @@
 import os
-from dotenv import load_dotenv
-
-# 프로젝트 루트(backend) 폴더에 있는 .env를 명시적으로 찾습니다.
-current_dir = os.path.dirname(os.path.abspath(__file__)) # routers 폴더
-backend_dir = os.path.dirname(current_dir) # backend 폴더
-env_path = os.path.join(backend_dir, '.env')
-
-load_dotenv(dotenv_path=env_path) 
-
-# --- 확인용 코드 추가 ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    print(f"❌ .env 로드 실패! 시도한 경로: {env_path}")
-else:
-    print(f"✅ .env 로드 성공! 키 확인: {GEMINI_API_KEY[:5]}***")
-
 import json
 import re
 import httpx
-from datetime import date, timedelta
+import google.generativeai as genai
+from dotenv import load_dotenv
+from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -29,26 +15,24 @@ from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum
 from routers.auth import get_current_user
 from tpo_rules import get_tpo_prompt_text
 
-from dotenv import load_dotenv
-load_dotenv() # .env 파일의 내용을 환경변수로 불러옵니다.
+# .env 파일 로드
+load_dotenv()
 
 router = APIRouter(prefix="/recommend", tags=["코디 추천"])
 
-import google.generativeai as genai
-
+# Gemini API 설정
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
-
 model = genai.GenerativeModel("models/gemini-flash-latest")
 
 WEATHER_BASE_URL = os.getenv("WEATHER_BASE_URL", "http://localhost:8000")
 
+# --- 데이터 모델 정의 ---
 class RecommendRequest(BaseModel):
     situation: Optional[str] = None
     temperature: Optional[float] = None
     weather_condition: Optional[str] = None
     address: Optional[str] = None 
-
 
 class OutfitItem(BaseModel):
     clothes_id: int
@@ -56,23 +40,17 @@ class OutfitItem(BaseModel):
     category: str
     color: str
 
-
 class RecommendResult(BaseModel):
     outfit_number: int
     items: list[OutfitItem]
     reason: str
 
-
 class RecommendResponse(BaseModel):
     outfits: list[RecommendResult]
     ai_message: str
 
-
+# --- 유틸리티 함수 ---
 def fetch_weather(address: str) -> dict:
-    """
-    B파트 /weather/address 호출
-    실패 시 기본값(기온 20, 맑음) 반환하여 추천 중단 방지
-    """
     try:
         with httpx.Client(timeout=5.0) as client:
             resp = client.get(
@@ -106,15 +84,15 @@ def fetch_weather(address: str) -> dict:
     except Exception as e:
         print(f"[날씨 연동 실패, 기본값 사용] {e}")
         return {"temperature": 20.0, "condition": "sunny"}
-# ──────────────────────────────────────────────
-# 사용자 프로필 텍스트 생성
-# ──────────────────────────────────────────────
 
 def get_user_profile_text(user: User, temperature: float):
     temp_sensitivity = user.temp_sensitivity or 0.0
     outer_threshold  = 14 + round(temp_sensitivity)
     felt_temp        = temperature - temp_sensitivity * 2
-    preferred_style  = user.preferred_style.value if user.preferred_style else "캐주얼"
+    
+    # Enum 값 처리 (AttributeError 방지)
+    preferred_style = user.preferred_style.value if hasattr(user.preferred_style, 'value') else (user.preferred_style or "캐주얼")
+    
     profile_text = (
         f"- 선호 스타일: {preferred_style}\n"
         f"- 온도 민감도: {temp_sensitivity} "
@@ -123,11 +101,6 @@ def get_user_profile_text(user: User, temperature: float):
         f"- 아우터 기준 온도: {outer_threshold}°C 이하"
     )
     return profile_text, preferred_style, felt_temp, outer_threshold
-
-
-# ──────────────────────────────────────────────
-# 1단계: 규칙 기반 필터링
-# ──────────────────────────────────────────────
 
 def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_condition: str) -> list[Clothes]:
     result = []
@@ -142,59 +115,46 @@ def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_cond
             if temperature <= 14 and c.thickness == ThicknessEnum.thin:
                 continue
         if weather_condition in ("rainy", "snowy"):
-            if c.material == "레더":   # material은 String 컬럼이므로 문자열 직접 비교
+            if c.material == "레더":
                 continue
         result.append(c)
     return result
-
 
 def get_unworn_days(c: Clothes) -> int:
     if c.last_worn_date is None:
         return 999
     return (date.today() - c.last_worn_date).days
 
-
 def clothes_to_text(c: Clothes) -> str:
     unworn = get_unworn_days(c)
     unworn_str = f"{unworn}일 미착용" if unworn < 999 else "착용 기록 없음"
+    
+    # Enum 필드 처리
+    category = c.category.value if hasattr(c.category, 'value') else c.category
+    color = c.color.value if hasattr(c.color, 'value') else c.color
+    season = c.season.value if hasattr(c.season, 'value') else c.season
+    style = c.style.value if hasattr(c.style, 'value') else c.style
+    thickness = c.thickness.value if hasattr(c.thickness, 'value') else (c.thickness or '미입력')
+    
     return (
         f"[ID:{c.clothes_id}] {c.name} / "
-        f"카테고리:{c.category.value} / "
-        f"색상:{c.color} / "
-        f"계절:{c.season.value} / "
-        f"스타일:{c.style.value} / "
+        f"카테고리:{category} / "
+        f"색상:{color} / "
+        f"계절:{season} / "
+        f"스타일:{style} / "
         f"소재:{c.material or '미입력'} / "
-        f"두께:{c.thickness or '미입력'} / "
+        f"두께:{thickness} / "
         f"{unworn_str}"
     )
 
-
-# ──────────────────────────────────────────────
-# 2단계: Gemini API 호출
-# ──────────────────────────────────────────────
-
-def build_prompt(
-    clothes_list: list[Clothes],
-    situation: str,
-    temperature: float,
-    weather_condition: str,
-    user: User
-) -> str:
+def build_prompt(clothes_list: list[Clothes], situation: str, temperature: float, weather_condition: str, user: User) -> str:
     situation_map = {
-        "daily":    "데일리",
-        "business": "비즈니스",
-        "interview":"면접",
-        "wedding":  "결혼식",
-        "funeral":  "장례식",
-        "exercise": "운동",
-        "date":     "데이트",
-        "meeting":  "모임",
-        "travel":   "여행",
-        "school":   "데일리",
-        "cafe":     "데일리",
+        "daily": "데일리", "business": "비즈니스", "interview": "면접",
+        "wedding": "결혼식", "funeral": "장례식", "exercise": "운동",
+        "date": "데이트", "meeting": "모임", "travel": "여행",
+        "school": "데일리", "cafe": "데일리",
     }
     situation_kr = situation_map.get(situation or "daily", situation or "데일리")
-
     context = get_tpo_prompt_text(situation_kr, temperature, weather_condition)
     profile_text, preferred_style, felt_temp, outer_threshold = get_user_profile_text(user, temperature)
 
@@ -211,19 +171,15 @@ def build_prompt(
 {context}
 [사용자 개인 정보]
 {profile_text}
-[보유 옷 목록] (미착용 기간이 긴 옷 위주로 선별됨)
+[보유 옷 목록]
 {clothes_text}
 [추천 규칙]
-1. 반드시 보유한 옷 ID만 사용하세요 (목록에 없는 ID 절대 사용 금지)
-2. 코디는 상의 1개 + 하의 1개 조합이 기본이며, 체감온도 {outer_threshold}°C 이하면 아우터 추가
-3. 미착용 기간이 긴 옷을 우선 포함하세요
-4. 색 조합이 자연스러워야 합니다 (무채색 베이스 선호)
-5. {situation_kr} 상황과 사용자 선호 스타일({preferred_style})에 맞게 선택하세요
-6. 면접이면 포멀 위주, 운동이면 활동성 우선
-7. 코디 3가지는 서로 겹치는 옷이 없어야 합니다
-8. items 배열이 절대 비어있으면 안 됩니다
-9. reason은 반드시 한국어 2~3문장으로 작성하세요
-[응답 형식] 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만:
+1. 반드시 보유한 옷 ID만 사용하세요.
+2. 코디는 상의 1개 + 하의 1개 조합이 기본이며, 체감온도 {outer_threshold}°C 이하면 아우터 추가.
+3. 색 조합이 자연스러워야 합니다.
+4. {situation_kr} 상황과 사용자 선호 스타일({preferred_style})에 맞게 선택하세요.
+5. reason은 반드시 한국어 2~3문장으로 작성하세요.
+[응답 형식] 반드시 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만:
 {{
   "outfits": [
     {{
@@ -231,32 +187,36 @@ def build_prompt(
       "items": [
         {{"clothes_id": 1, "name": "옷이름", "category": "카테고리", "color": "색상"}}
       ],
-      "reason": "2~3문장"
-    }},
-    {{"outfit_number": 2, "items": [], "reason": "이유"}},
-    {{"outfit_number": 3, "items": [], "reason": "이유"}}
+      "reason": "이유"
+    }}
   ],
-  "ai_message": "오늘 {situation_kr}에 잘 어울리는 코디를 준비했어요! 한 줄 멘트"
+  "ai_message": "멘트"
 }}
 """
     return prompt
-
 
 def call_gemini(prompt: str, retries: int = 2) -> dict:
     for attempt in range(retries + 1):
         try:
             response = model.generate_content(prompt)
-            # 1. AI가 실제로 뭐라고 대답하는지 터미널에 출력합니다.
             print(f"--- AI 응답 원본 (시도 {attempt+1}) ---\n{response.text}\n----------------")
             
             text = response.text.strip()
-            match = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+            
+            # ✅ [수정 포인트] 아래 세 줄을 정확히 복사해서 붙여넣으세요.
+            # 백틱(```) 3개로 감싸진 JSON 블록을 찾는 코드입니다.
+            pattern = r"[`]{3}(?:json)?\s*([\s\S]*?)[`]{3}"
+            match = re.search(pattern, text)
+            
             if match:
                 text = match.group(1).strip()
+            else:
+                # 백틱이 없는 경우 전체 텍스트에서 JSON 형태({})를 찾습니다.
+                json_match = re.search(r"\{[\s\S]*\}", text)
+                if json_match:
+                    text = json_match.group(0)
             
             result = json.loads(text)
-            
-            # 2. 리스트가 비어있는지 안전하게 검사합니다.
             if "outfits" in result and len(result["outfits"]) > 0:
                 return result
             else:
@@ -267,126 +227,37 @@ def call_gemini(prompt: str, retries: int = 2) -> dict:
             if attempt == retries:
                 raise HTTPException(status_code=500, detail=f"AI 추천 생성 실패: {str(e)}")
 
-
-# ──────────────────────────────────────────────
-# API 엔드포인트
-# ──────────────────────────────────────────────
-
 @router.get("/today")
 def recommend_today(
     situation: Optional[str] = None,
     temperature: Optional[float] = None,
-    weather_condition: Optional[str] = None,   # ← "sunny" 제거
-    address: Optional[str] = None,              # ← 추가
+    weather_condition: Optional[str] = None,
+    address: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # 1. 날씨 정보 가져오기 (주소가 있다면)
     if address:
         fetched = fetch_weather(address)
         temperature       = temperature       or fetched["temperature"]
         weather_condition = weather_condition or fetched["condition"]
 
+    # 기본값 설정
     temperature       = temperature       or 20.0
     weather_condition = weather_condition or "sunny"
 
-    user_id = current_user.id
-    try:
-        all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
-    except LookupError as e:
-        raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
+    # 2. 사용자 옷 데이터 조회
+    all_clothes = db.query(Clothes).filter(Clothes.user_id == current_user.id).all()
+    
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
+        
+    # 3. 날씨에 맞는 옷 필터링
     filtered = filter_clothes(all_clothes, temperature, weather_condition)
+    
     if len(filtered) < 2:
-        raise HTTPException(status_code=400, detail="날씨·상태 조건에 맞는 옷이 부족합니다")
+        raise HTTPException(status_code=400, detail="날씨 조건에 맞는 옷이 부족합니다")
+        
+    # 4. Gemini AI에게 추천 요청
     prompt = build_prompt(filtered, situation or "daily", temperature, weather_condition, current_user)
-    return call_gemini(prompt)
-
-@router.post("/custom")
-def recommend_custom(
-    body: RecommendRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    temperature       = body.temperature
-    weather_condition = body.weather_condition
-
-    if body.address:
-        fetched = fetch_weather(body.address)
-        temperature       = temperature       or fetched["temperature"]
-        weather_condition = weather_condition or fetched["condition"]
-
-    temperature       = temperature       or 20.0
-    weather_condition = weather_condition or "sunny"
-
-    user_id = current_user.id
-    try:
-        all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
-    except LookupError as e:
-        raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
-    if len(all_clothes) < 3:
-        raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered = filter_clothes(all_clothes, temperature, weather_condition)
-    prompt = build_prompt(filtered, body.situation or "daily", temperature, weather_condition, current_user)
-    return call_gemini(prompt)
-
-@router.get("/weekly")
-def recommend_weekly(
-    situation: Optional[str] = None,
-    temperature: Optional[float] = None,
-    weather_condition: Optional[str] = None,   # ← "sunny" 제거
-    address: Optional[str] = None,              # ← 추가
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    if address:
-        fetched = fetch_weather(address)
-        temperature       = temperature       or fetched["temperature"]
-        weather_condition = weather_condition or fetched["condition"]
-
-    temperature       = temperature       or 20.0
-    weather_condition = weather_condition or "sunny"
-
-    user_id = current_user.id
-    try:
-        all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
-    except LookupError as e:
-        raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
-    filtered = [c for c in all_clothes if c.status == StatusEnum.wearable]
-    if len(filtered) < 4:
-        raise HTTPException(status_code=400, detail="주간 추천을 위해 최소 4벌 이상의 옷이 필요합니다")
-    clothes_text = "\n".join([clothes_to_text(c) for c in filtered])
-    situation_kr = situation or "데일리"
-
-    prompt = f"""
-당신은 패션 코디 전문가입니다.
-아래 옷장에서 월~금 5일치 코디를 짜주세요. (옷 돌려막기 스타일)
-[오늘 날씨]
-- 기온: {temperature}°C
-- 날씨: {weather_condition}
-[목표]
-- 같은 옷을 연속으로 입지 않기
-- 상의 하나로 여러 코디 만들기
-- 미착용 기간이 긴 옷 우선 활용
-- 상황: {situation_kr}
-[추천 규칙]
-1. 반드시 보유한 옷 ID만 사용하세요
-2. 코디는 상의 1개 + 하의 1개 조합이 기본이며, 기온 14°C 이하면 아우터 추가
-3. items 배열이 절대 비어있으면 안 됩니다
-4. reason은 반드시 한국어 2~3문장으로 작성하세요
-[보유 옷]
-{clothes_text}
-[응답 형식] JSON만 응답:
-{{
-  "weekly_outfits": [
-    {{"day": "월요일", "items": [{{"clothes_id": 1, "name": "옷이름", "category": "카테고리", "color": "색상"}}], "reason": "이유"}},
-    {{"day": "화요일", "items": [], "reason": "이유"}},
-    {{"day": "수요일", "items": [], "reason": "이유"}},
-    {{"day": "목요일", "items": [], "reason": "이유"}},
-    {{"day": "금요일", "items": [], "reason": "이유"}}
-  ],
-  "tip": "이번 주 코디 팁 한 줄"
-}}
-"""
     return call_gemini(prompt)

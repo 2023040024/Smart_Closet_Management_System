@@ -11,6 +11,9 @@ import {
   View,
 } from 'react-native';
 
+// ✅ 1. 우리가 만든 api 인터셉터 가져오기 (경로는 파일 위치에 맞게 수정하세요)
+import api from '../_api';
+
 type ClothingItem = {
   id: string;
   name: string;
@@ -60,7 +63,7 @@ type GroupedWearHistoryItem = {
 
 const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여행', '운동', '모임'];
 
-const API_BASE_URL = 'http://192.168.1.122:8000';
+// ❌ 기존 하드코딩된 API_BASE_URL 삭제됨
 
 function formatDate(dateString?: string) {
   if (!dateString) return '날짜 없음';
@@ -101,6 +104,7 @@ export default function HistoryScreen() {
       .filter(Boolean) as ClothingItem[];
   };
 
+  // ✅ 2. fetch 대신 api.get 사용
   const fetchHistoryList = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -108,27 +112,11 @@ export default function HistoryScreen() {
       } else {
         setLoading(true);
       }
-
       setErrorMessage('');
 
-      const response = await fetch(`${API_BASE_URL}/history`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      let data: HistoryApiItem[] = [];
-
-      try {
-        data = await response.json();
-      } catch {
-        data = [];
-      }
-
-      if (!response.ok) {
-        throw new Error(`기록 조회 실패 (${response.status})`);
-      }
+      // 인터셉터가 자동으로 헤더에 토큰을 넣어줍니다
+      const response = await api.get('/history');
+      const data: HistoryApiItem[] = response.data;
 
       const mappedHistoryList = data.map(mapApiHistoryToUi);
 
@@ -151,12 +139,11 @@ export default function HistoryScreen() {
 
       setHistoryList(mappedHistoryList);
       setClothesMap(nextClothesMap);
-    } catch (error) {
+    } catch (error: any) {
       console.error('기록 불러오기 실패:', error);
+      // axios 에러 처리 방식 적용
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : '기록을 불러오지 못했습니다.'
+        error.response?.data?.detail || error.message || '기록을 불러오지 못했습니다.'
       );
     } finally {
       setLoading(false);
@@ -201,15 +188,12 @@ export default function HistoryScreen() {
       if (!groupedMap[key].style && item.style) {
         groupedMap[key].style = item.style;
       }
-
       if (!groupedMap[key].mood && item.mood) {
         groupedMap[key].mood = item.mood;
       }
-
       if (!groupedMap[key].tpo && item.tpo) {
         groupedMap[key].tpo = item.tpo;
       }
-
       if (!groupedMap[key].memo && item.memo) {
         groupedMap[key].memo = item.memo;
       }
@@ -218,6 +202,7 @@ export default function HistoryScreen() {
     return Object.values(groupedMap).sort((a, b) => b.date.localeCompare(a.date));
   }, [historyList, selectedFilter]);
 
+  // ✅ 3. fetch 대신 api.delete 사용
   const deleteHistoryByApi = async (id: string) => {
     const numericId = Number(id);
 
@@ -225,30 +210,14 @@ export default function HistoryScreen() {
       throw new Error('유효하지 않은 기록 ID입니다.');
     }
 
-    const response = await fetch(`${API_BASE_URL}/history/${numericId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    let responseData: any = null;
-
     try {
-      responseData = await response.json();
-    } catch {
-      responseData = null;
-    }
-
-    if (!response.ok) {
+      const response = await api.delete(`/history/${numericId}`);
+      return response.data;
+    } catch (error: any) {
       const message =
-        responseData?.detail ||
-        responseData?.message ||
-        `삭제 실패 (${response.status})`;
+        error.response?.data?.detail || error.message || '삭제 실패';
       throw new Error(message);
     }
-
-    return responseData;
   };
 
   const handleDelete = (group: GroupedWearHistoryItem) => {
@@ -311,9 +280,9 @@ export default function HistoryScreen() {
     const clothes = getClothesByIds(item.clothesIds);
 
     const tagText =
-  [item.style, item.mood, item.tpo]
-    .filter((value) => value && value.trim() !== '')
-    .join(' · ') || '태그 없음';
+      [item.style, item.mood, item.tpo]
+        .filter((value) => value && value.trim() !== '')
+        .join(' · ') || '태그 없음';
 
     return (
       <View style={styles.card}>

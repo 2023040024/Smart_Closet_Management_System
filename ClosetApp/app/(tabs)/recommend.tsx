@@ -17,12 +17,14 @@ import {
 import api from '../_api';
 import { ClothesItem, useCloset } from '../_closetStore';
 
+// ✨ AI 추천 이유(reason)를 저장할 수 있도록 필드 추가
 type OutfitSet = {
   top?: ClothesItem;
   bottom?: ClothesItem;
   outer?: ClothesItem;
   shoes?: ClothesItem;
   accessory?: ClothesItem;
+  reason?: string; 
 };
 
 function normalizeParam(value: string | string[] | undefined): string[] {
@@ -164,6 +166,7 @@ export default function RecommendScreen() {
   const [situation, setSituation] = useState('');
   const [apiLoading, setApiLoading] = useState(false);
   const [apiRecommendations, setApiRecommendations] = useState<OutfitSet[] | null>(null);
+  const [aiMessage, setAiMessage] = useState(''); // ✨ AI 멘트 저장용 상태 추가
 
   // --- 기존 조건 기반 필터링 상태 ---
   const categoryFilters = useMemo(
@@ -211,6 +214,7 @@ export default function RecommendScreen() {
 
     try {
       setApiLoading(true);
+      setAiMessage(''); // 시작할 때 멘트 초기화
 
       // 1. 위치 권한 요청
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -234,21 +238,46 @@ export default function RecommendScreen() {
 
       console.log(`요청 주소: ${address}, 상황: ${situation}`);
 
-      // 4. 백엔드 추천 API 호출 (fetch 대신 ✨ api.get 사용)
-      const response = await api.get(
-        `/recommend/today?situation=${encodeURIComponent(
-          situation
-        )}&address=${encodeURIComponent(address)}`
-      );
+      // 4. 백엔드 추천 API 호출 (✨ 파라미터를 객체 형태로 안전하게 전달)
+      const response = await api.get('/recommend/today', {
+        params: {
+          situation: situation,
+          address: address,
+        }
+      });
       
-      // Axios는 response.data 안에 결과물을 바로 담아줍니다.
-      setApiRecommendations(response.data);
+      // ✨ 5. 서버 데이터(ID)와 내 옷장 실제 데이터(이미지 포함) 매칭
+      const serverOutfits = response.data.outfits; // 배열 데이터 추출
+      setAiMessage(response.data.ai_message || ''); // AI 한 줄 멘트 저장
+
+      const matchedOutfits = serverOutfits.map((outfit: any) => {
+        const outfitSet: OutfitSet = {
+          reason: outfit.reason, // AI가 작성한 코디 이유 저장
+        };
+        
+        outfit.items.forEach((item: any) => {
+          // 서버에서 준 숫자 ID와 내 앱의 문자열 ID를 안전하게 비교
+          const myCloth = clothes.find(c => Number(c.id) === Number(item.clothes_id));
+          
+          if (myCloth) {
+            if (item.category === '상의') outfitSet.top = myCloth;
+            else if (item.category === '하의') outfitSet.bottom = myCloth;
+            else if (item.category === '아우터') outfitSet.outer = myCloth;
+            else if (item.category === '신발') outfitSet.shoes = myCloth;
+            else if (item.category === '악세사리') outfitSet.accessory = myCloth;
+          }
+        });
+        
+        return outfitSet;
+      });
+
+      setApiRecommendations(matchedOutfits);
 
     } catch (error) {
       console.error('API 호출 에러:', error);
       Alert.alert('오류', '추천 코디를 불러오는 중 문제가 발생했습니다.');
     } finally {
-      setApiLoading(false);
+      setApiLoading(false); // ✨ 중요: 성공하든 실패하든 로딩 해제!
     }
   };
 
@@ -292,13 +321,28 @@ export default function RecommendScreen() {
         {/* API 추천 결과 렌더링 */}
         {!apiLoading && apiRecommendations && apiRecommendations.length > 0 && (
           <View style={{ marginTop: 24 }}>
-            <Text style={styles.sectionTitle}>AI 추천 결과</Text>
+            <Text style={styles.sectionTitle}>✨ AI 추천 결과</Text>
+            
+            {/* ✨ AI 멘트 렌더링 박스 */}
+            {aiMessage ? (
+              <View style={styles.aiMessageBox}>
+                <Text style={styles.aiMessageText}>💬 {aiMessage}</Text>
+              </View>
+            ) : null}
+
             {apiRecommendations.map((outfit, index) => (
               <View key={`api-outfit-${index}`} style={styles.outfitCard}>
                 <Text style={styles.outfitTitle}>AI 추천 코디 {index + 1}</Text>
-                <Text style={styles.outfitDescription}>
-                  현재 날씨와 '{situation}' 상황에 맞춘 추천입니다.
-                </Text>
+                
+                {/* ✨ 코디 추천 이유 렌더링 */}
+                {outfit.reason ? (
+                  <Text style={styles.outfitDescription}>{outfit.reason}</Text>
+                ) : (
+                  <Text style={styles.outfitDescription}>
+                    현재 날씨와 '{situation}' 상황에 맞춘 추천입니다.
+                  </Text>
+                )}
+
                 <OutfitItemCard label="상의" item={outfit.top} />
                 <OutfitItemCard label="하의" item={outfit.bottom} />
                 <OutfitItemCard label="아우터" item={outfit.outer} />
@@ -558,5 +602,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 4,
+  },
+  // ✨ AI 메시지 박스 스타일 추가
+  aiMessageBox: {
+    backgroundColor: '#EEF2FF',
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  aiMessageText: {
+    fontSize: 15,
+    color: '#3730A3',
+    lineHeight: 22,
+    fontWeight: '600',
   },
 });
