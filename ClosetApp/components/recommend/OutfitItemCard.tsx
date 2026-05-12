@@ -11,7 +11,12 @@ function resolveImageUri(image?: string | null) {
 }
 
 export function OutfitItemCard({ label, item }: { label: string; item?: ClothesItem }) {
-  if (!item) return null;
+  // 💡 데이터가 없으면 '데이터 없음'이라는 표시라도 해서 디버깅을 도와줍니다.
+  if (!item) return (
+    <View style={styles.itemCard}>
+      <Text style={styles.imagePlaceholderText}>{label} 데이터 매칭 실패</Text>
+    </View>
+  );
 
   const fitText = item.tags.category === '상의' ? item.tags.topFit : 
                   item.tags.category === '하의' ? item.tags.bottomFit : '';
