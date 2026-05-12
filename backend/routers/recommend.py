@@ -168,7 +168,7 @@ def build_prompt(
         "funeral":  "장례식",
         "exercise": "운동",
         "date":     "데이트",
-        "meeting":  "모임",
+        "meeting":  "미팅",
         "travel":   "여행",
         "school":   "데일리",
         "cafe":     "데일리",
@@ -253,7 +253,7 @@ def call_gemini(prompt: str, retries: int = 2) -> dict:
 # API 엔드포인트
 # ──────────────────────────────────────────────
 
-@router.get("/today")
+@router.get("/today", response_model=RecommendResponse)
 def recommend_today(
     situation: Optional[str] = None,
     temperature: Optional[float] = None,
@@ -283,7 +283,7 @@ def recommend_today(
     prompt = build_prompt(filtered, situation or "daily", temperature, weather_condition, current_user)
     return call_gemini(prompt)
 
-@router.post("/custom")
+@router.post("/custom", response_model=RecommendResponse)
 def recommend_custom(
     body: RecommendRequest,
     db: Session = Depends(get_db),
