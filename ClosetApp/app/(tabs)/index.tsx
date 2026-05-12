@@ -124,7 +124,7 @@ function resolveImageUri(image?: string) {
   if (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('file://')) return image;
   
   // api.defaults.baseURL을 활용하거나 직접 base 경로 지정
-  const baseUrl = 'http://172.30.168.24:8000'; 
+  const baseUrl = 'http://192.168.1.122:8000'; 
   return image.startsWith('/') ? `${baseUrl}${image}` : `${baseUrl}/${image}`;
 }
 
@@ -155,6 +155,7 @@ function mapApiItemToClothesItem(item: ClothesApiItem): ClothesItem | null {
 
   return {
     id: String(rawId),
+    name: item.name || '이름 없음',
     image: resolveImageUri(item.image_url ?? item.image),
     createdAt: new Date().toISOString(),
     tags: {

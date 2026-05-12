@@ -14,7 +14,7 @@ import {
 import api from './_api';
 
 // 이미지 경로 처리를 위해 베이스 URL은 남겨둡니다.
-const API_BASE_URL = 'http://172.30.168.24:8000';
+const API_BASE_URL = 'http://192.168.1.122:8000';
 
 type DetailApiItem = {
   clothes_id?: number;

@@ -62,6 +62,7 @@ export type ClothesTags = {
 
 export type ClothesItem = {
   id: string;
+  name: string;
   image: string;
   createdAt: string;
   tags: ClothesTags;
@@ -155,6 +156,7 @@ function normalizeClothesItem(raw: any): ClothesItem | null {
 
   return {
     id: raw.id,
+    name: raw.name || '이름 없음',
     image: raw.image,
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString(),
     tags: normalizeLegacyTags(raw.tags),
