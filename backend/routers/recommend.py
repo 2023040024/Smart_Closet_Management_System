@@ -276,10 +276,16 @@ def recommend_today(
     except LookupError as e:
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
-        raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
+        return {
+            "outfits": [], 
+            "ai_message": "추천을 위해 최소 3벌 이상의 옷을 등록해주세요."
+        }
     filtered = filter_clothes(all_clothes, temperature, weather_condition)
     if len(filtered) < 2:
-        raise HTTPException(status_code=400, detail="날씨·상태 조건에 맞는 옷이 부족합니다")
+        return {
+            "outfits": [], 
+            "ai_message": "날씨·상태 조건에 맞는 옷이 부족합니다"
+        }
     prompt = build_prompt(filtered, situation or "daily", temperature, weather_condition, current_user)
     return call_gemini(prompt)
 
