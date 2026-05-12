@@ -1,0 +1,53 @@
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { ClothesItem } from '../../app/_closetStore';
+import { TagChip } from './TagChip';
+
+const API_BASE_URL = 'http://192.168.1.122:8000';
+
+function resolveImageUri(image?: string | null) {
+  if (!image) return '';
+  if (image.startsWith('http') || image.startsWith('file://')) return image;
+  return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
+}
+
+export function OutfitItemCard({ label, item }: { label: string; item?: ClothesItem }) {
+  if (!item) return null;
+
+  const fitText = item.tags.category === '상의' ? item.tags.topFit : 
+                  item.tags.category === '하의' ? item.tags.bottomFit : '';
+
+  return (
+    <View style={styles.itemCard}>
+      <View style={styles.itemHeaderRow}>
+        <Text style={styles.itemBadge}>{label}</Text>
+      </View>
+
+      {item.image ? (
+        <Image source={{ uri: resolveImageUri(item.image) }} style={styles.itemImage} />
+      ) : (
+        <View style={styles.imagePlaceholder}>
+          <Text style={styles.imagePlaceholderText}>이미지 없음</Text>
+        </View>
+      )}
+
+      <Text style={styles.itemName}>{`${item.tags.color || ''} ${item.tags.category}`}</Text>
+
+      <View style={styles.tagRow}>
+        <TagChip text={item.tags.style} />
+        <TagChip text={item.tags.mood} />
+        <TagChip text={fitText} />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  itemCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#EEF2F7' },
+  itemHeaderRow: { flexDirection: 'row', marginBottom: 10 },
+  itemBadge: { backgroundColor: '#E8EEF9', color: '#2563EB', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, fontSize: 12, fontWeight: '700' },
+  itemImage: { width: '100%', height: 180, borderRadius: 12, backgroundColor: '#E5E7EB', marginBottom: 12, resizeMode: 'cover' },
+  imagePlaceholder: { width: '100%', height: 180, borderRadius: 12, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  imagePlaceholderText: { fontSize: 13, color: '#6B7280', fontWeight: '600' },
+  itemName: { fontSize: 17, fontWeight: '800', color: '#111827', marginBottom: 10 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+});
