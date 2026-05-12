@@ -10,6 +10,10 @@ import {
   View,
 } from 'react-native';
 
+// ✅ api 인터셉터 가져오기 (경로 주의)
+import api from './_api';
+
+// 이미지 경로 처리를 위해 베이스 URL은 남겨둡니다.
 const API_BASE_URL = 'http://172.30.168.24:8000';
 
 type DetailApiItem = {
@@ -76,24 +80,11 @@ export default function DetailScreen() {
         setLoading(true);
         setErrorMessage('');
 
-        const response = await fetch(`${API_BASE_URL}/clothes`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        let data: DetailApiItem[] = [];
-
-        try {
-          data = await response.json();
-        } catch {
-          data = [];
-        }
-
-        if (!response.ok) {
-          throw new Error(`상세 조회 실패 (${response.status})`);
-        }
+        // ✅ fetch 대신 api.get 사용 (토큰 자동 포함)
+        const response = await api.get('/clothes');
+        
+        // axios는 response.data 안에 JSON 결과를 담아줍니다.
+        const data: DetailApiItem[] = response.data;
 
         const foundItem =
           data.find((clothesItem) => String(clothesItem.clothes_id) === String(id)) ??
@@ -107,11 +98,16 @@ export default function DetailScreen() {
         }
 
         setItem(foundItem);
-      } catch (error) {
+      } catch (error: any) {
         console.error('옷 상세 불러오기 실패:', error);
-        setErrorMessage(
-          error instanceof Error ? error.message : '상세 정보를 불러오지 못했습니다.'
-        );
+        
+        if (error.response?.status === 401) {
+          setErrorMessage('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
+        } else {
+          setErrorMessage(
+            error.response?.data?.detail || error.message || '상세 정보를 불러오지 못했습니다.'
+          );
+        }
         setItem(null);
       } finally {
         setLoading(false);
@@ -208,7 +204,6 @@ export default function DetailScreen() {
 
       <TouchableOpacity
         style={styles.button}
-        // 수정된 부분: URL 파라미터 id 대신, 서버에서 받아온 확실한 item.clothes_id (또는 item.id) 사용
         onPress={() => router.push({ 
           pathname: '/edit', 
           params: { id: String(item?.clothes_id ?? item?.id) } 
@@ -221,90 +216,20 @@ export default function DetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 24,
-  },
-  emptyText: {
-    color: '#6b7280',
-    fontSize: 15,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  image: {
-    width: '100%',
-    height: 280,
-    borderRadius: 16,
-    marginBottom: 20,
-    backgroundColor: '#f3f4f6',
-  },
-  imageFallback: {
-    width: '100%',
-    height: 280,
-    borderRadius: 16,
-    marginBottom: 20,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageFallbackText: {
-    color: '#6b7280',
-    fontSize: 15,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  emptyTagText: {
-    color: '#6b7280',
-    marginBottom: 20,
-  },
-  tagList: {
-    marginBottom: 20,
-  },
-  tagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  tagLabel: {
-    width: 88,
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  tagPill: {
-    flexShrink: 1,
-    backgroundColor: '#111827',
-    borderRadius: 999,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-  },
-  tagText: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  button: {
-    marginTop: 8,
-    backgroundColor: '#111827',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 24 },
+  emptyText: { color: '#6b7280', fontSize: 15, marginTop: 12, textAlign: 'center' },
+  container: { flex: 1, backgroundColor: '#fff' },
+  content: { padding: 16, paddingBottom: 32 },
+  image: { width: '100%', height: 280, borderRadius: 16, marginBottom: 20, backgroundColor: '#f3f4f6' },
+  imageFallback: { width: '100%', height: 280, borderRadius: 16, marginBottom: 20, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
+  imageFallbackText: { color: '#6b7280', fontSize: 15 },
+  sectionTitle: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
+  emptyTagText: { color: '#6b7280', marginBottom: 20 },
+  tagList: { marginBottom: 20 },
+  tagRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  tagLabel: { width: 88, fontSize: 14, color: '#6b7280' },
+  tagPill: { flexShrink: 1, backgroundColor: '#111827', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12 },
+  tagText: { color: '#fff', fontSize: 14 },
+  button: { marginTop: 8, backgroundColor: '#111827', paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
+  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });
