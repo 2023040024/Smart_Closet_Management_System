@@ -46,7 +46,7 @@ const temperatureOptions = ['추움', '적당함', '더움'];
 /**
  * 실제 폰(Expo Go) 테스트 시 PC IPv4 주소로 수정
  */
-const API_BASE_URL = 'http://192.168.1.122:8000';
+const API_BASE_URL = 'http://172.30.168.24:8000';
 
 const MOCK_CLOTHES_IDS = ['1', '2', '3', '4'];
 

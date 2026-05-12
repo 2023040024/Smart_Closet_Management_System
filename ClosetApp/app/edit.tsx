@@ -14,7 +14,7 @@ import {
 
 import { ClothesTags, EMPTY_TAGS, TAG_OPTIONS, useCloset } from './_closetStore';
 
-const API_BASE_URL = 'http://192.168.1.122:8000';
+const API_BASE_URL = 'http://172.30.168.24:8000';
 
 function resolveImageUri(image?: string | null) {
   if (!image) return '';
