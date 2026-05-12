@@ -312,8 +312,16 @@ def recommend_custom(
     except LookupError as e:
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
-        raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
+        return {
+            "outfits": [], 
+            "ai_message": "추천을 위해 최소 3벌 이상의 옷을 등록해주세요."
+        }
     filtered = filter_clothes(all_clothes, temperature, weather_condition)
+    if len(filtered) < 2:
+        return {
+            "outfits": [], 
+            "ai_message": "날씨·상태 조건에 맞는 옷이 부족합니다"
+        }
     prompt = build_prompt(filtered, body.situation or "daily", temperature, weather_condition, current_user)
     return call_gemini(prompt)
 
@@ -341,7 +349,10 @@ def recommend_weekly(
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     filtered = [c for c in all_clothes if c.status == StatusEnum.wearable]
     if len(filtered) < 4:
-        raise HTTPException(status_code=400, detail="주간 추천을 위해 최소 4벌 이상의 옷이 필요합니다")
+        return {
+            "outfits": [], 
+            "ai_message": "주간 추천을 위해 최소 4벌 이상의 옷을 등록해주세요."
+        }
     clothes_text = "\n".join([clothes_to_text(c) for c in filtered])
     situation_kr = situation or "데일리"
 
