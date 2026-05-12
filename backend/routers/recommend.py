@@ -249,6 +249,11 @@ def recommend_today(
     # 2. 사용자 옷 데이터 조회
     all_clothes = db.query(Clothes).filter(Clothes.user_id == current_user.id).all()
     
+    user_id = current_user.id
+    try:
+        all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
+    except LookupError as e:
+        raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
         
@@ -260,4 +265,92 @@ def recommend_today(
         
     # 4. Gemini AI에게 추천 요청
     prompt = build_prompt(filtered, situation or "daily", temperature, weather_condition, current_user)
+    return call_gemini(prompt)
+
+@router.post("/custom")
+def recommend_custom(
+    body: RecommendRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    temperature       = body.temperature
+    weather_condition = body.weather_condition
+
+    if body.address:
+        fetched = fetch_weather(body.address)
+        temperature       = temperature       or fetched["temperature"]
+        weather_condition = weather_condition or fetched["condition"]
+
+    temperature       = temperature       or 20.0
+    weather_condition = weather_condition or "sunny"
+
+    user_id = current_user.id
+    try:
+        all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
+    except LookupError as e:
+        raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
+    if len(all_clothes) < 3:
+        raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
+    filtered = filter_clothes(all_clothes, temperature, weather_condition)
+    prompt = build_prompt(filtered, body.situation or "daily", temperature, weather_condition, current_user)
+    return call_gemini(prompt)
+
+@router.get("/weekly")
+def recommend_weekly(
+    situation: Optional[str] = None,
+    temperature: Optional[float] = None,
+    weather_condition: Optional[str] = None,   # ← "sunny" 제거
+    address: Optional[str] = None,              # ← 추가
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if address:
+        fetched = fetch_weather(address)
+        temperature       = temperature       or fetched["temperature"]
+        weather_condition = weather_condition or fetched["condition"]
+
+    temperature       = temperature       or 20.0
+    weather_condition = weather_condition or "sunny"
+
+    user_id = current_user.id
+    try:
+        all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
+    except LookupError as e:
+        raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
+    filtered = [c for c in all_clothes if c.status == StatusEnum.wearable]
+    if len(filtered) < 4:
+        raise HTTPException(status_code=400, detail="주간 추천을 위해 최소 4벌 이상의 옷이 필요합니다")
+    clothes_text = "\n".join([clothes_to_text(c) for c in filtered])
+    situation_kr = situation or "데일리"
+
+    prompt = f"""
+당신은 패션 코디 전문가입니다.
+아래 옷장에서 월~금 5일치 코디를 짜주세요. (옷 돌려막기 스타일)
+[오늘 날씨]
+- 기온: {temperature}°C
+- 날씨: {weather_condition}
+[목표]
+- 같은 옷을 연속으로 입지 않기
+- 상의 하나로 여러 코디 만들기
+- 미착용 기간이 긴 옷 우선 활용
+- 상황: {situation_kr}
+[추천 규칙]
+1. 반드시 보유한 옷 ID만 사용하세요
+2. 코디는 상의 1개 + 하의 1개 조합이 기본이며, 기온 14°C 이하면 아우터 추가
+3. items 배열이 절대 비어있으면 안 됩니다
+4. reason은 반드시 한국어 2~3문장으로 작성하세요
+[보유 옷]
+{clothes_text}
+[응답 형식] JSON만 응답:
+{{
+  "weekly_outfits": [
+    {{"day": "월요일", "items": [{{"clothes_id": 1, "name": "옷이름", "category": "카테고리", "color": "색상"}}], "reason": "이유"}},
+    {{"day": "화요일", "items": [], "reason": "이유"}},
+    {{"day": "수요일", "items": [], "reason": "이유"}},
+    {{"day": "목요일", "items": [], "reason": "이유"}},
+    {{"day": "금요일", "items": [], "reason": "이유"}}
+  ],
+  "tip": "이번 주 코디 팁 한 줄"
+}}
+"""
     return call_gemini(prompt)
