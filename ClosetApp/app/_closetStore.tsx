@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import api from './_api'; // ✨ api 모듈 경로 확인 필요
+import api from './_api';
 
 export const TAG_OPTIONS = {
   category: ['상의', '하의', '아우터', '신발', '악세사리'] as const,
-  topFit: ['슬림', '레굴러', '오버핏', '크롭'] as const,
+  topFit: ['슬림', '레귤러', '오버핏', '크롭'] as const,
   bottomFit: ['슬림', '스트레이트', '와이드', '조거', '테이퍼드'] as const,
   color: [
     '블랙', '화이트', '그레이', '차콜', '네이비', '베이지', '아이보리', 
@@ -17,9 +17,11 @@ export const TAG_OPTIONS = {
     '스포티', '빈티지', '아메카지', '고프코어',
   ] as const,
   mood: ['활동적인', '세련된', '귀여운', '힙한', '차분한', '고급스러운'] as const,
-  material: ['니트', '데님', '코튼', '래더', '나일론', '패딩'] as const,
+  // ✅ '래더' -> '레더'로 수정 (백엔드 MaterialEnum 일치)
+  material: ['니트', '데님', '코튼', '레더', '나일론', '패딩'] as const,
   thickness: ['얇음', '보통', '두꺼움'] as const,
   point: ['프린팅', '레이어드', '컬러포인트', '무지', '스트라이프', '체크'] as const,
+  // ✅ '미팅' -> '모임'으로 수정 (백엔드 SituationEnum 일치)
   tpo: ['데일리', '비즈니스', '면접', '결혼식', '장례식', '운동', '데이트', '모임', '여행'] as const,
 } as const;
 
@@ -65,22 +67,14 @@ type ClosetContextType = {
 const STORAGE_KEY = 'clothes-v2';
 const ClosetContext = createContext<ClosetContextType | null>(null);
 
-/**
- * ✅ 서버의 데이터 구조를 앱의 구조로 변환하는 핵심 함수
- */
 function normalizeClothesItem(raw: any): ClothesItem | null {
   if (!raw || typeof raw !== 'object') return null;
 
-  // 1. ID 변환: 서버는 clothes_id, 앱은 id 사용
   const id = String(raw.clothes_id || raw.id || '');
-  
-  // 2. 이미지 변환: 서버는 image_url, 앱은 image 사용
   const image = raw.image_url || raw.image;
 
-  // 필수 데이터가 없으면 무시 (0개 로그의 주범 해결)
   if (!id || typeof image !== 'string') return null;
 
-  // 3. 태그 변환: 서버의 snake_case 필드들을 camelCase 태그로 매칭
   const tags: ClothesTags = {
     category: raw.category || '',
     topFit: raw.top_fit || raw.topFit || '',
@@ -93,7 +87,8 @@ function normalizeClothesItem(raw: any): ClothesItem | null {
     material: raw.material || '',
     thickness: raw.thickness || '',
     point: raw.point || '',
-    tpo: raw.tpo || '',
+    // ✅ 서버 스키마 필드명인 'situation'을 우선 확인
+    tpo: raw.situation || raw.tpo || '',
   };
 
   return {
@@ -109,16 +104,11 @@ export function ClosetProvider({ children }: { children: React.ReactNode }) {
   const [clothes, setClothes] = useState<ClothesItem[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  // ✅ 서버 동기화 함수
   const fetchClothes = async () => {
     try {
       const response = await api.get('/clothes');
-      console.log('📡 서버로부터 옷 목록 수신 성공');
-      
       if (response.data && Array.isArray(response.data)) {
-        // 수정된 변환 로직 적용
         const normalized = response.data.map(normalizeClothesItem).filter(Boolean) as ClothesItem[];
-        console.log(`✅ 변환 완료: ${normalized.length}개의 옷이 로드됨`);
         setClothes(normalized);
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
       }
@@ -127,7 +117,6 @@ export function ClosetProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 초기 로컬 데이터 로드
   useEffect(() => {
     const loadLocalData = async () => {
       try {
@@ -147,7 +136,6 @@ export function ClosetProvider({ children }: { children: React.ReactNode }) {
     loadLocalData();
   }, []);
 
-  // 상태 변경 시 로컬 저장
   useEffect(() => {
     if (!loaded) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(clothes)).catch(console.log);

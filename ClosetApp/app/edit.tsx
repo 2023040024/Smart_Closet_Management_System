@@ -88,7 +88,7 @@ export default function EditScreen() {
           material: foundItem.material || '',
           thickness: foundItem.thickness || '',
           point: foundItem.point || '',
-          tpo: foundItem.tpo || foundItem.situation || '',
+          tpo: foundItem.situation || foundItem.tpo || '', // ✅ 서버 규격인 situation 우선 로드
         });
 
         const rawPrice = foundItem.price ?? foundItem.purchase_price;
@@ -150,7 +150,8 @@ export default function EditScreen() {
         material: selected.material || null,
         thickness: selected.thickness || null,
         point: selected.point || null,
-        situation: selected.tpo || null,
+        // ✅ 수정된 핵심 부분: 필드명을 'situation'으로 전송
+        situation: selected.tpo || null, 
         price: price ? Math.floor(Number(price)) : 0,
         status: null, 
       };
