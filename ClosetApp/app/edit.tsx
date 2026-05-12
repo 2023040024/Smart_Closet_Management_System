@@ -12,6 +12,8 @@ import {
   View,
 } from 'react-native';
 
+// ✅ 1. 인터셉터 가져오기 (파일 위치에 따라 ./_api 또는 ../_api 확인)
+import api from './_api';
 import { ClothesTags, EMPTY_TAGS, TAG_OPTIONS, useCloset } from './_closetStore';
 
 const API_BASE_URL = 'http://172.30.168.24:8000';
@@ -49,14 +51,14 @@ function Chip({
 
 export default function EditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { updateClothes } = useCloset(); // 기존 로컬 스토어 (필요시 유지)
+  const { updateClothes } = useCloset();
 
   const [loading, setLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
   
   const [imageUri, setImageUri] = useState<string>('');
   const [selected, setSelected] = useState<ClothesTags>(EMPTY_TAGS);
-  const [price, setPrice] = useState<string>(''); // 구매가 상태 추가
+  const [price, setPrice] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState('');
 
   // 백엔드 API에서 기존 데이터를 불러와서 폼에 채워넣기
@@ -69,13 +71,12 @@ export default function EditScreen() {
       }
 
       try {
-        const response = await fetch(`${API_BASE_URL}/clothes`);
-        let data = [];
-        try {
-          data = await response.json();
-        } catch {
-          data = [];
-        }
+        setLoading(true);
+        // ✅ 2. fetch 대신 api.get 사용 (인증 토큰 자동 포함)
+        const response = await api.get('/clothes');
+        
+        // ✅ 3. 데이터가 배열인지 안전하게 확인
+        const data = Array.isArray(response.data) ? response.data : [];
 
         const foundItem =
           data.find((c: any) => String(c.clothes_id) === String(id)) ??
@@ -87,7 +88,7 @@ export default function EditScreen() {
           return;
         }
 
-        // 받아온 데이터를 화면 상태(State)에 매핑
+        // 데이터 매핑
         setSelected({
           category: foundItem.category || '',
           topFit: foundItem.top_fit || foundItem.fit || '',
@@ -103,18 +104,20 @@ export default function EditScreen() {
           tpo: foundItem.tpo || foundItem.situation || '',
         });
 
-        // 구매가 매핑 (백엔드 변수명이 무엇이든 호환되도록 처리)
         const rawPrice = foundItem.price ?? foundItem.purchase_price;
         if (rawPrice != null && rawPrice !== '') {
           setPrice(String(rawPrice));
         }
 
-        // 이미지 매핑
         setImageUri(resolveImageUri(foundItem.image_url ?? foundItem.image));
 
-      } catch (error) {
+      } catch (error: any) {
         console.error('불러오기 실패:', error);
-        setErrorMessage('데이터를 불러오지 못했습니다.');
+        setErrorMessage(
+          error.response?.status === 401 
+            ? '인증 오류가 발생했습니다. 다시 로그인해주세요.' 
+            : '데이터를 불러오지 못했습니다.'
+        );
       } finally {
         setLoading(false);
       }
@@ -178,7 +181,6 @@ export default function EditScreen() {
     try {
       setSaveLoading(true);
 
-      // 백엔드에 업데이트할 데이터 구성 (수정할 데이터)
       const updateData = {
         category: selected.category,
         top_fit: selected.category === '상의' ? selected.topFit : '',
@@ -192,31 +194,20 @@ export default function EditScreen() {
         thickness: selected.thickness,
         point: selected.point,
         tpo: selected.tpo,
-        price: price ? Number(price) : null, // 구매가 추가 전송
+        price: price ? Number(price) : null,
       };
 
-      // 백엔드 수정 API 호출 (보통 수정은 PUT 또는 PATCH를 사용합니다)
-      const response = await fetch(`${API_BASE_URL}/clothes/${id}`, {
-        method: 'PUT', // 만약 백엔드가 PATCH를 쓴다면 PATCH로 변경
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      });
+      // ✅ 4. fetch 대신 api.put 사용
+      await api.put(`/clothes/${id}`, updateData);
 
-      if (!response.ok) {
-        throw new Error('서버 수정 실패');
-      }
-
-      // 기존 로컬 스토어도 업데이트 (앱 내 에러 방지용)
       updateClothes(String(id), { tags: selected });
 
       Alert.alert('수정 완료', '옷 정보가 성공적으로 수정되었습니다.', [
         { text: '확인', onPress: () => router.back() }
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('수정 중 에러:', error);
-      Alert.alert('수정 실패', '옷 정보를 수정하는 중 오류가 발생했습니다.');
+      Alert.alert('수정 실패', error.response?.data?.detail || '옷 정보를 수정하지 못했습니다.');
     } finally {
       setSaveLoading(false);
     }
@@ -291,7 +282,6 @@ export default function EditScreen() {
       <Text style={styles.sectionTitle}>TPO</Text>
       {renderChips(TAG_OPTIONS.tpo, 'tpo')}
 
-      {/* 구매가 입력 폼 추가 */}
       <Text style={styles.sectionTitle}>구매가 수정</Text>
       <TextInput
         style={styles.priceInput}
@@ -313,6 +303,7 @@ export default function EditScreen() {
   );
 }
 
+// 스타일 시트는 기존 것 유지
 const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
   emptyText: { color: '#6b7280', fontSize: 15, marginTop: 12 },
@@ -333,7 +324,6 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: '#111827' },
   chipText: { color: '#111827' },
   chipTextSelected: { color: '#fff' },
-  // 구매가 입력 인풋 스타일 (register.tsx와 동일하게)
   priceInput: {
     borderWidth: 1,
     borderColor: '#e5e7eb',
