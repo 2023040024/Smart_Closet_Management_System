@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'; // ✅ useFocusEffect 추가
+import { useCallback, useMemo, useState } from 'react'; // ✅ useCallback 추가
 import {
   ActivityIndicator,
   Image,
@@ -10,11 +10,10 @@ import {
   View,
 } from 'react-native';
 
-// ✅ api 인터셉터 가져오기 (경로 주의)
+// ✅ api 인터셉터 가져오기
 import api from './_api';
 
-// 이미지 경로 처리를 위해 베이스 URL은 남겨둡니다.
-const API_BASE_URL = 'http://172.30.168.24:8000';
+const API_BASE_URL = 'http://192.168.1.122:8000';
 
 type DetailApiItem = {
   clothes_id?: number;
@@ -45,20 +44,10 @@ type DetailApiItem = {
 
 function resolveImageUri(image?: string | null) {
   if (!image) return '';
-
-  if (
-    image.startsWith('http://') ||
-    image.startsWith('https://') ||
-    image.startsWith('file://')
-  ) {
+  if (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('file://')) {
     return image;
   }
-
-  if (image.startsWith('/')) {
-    return `${API_BASE_URL}${image}`;
-  }
-
-  return `${API_BASE_URL}/${image}`;
+  return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
 }
 
 export default function DetailScreen() {
@@ -68,54 +57,52 @@ export default function DetailScreen() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
-  useEffect(() => {
-    const fetchDetail = async () => {
-      if (!id) {
-        setErrorMessage('옷 ID가 없습니다.');
-        setLoading(false);
+  // ✅ 1. 데이터를 불러오는 로직을 useCallback으로 감싸 재사용 가능하게 만듭니다.
+  const fetchDetail = useCallback(async () => {
+    if (!id) {
+      setErrorMessage('옷 ID가 없습니다.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setErrorMessage('');
+
+      const response = await api.get(`/clothes?t=${new Date().getTime()}`);
+      const data: DetailApiItem[] = response.data;
+
+      const foundItem =
+        data.find((clothesItem) => String(clothesItem.clothes_id) === String(id)) ??
+        data.find((clothesItem) => String(clothesItem.id) === String(id)) ??
+        null;
+
+      if (!foundItem) {
+        setErrorMessage('데이터가 없습니다.');
+        setItem(null);
         return;
       }
 
-      try {
-        setLoading(true);
-        setErrorMessage('');
-
-        // ✅ fetch 대신 api.get 사용 (토큰 자동 포함)
-        const response = await api.get('/clothes');
-        
-        // axios는 response.data 안에 JSON 결과를 담아줍니다.
-        const data: DetailApiItem[] = response.data;
-
-        const foundItem =
-          data.find((clothesItem) => String(clothesItem.clothes_id) === String(id)) ??
-          data.find((clothesItem) => String(clothesItem.id) === String(id)) ??
-          null;
-
-        if (!foundItem) {
-          setErrorMessage('데이터가 없습니다.');
-          setItem(null);
-          return;
-        }
-
-        setItem(foundItem);
-      } catch (error: any) {
-        console.error('옷 상세 불러오기 실패:', error);
-        
-        if (error.response?.status === 401) {
-          setErrorMessage('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
-        } else {
-          setErrorMessage(
-            error.response?.data?.detail || error.message || '상세 정보를 불러오지 못했습니다.'
-          );
-        }
-        setItem(null);
-      } finally {
-        setLoading(false);
+      setItem(foundItem);
+    } catch (error: any) {
+      console.error('옷 상세 불러오기 실패:', error);
+      if (error.response?.status === 401) {
+        setErrorMessage('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
+      } else {
+        setErrorMessage(error.response?.data?.detail || '상세 정보를 불러오지 못했습니다.');
       }
-    };
-
-    fetchDetail();
+      setItem(null);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  // ✅ 2. useFocusEffect를 사용하여 화면이 보일 때마다 fetchDetail을 실행합니다.
+  useFocusEffect(
+    useCallback(() => {
+      fetchDetail();
+    }, [fetchDetail])
+  );
 
   const visibleTags = useMemo(() => {
     if (!item) return [];
@@ -123,7 +110,6 @@ export default function DetailScreen() {
     const fitValue = item.fit ?? item.top_fit ?? item.bottom_fit ?? '';
     const tpoValue = item.tpo ?? item.situation ?? '';
     
-    // 백엔드 응답이 price일 수도, purchase_price일 수도 있으므로 둘 다 체크
     const rawPrice = (item as any).price ?? item.purchase_price;
     const priceValue = rawPrice != null && rawPrice !== ''
       ? `${Number(rawPrice).toLocaleString()}원` 
@@ -142,7 +128,7 @@ export default function DetailScreen() {
       { label: '두께', value: item.thickness },
       { label: '포인트', value: item.point },
       { label: 'TPO', value: tpoValue },
-      { label: '구매가', value: priceValue }, // 구매가 추가
+      { label: '구매가', value: priceValue },
       { label: '마지막 착용일', value: item.last_worn_date },
     ].filter(
       (tag) =>
@@ -152,7 +138,7 @@ export default function DetailScreen() {
     );
   }, [item]);
 
-  if (loading) {
+  if (loading && !item) { // 이미 데이터가 있는 경우 로딩 인디케이터를 띄우지 않아 깜빡임을 방지할 수 있습니다.
     return (
       <View style={styles.emptyContainer}>
         <ActivityIndicator size="large" />
@@ -174,11 +160,7 @@ export default function DetailScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {imageUri ? (
-        <Image
-          source={{ uri: imageUri }}
-          style={styles.image} 
-          resizeMode="contain"
-          />
+        <Image source={{ uri: imageUri }} style={styles.image} resizeMode="contain" />
       ) : (
         <View style={styles.imageFallback}>
           <Text style={styles.imageFallbackText}>이미지가 없습니다.</Text>

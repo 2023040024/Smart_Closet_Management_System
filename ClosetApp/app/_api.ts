@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
 // 백엔드 API 기본 주소 (기존과 동일)
-const API_BASE_URL = 'http://172.30.168.24:8000';
+const API_BASE_URL = 'http://192.168.1.122:8000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
