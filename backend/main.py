@@ -37,6 +37,7 @@ app.include_router(vision.router)
 # C 담당자가 추가할 라우터
 app.include_router(history.router)
 app.include_router(stats.router)
+app.include_router(feedback.router)
 
 @app.get("/")
 def root():
