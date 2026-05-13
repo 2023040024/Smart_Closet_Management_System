@@ -38,9 +38,13 @@ export function OutfitItemCard({ label, item }: { label: string; item?: ClothesI
       <Text style={styles.itemName}>{`${item.tags.color || ''} ${item.tags.category}`}</Text>
 
       <View style={styles.tagRow}>
-        <TagChip text={item.tags.style} />
-        <TagChip text={item.tags.mood} />
-        <TagChip text={fitText} />
+        {/* ✅ 조건부 렌더링 적용: 데이터가 있을 때만 TagChip을 그립니다. */}
+        {item.tags.style ? <TagChip text={item.tags.style} /> : null}
+        {item.tags.mood ? <TagChip text={item.tags.mood} /> : null}
+        {fitText ? <TagChip text={fitText} /> : null}
+        
+        {/* ✅ 누락되었던 TPO(상황) 태그 추가 */}
+        {item.tags.tpo ? <TagChip text={item.tags.tpo} /> : null}
       </View>
     </View>
   );
