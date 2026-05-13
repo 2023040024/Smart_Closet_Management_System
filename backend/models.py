@@ -245,7 +245,7 @@ class TpoScore(Base):
     __tablename__ = "tpo_scores"
 
     id         = Column(Integer, primary_key=True, index=True)
-    clothes_id = Column(Integer, ForeignKey("clothes.id", ondelete="CASCADE"), nullable=False)
+    clothes_id = Column(Integer, ForeignKey("clothes.clothes_id", ondelete="CASCADE"), nullable=False)
     tpo_name   = Column(String, nullable=False)
     scor       = Column(Integer, default=100, nullable=False)
     clothes    = relationship("Clothes", back_populates="tpo_scores")

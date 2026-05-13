@@ -32,13 +32,15 @@ function resolveImageUri(image?: string | null) {
 }
 
 /**
- * ✅ 1단계: 빈 태그 박스 노출 방지 로직 적용
+ * ✅ 수정 1: 타입 캐스팅(as any)을 통해 TypeScript 에러(Line 41) 해결
  */
 function OutfitItemCard({ label, item }: { label: string; item?: ClothesItem }) {
   if (!item) return null;
 
-  const fitText = item.tags.category === '상의' ? item.tags.topFit :
-                  item.tags.category === '하의' ? item.tags.bottomFit : '';
+  // 데이터가 어느 경로에 있든 가져올 수 있게 any로 우회 처리
+  const category = (item as any).category || item.tags?.category || ''; 
+  const fitText = category === '상의' ? item.tags?.topFit :
+                  category === '하의' ? item.tags?.bottomFit : '';
 
   return (
     <View style={styles.itemCard}>
@@ -60,21 +62,17 @@ function OutfitItemCard({ label, item }: { label: string; item?: ClothesItem }) 
         </View>
       )}
 
-      <Text style={styles.itemName}>{`${item.tags.color || ''} ${item.tags.category}`}</Text>
+      <Text style={styles.itemName}>{`${item.tags?.color || ''} ${category}`}</Text>
       <View style={styles.tagRow}>
-        {/* ✅ 데이터가 있을 때만 렌더링되도록 수정 */}
-        {item.tags.style ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.style}</Text></View> : null}
-        {item.tags.mood ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.mood}</Text></View> : null}
+        {item.tags?.style ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.style}</Text></View> : null}
+        {item.tags?.mood ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.mood}</Text></View> : null}
         {fitText ? <View style={styles.tagChip}><Text style={styles.tagText}>{fitText}</Text></View> : null}
-        {item.tags.tpo ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.tpo}</Text></View> : null}
+        {item.tags?.tpo ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.tpo}</Text></View> : null}
       </View>
     </View>
   );
 }
 
-/**
- * ✅ 2단계: 스켈레톤 UI 컴포넌트 추가
- */
 function SkeletonLoader() {
   return (
     <View style={{ marginTop: 24 }}>
@@ -129,7 +127,12 @@ export default function RecommendScreen() {
         outfit.items.forEach((item: any) => {
           const myCloth = clothes.find(c => Number(c.id) === Number(item.clothes_id));
           if (myCloth) {
-            const cat = item.category;
+            console.log(`[ID: ${myCloth.id}] 상세 데이터:`, JSON.stringify(myCloth));
+            
+            const cat = (myCloth as any).category || myCloth.tags?.category || (item as any).category;
+            
+            console.log(`[ID: ${myCloth.id}] 최종 결정된 카테고리:`, cat);
+
             if (cat === '상의') set.top = myCloth;
             else if (cat === '하의') set.bottom = myCloth;
             else if (cat === '아우터') set.outer = myCloth;
@@ -140,6 +143,7 @@ export default function RecommendScreen() {
       });
       setApiRecommendations(matched);
     } catch (error) {
+      console.error(error);
       Alert.alert('오류', '추천을 불러오지 못했습니다.');
     } finally {
       setApiLoading(false);
@@ -158,7 +162,6 @@ export default function RecommendScreen() {
           <Text style={styles.actionButtonText}>{apiLoading ? '불러오는 중...' : '코디 추천받기'}</Text>
         </TouchableOpacity>
 
-        {/* ✅ 로딩 중일 때 스켈레톤 UI 표시 */}
         {apiLoading && <SkeletonLoader />}
 
         {!apiLoading && apiRecommendations && (
@@ -209,7 +212,6 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tagChip: { backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   tagText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
-  // ✅ 스켈레톤 전용 스타일
   skeletonBase: { backgroundColor: '#E5E7EB', borderRadius: 8 },
   aiMessageBoxSkeleton: { backgroundColor: '#F3F4F6', padding: 20, borderRadius: 16, marginBottom: 20 },
   outfitCardSkeleton: { marginBottom: 24, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20 },
