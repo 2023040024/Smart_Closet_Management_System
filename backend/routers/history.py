@@ -73,18 +73,21 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
         raise HTTPException(status_code=500, detail="서버 오류로 인해 기록에 실패했습니다.")
 
 @router.get("", response_model=List[WearHistoryResponse])
-def get_wear_histories(skip: int = 0, limit: int = 100, 
-                       db: Session = Depends(get_db),
-                       current_user: User = Depends(get_current_user)
-                       ):
+def get_wear_histories(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     histories = db.query(WearHistory)\
         .options(joinedload(WearHistory.clothes))\
-            .filter(WearHistory.user_id == current_user.id)\
+        .filter(WearHistory.user_id == current_user.id)\
         .order_by(WearHistory.worn_date.desc()).offset(skip).limit(limit)\
-            .all()
+        .all()
+    
     return histories
 
-@router.delete("/{history_id}")
+@router.delete("/{history_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_wear_history(history_id: int, 
                         db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)
@@ -113,7 +116,11 @@ def delete_wear_history(history_id: int,
         cloth.last_worn_date = remaining_last_history.worn_date if remaining_last_history else None
 
     # 3. DB에서 실제 삭제
-    db.delete(history)
-    db.commit()
+    try:
+        db.delete(history)
+        db.commit()
+    except Exception as e:
+        db.rollback() # 에러 발생 시 DB 보호
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="삭제 중 서버 오류가 발생했습니다.")
     
-    return {"message": f"기록 {history_id}번이 성공적으로 삭제되었으며, 옷의 착용 횟수가 조정되었습니다."}
+    return None

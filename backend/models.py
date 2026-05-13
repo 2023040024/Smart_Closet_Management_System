@@ -181,6 +181,7 @@ class Clothes(Base):
     owner        = relationship("User", back_populates="clothes")
     wear_history = relationship("WearHistory", back_populates="clothes", cascade="all, delete-orphan")
     outfit_items = relationship("OutfitClothes", back_populates="clothes")
+    tpo_scores = relationship("TpoScore", back_populates="clothes", cascade="all, delete-orphan")
 
     @property
     def cost_per_wear(self):
@@ -239,3 +240,13 @@ class OutfitClothes(Base):
 
     outfit  = relationship("Outfit", back_populates="items")
     clothes = relationship("Clothes", back_populates="outfit_items")
+
+class TpoScore(Base):
+    """옷의 상황(TPO)별 점수를 저장하는 테이블"""
+    __tablename__ = "tpo_scores"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    clothes_id = Column(Integer, ForeignKey("clothes.id", ondelete="CASCADE"), nullable=False)
+    tpo_name   = Column(String, nullable=False)
+    scor       = Column(Integer, default=100, nullable=False)
+    clothes    = relationship("Clothes", back_populates="tpo_scores")
