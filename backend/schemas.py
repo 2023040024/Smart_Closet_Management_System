@@ -77,6 +77,20 @@ class StyleUpdate(BaseModel):
 # Clothes
 # ──────────────────────────────────────────────
 
+class ClothesTagsResponse(BaseModel):
+    category:       CategoryEnum
+    color:          Optional[ColorEnum] = None
+    situation:      Optional[SituationEnum] = None
+    top_fit:        Optional[TopFitEnum] = None
+    bottom_fit:     Optional[BottomFitEnum] = None
+    style:          Optional[StyleEnum] = None
+    mood:           Optional[MoodEnum] = None
+    season:         Optional[SeasonEnum] = None
+    tone:           Optional[ToneEnum] = None
+    material:       Optional[str] = None
+    thickness:      Optional[ThicknessEnum] = None
+    point:          Optional[PointEnum] = None
+    
 class ClothesCreate(BaseModel):
     name:           str
     category:       CategoryEnum
