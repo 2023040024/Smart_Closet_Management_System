@@ -17,12 +17,10 @@ export const TAG_OPTIONS = {
     '스포티', '빈티지', '아메카지', '고프코어',
   ] as const,
   mood: ['활동적인', '세련된', '귀여운', '힙한', '차분한', '고급스러운'] as const,
-  // ✅ '래더' -> '레더'로 수정 (백엔드 MaterialEnum 일치)
-  material: ['니트', '데님', '코튼', '레더', '나일론', '패딩'] as const,
+  material: ['니트', '데님', '코튼', '래더', '나일론', '패딩'] as const,
   thickness: ['얇음', '보통', '두꺼움'] as const,
   point: ['프린팅', '레이어드', '컬러포인트', '무지', '스트라이프', '체크'] as const,
-  // ✅ '미팅' -> '모임'으로 수정 (백엔드 SituationEnum 일치)
-  tpo: ['데일리', '비즈니스', '면접', '결혼식', '장례식', '운동', '데이트', '모임', '여행'] as const,
+  tpo: ['데일리', '비즈니스', '면접', '결혼식', '장례식', '운동', '데이트', '미팅', '여행'] as const,
 } as const;
 
 export type Category = (typeof TAG_OPTIONS.category)[number];

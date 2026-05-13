@@ -41,7 +41,8 @@ function Chip({
 
 export default function EditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { updateClothes } = useCloset();
+  // ✅ fetchClothes를 함께 가져옵니다.
+  const { updateClothes, fetchClothes } = useCloset(); 
 
   const [loading, setLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
@@ -88,7 +89,7 @@ export default function EditScreen() {
           material: foundItem.material || '',
           thickness: foundItem.thickness || '',
           point: foundItem.point || '',
-          tpo: foundItem.situation || foundItem.tpo || '', // ✅ 서버 규격인 situation 우선 로드
+          tpo: foundItem.situation || foundItem.tpo || '', 
         });
 
         const rawPrice = foundItem.price ?? foundItem.purchase_price;
@@ -150,13 +151,18 @@ export default function EditScreen() {
         material: selected.material || null,
         thickness: selected.thickness || null,
         point: selected.point || null,
-        // ✅ 수정된 핵심 부분: 필드명을 'situation'으로 전송
         situation: selected.tpo || null, 
         price: price ? Math.floor(Number(price)) : 0,
         status: null, 
       };
 
+      // 1. 서버에 수정 요청 전송
       await api.put(`/clothes/${id}`, updateData);
+      
+      // ✅ 2. 서버 데이터와 로컬 상태를 강제로 재동기화 (중요)
+      await fetchClothes(); 
+      
+      // 3. 로컬 Context 업데이트
       updateClothes(String(id), { name, tags: selected });
 
       Alert.alert('수정 완료', '성공적으로 수정되었습니다.', [
