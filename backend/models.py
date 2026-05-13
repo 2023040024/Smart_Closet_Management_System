@@ -120,7 +120,7 @@ class SituationEnum(str, enum.Enum):
     funeral = "장례식"
     exercise = "운동"
     date     = "데이트"
-    meeting = "모임"
+    meeting = "미팅"
     travel   = "여행"
 
 class FeedbackTempEnum(str, enum.Enum):
