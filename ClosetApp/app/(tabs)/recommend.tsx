@@ -32,7 +32,7 @@ function resolveImageUri(image?: string | null) {
 }
 
 /**
- * ✅ 사진이 짤리지 않도록 수정된 아이템 카드
+ * ✅ 1단계: 빈 태그 박스 노출 방지 로직 적용
  */
 function OutfitItemCard({ label, item }: { label: string; item?: ClothesItem }) {
   if (!item) return null;
@@ -51,7 +51,7 @@ function OutfitItemCard({ label, item }: { label: string; item?: ClothesItem }) 
           <Image
             source={{ uri: resolveImageUri(item.image) }}
             style={styles.itemImage}
-            resizeMode="contain" // ✅ 사진 전체가 짤리지 않고 나오게 설정
+            resizeMode="contain"
           />
         </View>
       ) : (
@@ -62,10 +62,34 @@ function OutfitItemCard({ label, item }: { label: string; item?: ClothesItem }) 
 
       <Text style={styles.itemName}>{`${item.tags.color || ''} ${item.tags.category}`}</Text>
       <View style={styles.tagRow}>
-        <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.style}</Text></View>
-        <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.mood}</Text></View>
+        {/* ✅ 데이터가 있을 때만 렌더링되도록 수정 */}
+        {item.tags.style ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.style}</Text></View> : null}
+        {item.tags.mood ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.mood}</Text></View> : null}
         {fitText ? <View style={styles.tagChip}><Text style={styles.tagText}>{fitText}</Text></View> : null}
+        {item.tags.tpo ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.tpo}</Text></View> : null}
       </View>
+    </View>
+  );
+}
+
+/**
+ * ✅ 2단계: 스켈레톤 UI 컴포넌트 추가
+ */
+function SkeletonLoader() {
+  return (
+    <View style={{ marginTop: 24 }}>
+      <View style={[styles.skeletonBase, { width: 150, height: 28, marginBottom: 15 }]} />
+      <View style={styles.aiMessageBoxSkeleton}>
+        <View style={[styles.skeletonBase, { width: '100%', height: 16, marginBottom: 8 }]} />
+        <View style={[styles.skeletonBase, { width: '90%', height: 16, marginBottom: 8 }]} />
+        <View style={[styles.skeletonBase, { width: '60%', height: 16 }]} />
+      </View>
+      {[1, 2].map((i) => (
+        <View key={i} style={styles.outfitCardSkeleton}>
+          <View style={[styles.skeletonBase, { width: 120, height: 24, marginBottom: 15 }]} />
+          <View style={[styles.skeletonBase, { width: '100%', height: 180, borderRadius: 12 }]} />
+        </View>
+      ))}
     </View>
   );
 }
@@ -103,7 +127,6 @@ export default function RecommendScreen() {
       const matched = response.data.outfits.map((outfit: any) => {
         const set: OutfitSet = { reason: outfit.reason };
         outfit.items.forEach((item: any) => {
-          // ✅ 수정 포인트: c.clothes_id 대신 c.id를 사용 (타입 에러 해결)
           const myCloth = clothes.find(c => Number(c.id) === Number(item.clothes_id));
           if (myCloth) {
             const cat = item.category;
@@ -134,6 +157,9 @@ export default function RecommendScreen() {
         <TouchableOpacity style={styles.actionButton} onPress={fetchTodayRecommendation} disabled={apiLoading}>
           <Text style={styles.actionButtonText}>{apiLoading ? '불러오는 중...' : '코디 추천받기'}</Text>
         </TouchableOpacity>
+
+        {/* ✅ 로딩 중일 때 스켈레톤 UI 표시 */}
+        {apiLoading && <SkeletonLoader />}
 
         {!apiLoading && apiRecommendations && (
           <View style={{ marginTop: 24 }}>
@@ -183,4 +209,8 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tagChip: { backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   tagText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
+  // ✅ 스켈레톤 전용 스타일
+  skeletonBase: { backgroundColor: '#E5E7EB', borderRadius: 8 },
+  aiMessageBoxSkeleton: { backgroundColor: '#F3F4F6', padding: 20, borderRadius: 16, marginBottom: 20 },
+  outfitCardSkeleton: { marginBottom: 24, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20 },
 });
