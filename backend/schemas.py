@@ -77,20 +77,6 @@ class StyleUpdate(BaseModel):
 # Clothes
 # ──────────────────────────────────────────────
 
-class ClothesTagsResponse(BaseModel):
-    category:       CategoryEnum
-    color:          Optional[ColorEnum] = None
-    situation:      Optional[SituationEnum] = None
-    top_fit:        Optional[TopFitEnum] = None
-    bottom_fit:     Optional[BottomFitEnum] = None
-    style:          Optional[StyleEnum] = None
-    mood:           Optional[MoodEnum] = None
-    season:         Optional[SeasonEnum] = None
-    tone:           Optional[ToneEnum] = None
-    material:       Optional[str] = None
-    thickness:      Optional[ThicknessEnum] = None
-    point:          Optional[PointEnum] = None
-    
 class ClothesCreate(BaseModel):
     name:           str
     category:       CategoryEnum
@@ -146,28 +132,55 @@ class ClothesUpdate(BaseModel):
 class ClothesStatusUpdate(BaseModel):
     status: StatusEnum
 
-class ClothesResponse(BaseModel):
-    clothes_id:     int
-    name:           str
+class ClothesTagsResponse(BaseModel):
     category:       CategoryEnum
+    color:          Optional[ColorEnum] = None
+    situation:      Optional[SituationEnum] = None
     top_fit:        Optional[TopFitEnum] = None
     bottom_fit:     Optional[BottomFitEnum] = None
-    color:          Optional[ColorEnum] = None
-    season:         Optional[SeasonEnum] = None
-    tone:           Optional[ToneEnum] = None
     style:          Optional[StyleEnum] = None
     mood:           Optional[MoodEnum] = None
+    season:         Optional[SeasonEnum] = None
+    tone:           Optional[ToneEnum] = None
     material:       Optional[str] = None
     thickness:      Optional[ThicknessEnum] = None
     point:          Optional[PointEnum] = None
+
+class ClothesResponse(BaseModel):
+    id:             int = Field(..., alias="clothes_id")
+    name:           str
     price:          Optional[int] = 0
-    situation:      Optional[SituationEnum] = None
-    image_url:      Optional[str] = None
+    image:          Optional[str] = Field(None, alias="image_url")
     status:         Optional[StatusEnum] = None
     wear_count:     int
     last_worn_date: Optional[date] = None
     cost_per_wear:  Optional[float] = 0.0  # 계산된 값 (wear_count=0이면 null)
     created_at:     datetime
+    tags:           ClothesTagsResponse
+
+    @model_validator(mode='before')
+    @classmethod
+    def wrap_tags(cls, data: Any) -> Any:
+        """
+        DB에서 가져온 Flat한 데이터를 프론트엔드용 
+        계층형(tags 객체 내부) 구조로 변환하는 헬퍼 로직
+        """
+        # SQLAlchemy 모델 객체인 경우 dict로 변환하여 처리
+        if not isinstance(data, dict):
+            obj_data = {c.name: getattr(data, c.name) for c in data.__table__.columns}
+        else:
+            obj_data = data
+
+        tag_fields = [
+            'category', 'color', 'situation', 'top_fit', 'bottom_fit',
+            'style', 'mood', 'season', 'tone', 'material', 'thickness', 'point'
+        ]
+        
+        # tags 키가 없는 경우에만 생성하여 데이터 매핑
+        if 'tags' not in obj_data:
+            obj_data['tags'] = {k: obj_data.get(k) for k in tag_fields}
+            
+        return obj_data
 
     @model_validator(mode='after')
     def calculate_cpw(self) -> 'ClothesResponse':
