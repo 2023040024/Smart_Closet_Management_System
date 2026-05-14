@@ -5,10 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Clothes, User, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum, SituationEnum
-from schemas import ClothesUpdate, ClothesStatusUpdate, ClothesResponse
+from models import Clothes, User, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum, SituationEnum, ColorEnum
+from schemas import ClothesUpdate, ClothesStatusUpdate, ClothesResponse, ClothesCreate
 from .auth import get_current_user
-from schemas import ClothesCreate
 
 router = APIRouter(prefix="/clothes", tags=["옷장"])
 
@@ -75,11 +74,12 @@ def get_material_tip(material_name: Optional[str]):
 async def create_clothes(
     # Form 필드로 받기 (이미지 업로드와 함께 사용 시 multipart/form-data)
     name:           str               = Form(...),
-    category:       str               = Form(...),
-    color:          str               = Form(...),
-    season:         str               = Form(...),
-    style:          str               = Form(...),
+    category:       Optional[CategoryEnum] = Form(...),
+    color:          Optional[ColorEnum] = Form(...),
+    season:         Optional[SeasonEnum] = Form(...),
+    style:          Optional[StyleEnum] = Form(...),
     material:       Optional[str]     = Form(None),
+    situation:      Optional[SituationEnum] = Form(None),
     thickness:      Optional[ThicknessEnum] = Form(None),
     price:          Optional[int]     = Form(None),
     image:          Optional[UploadFile] = File(None),
@@ -108,10 +108,12 @@ async def create_clothes(
         color          = color,
         season         = season,
         style          = style,
+        situation      = situation,
         material       = material.strip() if material else None,
         thickness      = thickness,
         price          = price,
         image_url      = image_url,
+        status         = StatusEnum.wearable
     )
     db.add(clothes)
     db.commit()
