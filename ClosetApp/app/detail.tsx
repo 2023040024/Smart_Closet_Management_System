@@ -14,7 +14,7 @@ import api from './_api';
 
 const API_BASE_URL = 'http://192.168.1.122:8000';
 
-// ⭐ 백엔드의 계층형 구조와 최상위 필드 에러 방지를 위해 타입 정의 보강
+// ✅ 빨간 줄 에러를 해결하기 위해 최상위에 situation, tpo 추가
 type DetailApiItem = {
   id?: number;
   clothes_id?: number;
@@ -24,11 +24,8 @@ type DetailApiItem = {
   purchase_price?: number | null;
   price?: number | null;
   last_worn_date?: string | null;
-  
-  // 타입 에러 해결을 위해 최상위 레벨에도 필드 추가
   situation?: string | null; 
   tpo?: string | null;
-  
   tags?: {
     category?: string;
     color?: string;
@@ -118,7 +115,7 @@ export default function DetailScreen() {
     const s = item.tags || {};
     const fitValue = s.top_fit ?? s.topFit ?? s.bottom_fit ?? s.bottomFit ?? '';
     
-    // ⭐ 에러 해결: s.situation부터 item.situation까지 순차적으로 확인
+    // ✅ 에러 없이 안전하게 호출 가능
     const tpoValue = s.situation ?? s.tpo ?? item.situation ?? item.tpo ?? '';
     
     const rawPrice = item.price ?? item.purchase_price;

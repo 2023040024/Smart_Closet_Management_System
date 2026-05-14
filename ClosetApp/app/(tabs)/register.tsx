@@ -68,7 +68,7 @@ function stringifyErrorDetail(responseData: any, status: number) {
 }
 
 export default function RegisterScreen() {
-  const { fetchClothes } = useCloset(); // ✅ 등록 후 목록 갱신을 위해 가져옴
+  const { fetchClothes } = useCloset(); // ✅ 등록 후 목록 갱신용
   const [image, setImage] = useState<string | null>(null);
   const [selected, setSelected] = useState<ClothesTags>(EMPTY_TAGS);
   const [price, setPrice] = useState<string>('');
@@ -116,14 +116,10 @@ export default function RegisterScreen() {
     const formData = new FormData();
     const generatedName = getClothesName(selected);
 
-    // ⭐ 백엔드 필드 명세에 맞춰 모든 태그 데이터 포함
     formData.append('name', generatedName);
     formData.append('category', selected.category || '');
-    
-    // 핏 정보 분리 대응
     formData.append('top_fit', selected.category === '상의' ? (selected.topFit || '') : '');
     formData.append('bottom_fit', selected.category === '하의' ? (selected.bottomFit || '') : '');
-    
     formData.append('color', selected.color || '');
     formData.append('season', selected.season || '');
     formData.append('tone', selected.tone || '');
@@ -133,7 +129,7 @@ export default function RegisterScreen() {
     formData.append('thickness', selected.thickness || '');
     formData.append('point', selected.point || '');
     
-    // ⭐ TPO 데이터를 백엔드 명세인 'situation'으로 전송
+    // ⭐ 백엔드 명세에 맞춰 TPO를 'situation' 필드로 확실하게 전송
     formData.append('situation', selected.tpo || ''); 
     
     formData.append('price', price || '0');
@@ -164,7 +160,7 @@ export default function RegisterScreen() {
       setLoading(true);
       await saveClothesToApi();
       
-      // ✅ 등록 직후 서버 데이터를 다시 불러와서 메인 화면을 동기화합니다.
+      // ✅ 서버에 등록 후 전역 상태 갱신 (index.tsx와 동기화됨)
       await fetchClothes();
 
       Alert.alert('등록 완료', '옷이 서버에 등록되었습니다.', [
@@ -206,7 +202,7 @@ export default function RegisterScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>옷 등록</Text>
       <TouchableOpacity style={styles.imageBox} onPress={pickImage}>
-        {image ? <Image source={{ uri: image }} style={styles.image} resizeMode="contain" /> : <Text style={styles.imagePlaceholder}>+ 사진 추가</Text>}
+        {image ? <Image source={{ uri: image }} style={styles.image} resizeMode="cover" /> : <Text style={styles.imagePlaceholder}>+ 사진 추가</Text>}
       </TouchableOpacity>
       <Text style={styles.sectionTitle}>카테고리</Text>
       {renderChips(TAG_OPTIONS.category, 'category')}

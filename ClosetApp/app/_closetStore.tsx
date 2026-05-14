@@ -62,19 +62,26 @@ type ClosetContextType = {
   fetchClothes: (forceRefresh?: boolean) => Promise<void>;
 };
 
-const STORAGE_KEY = 'clothes-v3'; // 버전을 v3로 올려서 기존 잘못된 캐시를 무시합니다.
+const STORAGE_KEY = 'clothes-v3'; 
 const ClosetContext = createContext<ClosetContextType | null>(null);
+
+const API_BASE_URL = 'http://192.168.1.122:8000';
+
+// ✅ 하얗게 뜨는 이미지 문제 해결을 위한 URL 변환 함수
+function resolveImageUri(image?: string | null) {
+  if (!image) return '';
+  if (image.startsWith('http') || image.startsWith('file://')) return image;
+  return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
+}
 
 function normalizeClothesItem(raw: any): ClothesItem | null {
   if (!raw || typeof raw !== 'object') return null;
 
-  // 백엔드 변경 사항 반영: clothes_id -> id, image_url -> image
   const id = String(raw.id || raw.clothes_id || '');
   const image = raw.image || raw.image_url;
 
   if (!id || typeof image !== 'string') return null;
 
-  // 계층화된 응답 구조(tags 객체) 대응
   const s = raw.tags || {}; 
 
   const tags: ClothesTags = {
@@ -89,14 +96,13 @@ function normalizeClothesItem(raw: any): ClothesItem | null {
     material: s.material || raw.material || '',
     thickness: s.thickness || raw.thickness || '',
     point: s.point || raw.point || '',
-    // situation 필드를 프론트의 tpo로 매핑
     tpo: s.situation || s.tpo || raw.situation || raw.tpo || '',
   };
 
   return {
     id,
     name: raw.name || '이름 없음',
-    image: image,
+    image: resolveImageUri(image), // ✅ 이미지 경로 정상화
     createdAt: raw.created_at || raw.createdAt || new Date().toISOString(),
     tags: tags,
   };
@@ -108,13 +114,11 @@ export function ClosetProvider({ children }: { children: React.ReactNode }) {
 
   const fetchClothes = async (forceRefresh = false) => {
     try {
-      console.log('🔄 서버에서 옷 데이터 가져오는 중...');
       const response = await api.get('/clothes');
       if (response.data && Array.isArray(response.data)) {
         const normalized = response.data.map(normalizeClothesItem).filter(Boolean) as ClothesItem[];
         setClothes(normalized);
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-        console.log('✅ 동기화 완료:', normalized.length, '개의 아이템');
       }
     } catch (error) {
       console.log('❌ 옷 동기화 실패:', error);
@@ -129,7 +133,6 @@ export function ClosetProvider({ children }: { children: React.ReactNode }) {
           const parsed = JSON.parse(data);
           setClothes(parsed.map(normalizeClothesItem).filter(Boolean));
         }
-        // 앱 시작 시 항상 서버 데이터를 새로 가져와서 구조를 맞춤
         await fetchClothes();
       } catch (e) {
         console.log('로드 실패:', e);
@@ -146,7 +149,7 @@ export function ClosetProvider({ children }: { children: React.ReactNode }) {
     }
   }, [clothes, loaded]);
 
-  const value = useMemo(() => ({
+  const value = useMemo<ClosetContextType>(() => ({
     clothes,
     addClothes: (item: ClothesItem) => setClothes(prev => [item, ...prev]),
     deleteClothes: (id: string) => setClothes(prev => prev.filter(i => i.id !== id)),
