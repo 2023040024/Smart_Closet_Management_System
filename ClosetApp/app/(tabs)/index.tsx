@@ -16,11 +16,9 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Category, ClothesItem, EMPTY_TAGS, TAG_OPTIONS } from '../_closetStore';
-// 1. 전역 api 모듈 임포트
 import api from '../_api';
+import { Category, ClothesItem, ClothesTags, TAG_OPTIONS } from '../_closetStore';
 
-// api.ts에서 처리하므로 내부 변수는 제거하거나 api 객체 내 설정을 따름
 const CATEGORY_ORDER: Array<'전체' | Category> = ['전체', ...TAG_OPTIONS.category];
 
 type FilterType = {
@@ -37,10 +35,16 @@ type FilterType = {
   tpo: string;
 };
 
+// 서버 응답 구조 정의 (계층형 tags 대응)
 type ClothesApiItem = {
-  clothes_id?: number;
   id?: number;
+  clothes_id?: number;
   name?: string;
+  image?: string;
+  image_url?: string;
+  created_at?: string;
+  createdAt?: string;
+  tags?: any; 
   category?: string;
   color?: string;
   season?: string;
@@ -50,13 +54,10 @@ type ClothesApiItem = {
   material?: string;
   thickness?: string;
   point?: string;
-  tpo?: string;
   situation?: string;
-  fit?: string;
-  top_fit?: string | null;
-  bottom_fit?: string | null;
-  image?: string;
-  image_url?: string;
+  tpo?: string;
+  top_fit?: string;
+  bottom_fit?: string;
 };
 
 const FILTER_OPTIONS = {
@@ -118,61 +119,52 @@ function normalizeCategory(category?: string): Category {
   return '악세사리';
 }
 
-// 이미지 경로는 api 인스턴스의 baseURL을 활용하도록 수정 가능
 function resolveImageUri(image?: string) {
   if (!image) return '';
   if (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('file://')) return image;
-  
-  // api.defaults.baseURL을 활용하거나 직접 base 경로 지정
   const baseUrl = 'http://192.168.1.122:8000'; 
   return image.startsWith('/') ? `${baseUrl}${image}` : `${baseUrl}/${image}`;
 }
 
 function pickValidTag<T extends readonly string[]>(options: T, value?: string | null): T[number] | '' {
   if (!value) return '';
-  return options.includes(value) ? (value as T[number]) : '';
+  return options.includes(value as any) ? (value as T[number]) : '';
 }
 
+// ⭐ 데이터 변환 로직 (TPO 반영 핵심)
 function mapApiItemToClothesItem(item: ClothesApiItem): ClothesItem | null {
-  const rawId = item.clothes_id ?? item.id;
+  const rawId = item.id ?? item.clothes_id;
   if (!rawId) return null;
 
-  const category = normalizeCategory(item.category);
-  const fitValue = item.fit ?? item.top_fit ?? item.bottom_fit ?? '';
+  const s = item.tags || {};
+  const category = normalizeCategory(s.category ?? item.category);
+  
+  // TPO(situation) 데이터를 계층형 tags 객체에서 우선적으로 추출
+  const tpoValue = s.situation ?? s.tpo ?? item.situation ?? item.tpo;
+  const topFitValue = s.top_fit ?? s.topFit ?? item.top_fit;
+  const bottomFitValue = s.bottom_fit ?? s.bottomFit ?? item.bottom_fit;
 
-  const color = pickValidTag(TAG_OPTIONS.color, item.color);
-  const season = pickValidTag(TAG_OPTIONS.season, item.season);
-  const tone = pickValidTag(TAG_OPTIONS.tone, item.tone);
-  const style = pickValidTag(TAG_OPTIONS.style, item.style);
-  const mood = pickValidTag(TAG_OPTIONS.mood, item.mood);
-  const material = pickValidTag(TAG_OPTIONS.material, item.material);
-  const thickness = pickValidTag(TAG_OPTIONS.thickness, item.thickness);
-  const point = pickValidTag(TAG_OPTIONS.point, item.point);
-  const tpo = pickValidTag(TAG_OPTIONS.tpo, item.tpo ?? item.situation);
-
-  const topFit = category === '상의' ? pickValidTag(TAG_OPTIONS.topFit, fitValue) : '';
-  const bottomFit = category === '하의' ? pickValidTag(TAG_OPTIONS.bottomFit, fitValue) : '';
+  const tags: ClothesTags = {
+    category,
+    color: pickValidTag(TAG_OPTIONS.color, s.color ?? item.color),
+    season: pickValidTag(TAG_OPTIONS.season, s.season ?? item.season),
+    tone: pickValidTag(TAG_OPTIONS.tone, s.tone ?? item.tone),
+    style: pickValidTag(TAG_OPTIONS.style, s.style ?? item.style),
+    mood: pickValidTag(TAG_OPTIONS.mood, s.mood ?? item.mood),
+    material: pickValidTag(TAG_OPTIONS.material, s.material ?? item.material),
+    thickness: pickValidTag(TAG_OPTIONS.thickness, s.thickness ?? item.thickness),
+    point: pickValidTag(TAG_OPTIONS.point, s.point ?? item.point),
+    tpo: pickValidTag(TAG_OPTIONS.tpo, tpoValue),
+    topFit: category === '상의' ? pickValidTag(TAG_OPTIONS.topFit, topFitValue) : '',
+    bottomFit: category === '하의' ? pickValidTag(TAG_OPTIONS.bottomFit, bottomFitValue) : '',
+  };
 
   return {
     id: String(rawId),
     name: item.name || '이름 없음',
-    image: resolveImageUri(item.image_url ?? item.image),
-    createdAt: new Date().toISOString(),
-    tags: {
-      ...EMPTY_TAGS,
-      category,
-      color,
-      season,
-      tone,
-      style,
-      mood,
-      material,
-      thickness,
-      point,
-      tpo,
-      topFit,
-      bottomFit,
-    },
+    image: resolveImageUri(item.image ?? item.image_url),
+    createdAt: item.created_at ?? item.createdAt ?? new Date().toISOString(),
+    tags: tags,
   };
 }
 
@@ -204,20 +196,13 @@ export default function HomeScreen() {
 
   const [showAllOptions, setShowAllOptions] = useState<Partial<Record<keyof FilterType, boolean>>>({});
 
-  // 2. 옷 목록 가져오기 로직을 api 모듈로 수정
   const fetchClothes = useCallback(async () => {
     try {
       setLoading(true);
       setErrorMessage('');
-
-      // api.get 사용 (인터셉터에 의해 토큰 자동 포함)
       const response = await api.get('/clothes');
       const data: ClothesApiItem[] = response.data;
-
-      const mapped = data
-        .map(mapApiItemToClothesItem)
-        .filter(Boolean) as ClothesItem[];
-
+      const mapped = data.map(mapApiItemToClothesItem).filter(Boolean) as ClothesItem[];
       setClothes(mapped);
     } catch (error: any) {
       console.error('옷 목록 불러오기 실패:', error);
@@ -238,10 +223,6 @@ export default function HomeScreen() {
     }, [fetchClothes])
   );
 
-  const activeFilterCount = useMemo(() => {
-    return Object.values(filter).filter(Boolean).length;
-  }, [filter]);
-
   const filteredClothes = useMemo(() => {
     return clothes.filter((item) => {
       const matchType = selectedType === '전체' || item.tags.category === selectedType;
@@ -260,6 +241,10 @@ export default function HomeScreen() {
       return matchType && matchFilter;
     });
   }, [clothes, selectedType, filter]);
+
+  const activeFilterCount = useMemo(() => {
+    return Object.values(filter).filter(Boolean).length;
+  }, [filter]);
 
   const toggleFilter = (category: keyof FilterType, value: string) => {
     setFilter((prev) => ({
@@ -296,10 +281,8 @@ export default function HomeScreen() {
     router.push({ pathname: '/detail', params: { id } });
   };
 
-  // 3. 삭제 로직을 api 모듈로 수정
   const handleDelete = () => {
     if (!selectedItem || deletingId) return;
-
     Alert.alert('삭제 확인', '이 옷을 삭제할까요?', [
       { text: '취소', style: 'cancel' },
       {
@@ -308,9 +291,7 @@ export default function HomeScreen() {
         onPress: async () => {
           try {
             setDeletingId(selectedItem.id);
-            // api.delete 사용
             await api.delete(`/clothes/${Number(selectedItem.id)}`);
-
             closeMenu();
             await fetchClothes();
           } catch (error: any) {
@@ -501,13 +482,13 @@ export default function HomeScreen() {
                 </View>
               ))}
             </ScrollView>
-            <View style={styles.paginationWrap}>
+            <View style={paginationStyles.paginationWrap}>
               {FILTER_SECTIONS.map((_, index) => (
                 <TouchableOpacity
                   key={index}
                   activeOpacity={0.8}
                   onPress={() => moveToFilterPage(index)}
-                  style={[styles.paginationDot, currentFilterPage === index && styles.paginationDotActive]}
+                  style={[paginationStyles.paginationDot, currentFilterPage === index && paginationStyles.paginationDotActive]}
                 />
               ))}
             </View>
@@ -554,6 +535,12 @@ export default function HomeScreen() {
     </View>
   );
 }
+
+const paginationStyles = StyleSheet.create({
+  paginationWrap: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, gap: 6 },
+  paginationDot: { width: 8, height: 8, borderRadius: 999, backgroundColor: '#d5d5d5' },
+  paginationDotActive: { width: 20, backgroundColor: '#111' },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16, paddingTop: 16, backgroundColor: '#fff' },
@@ -602,9 +589,6 @@ const styles = StyleSheet.create({
   optionChipTextSelected: { color: '#fff', fontWeight: '800' },
   moreButton: { marginTop: 6, alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 2 },
   moreButtonText: { fontSize: 12, color: '#555', fontWeight: '700' },
-  paginationWrap: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, gap: 6 },
-  paginationDot: { width: 8, height: 8, borderRadius: 999, backgroundColor: '#d5d5d5' },
-  paginationDotActive: { width: 20, backgroundColor: '#111' },
   resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingHorizontal: 2 },
   resultTitle: { fontSize: 17, fontWeight: '800', color: '#111' },
   resultCount: { fontSize: 13, color: '#666', fontWeight: '600' },

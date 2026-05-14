@@ -59,34 +59,38 @@ type ClosetContextType = {
   addClothes: (item: ClothesItem) => void;
   deleteClothes: (id: string) => void;
   updateClothes: (id: string, updated: Partial<ClothesItem>) => void;
-  fetchClothes: () => Promise<void>;
+  fetchClothes: (forceRefresh?: boolean) => Promise<void>;
 };
 
-const STORAGE_KEY = 'clothes-v2';
+const STORAGE_KEY = 'clothes-v3'; // 버전을 v3로 올려서 기존 잘못된 캐시를 무시합니다.
 const ClosetContext = createContext<ClosetContextType | null>(null);
 
 function normalizeClothesItem(raw: any): ClothesItem | null {
   if (!raw || typeof raw !== 'object') return null;
 
-  const id = String(raw.clothes_id || raw.id || '');
-  const image = raw.image_url || raw.image;
+  // 백엔드 변경 사항 반영: clothes_id -> id, image_url -> image
+  const id = String(raw.id || raw.clothes_id || '');
+  const image = raw.image || raw.image_url;
 
   if (!id || typeof image !== 'string') return null;
 
+  // 계층화된 응답 구조(tags 객체) 대응
+  const s = raw.tags || {}; 
+
   const tags: ClothesTags = {
-    category: raw.category || '',
-    topFit: raw.top_fit || raw.topFit || '',
-    bottomFit: raw.bottom_fit || raw.bottomFit || '',
-    color: raw.color || '',
-    season: raw.season || '',
-    tone: raw.tone || '',
-    style: raw.style || '',
-    mood: raw.mood || '',
-    material: raw.material || '',
-    thickness: raw.thickness || '',
-    point: raw.point || '',
-    // ✅ 서버 스키마 필드명인 'situation'을 우선 확인
-    tpo: raw.situation || raw.tpo || '',
+    category: s.category || raw.category || '',
+    topFit: s.top_fit || s.topFit || raw.top_fit || raw.topFit || '',
+    bottomFit: s.bottom_fit || s.bottomFit || raw.bottom_fit || raw.bottomFit || '',
+    color: s.color || raw.color || '',
+    season: s.season || raw.season || '',
+    tone: s.tone || raw.tone || '',
+    style: s.style || raw.style || '',
+    mood: s.mood || raw.mood || '',
+    material: s.material || raw.material || '',
+    thickness: s.thickness || raw.thickness || '',
+    point: s.point || raw.point || '',
+    // situation 필드를 프론트의 tpo로 매핑
+    tpo: s.situation || s.tpo || raw.situation || raw.tpo || '',
   };
 
   return {
@@ -102,13 +106,15 @@ export function ClosetProvider({ children }: { children: React.ReactNode }) {
   const [clothes, setClothes] = useState<ClothesItem[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  const fetchClothes = async () => {
+  const fetchClothes = async (forceRefresh = false) => {
     try {
+      console.log('🔄 서버에서 옷 데이터 가져오는 중...');
       const response = await api.get('/clothes');
       if (response.data && Array.isArray(response.data)) {
         const normalized = response.data.map(normalizeClothesItem).filter(Boolean) as ClothesItem[];
         setClothes(normalized);
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+        console.log('✅ 동기화 완료:', normalized.length, '개의 아이템');
       }
     } catch (error) {
       console.log('❌ 옷 동기화 실패:', error);
@@ -116,40 +122,38 @@ export function ClosetProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const loadLocalData = async () => {
+    const loadData = async () => {
       try {
         const data = await AsyncStorage.getItem(STORAGE_KEY);
         if (data) {
           const parsed = JSON.parse(data);
-          if (Array.isArray(parsed)) {
-            setClothes(parsed.map(normalizeClothesItem).filter(Boolean) as ClothesItem[]);
-          }
+          setClothes(parsed.map(normalizeClothesItem).filter(Boolean));
         }
-      } catch (error) {
-        console.log('로컬 로드 실패:', error);
+        // 앱 시작 시 항상 서버 데이터를 새로 가져와서 구조를 맞춤
+        await fetchClothes();
+      } catch (e) {
+        console.log('로드 실패:', e);
       } finally {
         setLoaded(true);
       }
     };
-    loadLocalData();
+    loadData();
   }, []);
 
   useEffect(() => {
-    if (!loaded) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(clothes)).catch(console.log);
+    if (loaded) {
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(clothes));
+    }
   }, [clothes, loaded]);
 
-  const value = useMemo<ClosetContextType>(
-    () => ({
-      clothes,
-      addClothes: (item) => setClothes((prev) => [item, ...prev]),
-      deleteClothes: (id) => setClothes((prev) => prev.filter((item) => item.id !== id)),
-      updateClothes: (id, updated) =>
-        setClothes((prev) => prev.map((item) => (item.id === id ? { ...item, ...updated } : item))),
-      fetchClothes,
-    }),
-    [clothes]
-  );
+  const value = useMemo(() => ({
+    clothes,
+    addClothes: (item: ClothesItem) => setClothes(prev => [item, ...prev]),
+    deleteClothes: (id: string) => setClothes(prev => prev.filter(i => i.id !== id)),
+    updateClothes: (id: string, updated: Partial<ClothesItem>) =>
+      setClothes(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i)),
+    fetchClothes,
+  }), [clothes]);
 
   return <ClosetContext.Provider value={value}>{children}</ClosetContext.Provider>;
 }
