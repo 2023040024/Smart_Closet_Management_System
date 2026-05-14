@@ -168,11 +168,12 @@ class Clothes(Base):
     tone           = Column(Enum(ToneEnum), nullable=True)
     mood           = Column(Enum(MoodEnum), nullable=True)
     material       = Column(String, nullable=True)   # 면, 폴리, 울, 니트 등
+    situation      = Column(Enum(SituationEnum), nullable=True)
     point          = Column(Enum(PointEnum), nullable=True)
     thickness      = Column(Enum(ThicknessEnum), nullable=True)
     price          = Column(Integer, default=0, nullable=True)       # 가성비 계산용 (0원 허용)
     image_url      = Column(String(255), nullable=True)
-    status         = Column(Enum(StatusEnum), default=StatusEnum.wearable)
+    status         = Column(Enum(StatusEnum), default=StatusEnum.wearable, nullable=True)
     wear_count     = Column(Integer, default=0)
     last_worn_date = Column(Date, nullable=True)
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
@@ -245,7 +246,7 @@ class TpoScore(Base):
     __tablename__ = "tpo_scores"
 
     id         = Column(Integer, primary_key=True, index=True)
-    clothes_id = Column(Integer, ForeignKey("clothes.id", ondelete="CASCADE"), nullable=False)
+    clothes_id = Column(Integer, ForeignKey("clothes.clothes_id", ondelete="CASCADE"), nullable=False)
     tpo_name   = Column(String, nullable=False)
     scor       = Column(Integer, default=100, nullable=False)
     clothes    = relationship("Clothes", back_populates="tpo_scores")
