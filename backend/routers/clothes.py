@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Clothes, User, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum
+from models import Clothes, User, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum, SituationEnum
 from schemas import ClothesUpdate, ClothesStatusUpdate, ClothesResponse
 from .auth import get_current_user
 from schemas import ClothesCreate
@@ -129,6 +129,7 @@ def get_clothes(
     season:   Optional[SeasonEnum]   = None,
     style:    Optional[StyleEnum]    = None,
     status:   Optional[StatusEnum]   = None,
+    situation: Optional[SituationEnum] = None,
     db:       Session                = Depends(get_db),
     current_user: User               = Depends(get_current_user)
 ):
@@ -139,6 +140,7 @@ def get_clothes(
     if season:   query = query.filter(Clothes.season == season)
     if style:    query = query.filter(Clothes.style == style)
     if status:   query = query.filter(Clothes.status == status)
+    if situation:query = query.filter(Clothes.situation == situation)
 
     all_clothes = query.order_by(Clothes.created_at.desc()).all()
 
