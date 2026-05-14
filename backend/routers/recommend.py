@@ -105,7 +105,7 @@ def get_user_profile_text(user: User, temperature: float):
 def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_condition: str) -> list[Clothes]:
     result = []
     for c in clothes_list:
-        if c.status != StatusEnum.wearable:
+        if c.status is not None and c.status != StatusEnum.wearable:
             continue
         if c.category == CategoryEnum.acc:
             continue
@@ -134,6 +134,7 @@ def clothes_to_text(c: Clothes) -> str:
     color = c.color.value if hasattr(c.color, 'value') else c.color
     season = c.season.value if hasattr(c.season, 'value') else c.season
     style = c.style.value if hasattr(c.style, 'value') else c.style
+    situation = c.situation.value if hasattr(c.situation, 'value') else (c.situation or '미입력')
     thickness = c.thickness.value if hasattr(c.thickness, 'value') else (c.thickness or '미입력')
     
     return (
@@ -142,6 +143,7 @@ def clothes_to_text(c: Clothes) -> str:
         f"색상:{color} / "
         f"계절:{season} / "
         f"스타일:{style} / "
+        f"상황:{situation} / "
         f"소재:{c.material or '미입력'} / "
         f"두께:{thickness} / "
         f"{unworn_str}"
@@ -327,7 +329,7 @@ def recommend_weekly(
         all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     except LookupError as e:
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
-    filtered = [c for c in all_clothes if c.status == StatusEnum.wearable]
+    filtered = [c for c in all_clothes if c.status in (StatusEnum.wearable, None)]
     if len(filtered) < 4:
         return {
             "outfits": [], 
