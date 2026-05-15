@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from database import get_db
 from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum
 from routers.auth import get_current_user
-from tpo_rules import get_tpo_prompt_text
+from tpo_rules import get_tpo_prompt_text, check_color_conflict
 
 router = APIRouter(prefix="/recommend", tags=["코디 추천"])
 
@@ -19,7 +19,7 @@ import google.generativeai as genai
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "여기에_API_키_입력")
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.0-flash")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 WEATHER_BASE_URL = os.getenv("WEATHER_BASE_URL", "http://localhost:8000")
 
@@ -106,10 +106,33 @@ def get_user_profile_text(user: User, temperature: float):
 
 
 # ──────────────────────────────────────────────
-# 1단계: 규칙 기반 필터링
+# 1단계: 규칙 기반 필터링 (F-13 계절·색 충돌 포함)
 # ──────────────────────────────────────────────
 
-def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_condition: str) -> list[Clothes]:
+def get_current_season() -> str:
+    month = date.today().month
+    if month in (3, 4, 5):   return "봄"
+    elif month in (6, 7, 8): return "여름"
+    elif month in (9, 10, 11): return "가을"
+    else:                     return "겨울"
+
+
+def calculate_conflict_score(c: Clothes, situation: str) -> int:
+    """F-13: 색·계절 충돌 감점(C) 계산
+    - 계절 불일치 C=80 (사계절 제외)
+    - 면접 고채도 색상(레드/핑크) C=60
+    """
+    season_val = c.season.value if hasattr(c.season, "value") else c.season
+    if season_val != "사계절" and season_val != get_current_season():
+        return 80
+    if situation in ("면접", "interview"):
+        color = c.color or ""
+        if check_color_conflict(color, "", "면접") >= 60:
+            return 60
+    return 0
+
+
+def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_condition: str, situation: str = "데일리") -> list[Clothes]:
     result = []
     for c in clothes_list:
         if c.status != StatusEnum.wearable.value:
@@ -122,8 +145,11 @@ def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_cond
             if temperature <= 14 and c.thickness == ThicknessEnum.thin.value:
                 continue
         if weather_condition in ("rainy", "snowy"):
-            if c.material == "레더":   # material은 String 컬럼이므로 문자열 직접 비교
+            if c.material == "레더":
                 continue
+        # F-13: 계절 불일치(C=80) 제외
+        if calculate_conflict_score(c, situation) >= 80:
+            continue
         result.append(c)
     return result
 
@@ -200,6 +226,7 @@ def build_prompt(
 4. 색 조합이 자연스러워야 합니다 (무채색 베이스 선호)
 5. {situation_kr} 상황과 사용자 선호 스타일({preferred_style})에 맞게 선택하세요
 6. 면접이면 포멀 위주, 운동이면 활동성 우선
+7. 면접 상황에서 레드·핑크 계열 색상은 피하세요 (고채도 충돌 C=60 감점 적용)
 7. 코디 3가지는 서로 겹치는 옷이 없어야 합니다
 8. items 배열이 절대 비어있으면 안 됩니다
 9. reason은 반드시 한국어 2~3문장으로 작성하세요
@@ -277,7 +304,7 @@ def recommend_today(
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered = filter_clothes(all_clothes, temperature, weather_condition)
+    filtered = filter_clothes(all_clothes, temperature, weather_condition, situation or "데일리")
     if len(filtered) < 2:
         raise HTTPException(status_code=400, detail="날씨·상태 조건에 맞는 옷이 부족합니다")
     prompt = build_prompt(filtered, situation or "daily", temperature, weather_condition, current_user)
@@ -307,7 +334,7 @@ def recommend_custom(
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered = filter_clothes(all_clothes, temperature, weather_condition)
+    filtered = filter_clothes(all_clothes, temperature, weather_condition, body.situation or "데일리")
     prompt = build_prompt(filtered, body.situation or "daily", temperature, weather_condition, current_user)
     return call_gemini(prompt)
 
