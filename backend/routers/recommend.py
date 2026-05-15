@@ -19,7 +19,7 @@ import google.generativeai as genai
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "여기에_API_키_입력")
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 WEATHER_BASE_URL = os.getenv("WEATHER_BASE_URL", "http://localhost:8000")
 
@@ -112,14 +112,14 @@ def get_user_profile_text(user: User, temperature: float):
 def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_condition: str) -> list[Clothes]:
     result = []
     for c in clothes_list:
-        if c.status != StatusEnum.wearable:
+        if c.status != StatusEnum.wearable.value:
             continue
-        if c.category == CategoryEnum.acc:
+        if c.category == CategoryEnum.acc.value:
             continue
         if temperature is not None:
-            if temperature >= 25 and c.thickness == ThicknessEnum.thick:
+            if temperature >= 25 and c.thickness == ThicknessEnum.thick.value:
                 continue
-            if temperature <= 14 and c.thickness == ThicknessEnum.thin:
+            if temperature <= 14 and c.thickness == ThicknessEnum.thin.value:
                 continue
         if weather_condition in ("rainy", "snowy"):
             if c.material == "레더":   # material은 String 컬럼이므로 문자열 직접 비교
