@@ -56,7 +56,8 @@ export default function HistoryDetailScreen() {
                 <View key={cloth.id} style={styles.clothCard}>
                   <Text style={styles.clothCategory}>{cloth.category}</Text>
                   <Text style={styles.clothName}>{cloth.name}</Text>
-                  <Text style={styles.clothColor}>색상: {cloth.color}</Text>
+                  {/* ✅ Commit 2: history.tsx에서 넘어온 color를 안전하게 바인딩하여 노출 */}
+                  <Text style={styles.clothColor}>색상: {cloth.color || '정보 없음'}</Text>
                 </View>
               ))
             ) : (
@@ -70,56 +71,14 @@ export default function HistoryDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 24,
-  },
-  section: {
-    backgroundColor: '#f7f7f7',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#555',
-    marginBottom: 8,
-  },
-  sectionValue: {
-    fontSize: 16,
-    color: '#111',
-    lineHeight: 22,
-  },
-  clothCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#ececec',
-  },
-  clothCategory: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 4,
-  },
-  clothName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#222',
-    marginBottom: 4,
-  },
-  clothColor: {
-    fontSize: 13,
-    color: '#666',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#777',
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  content: { padding: 16, paddingBottom: 24 },
+  section: { backgroundColor: '#f7f7f7', borderRadius: 14, padding: 16, marginBottom: 12 },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#555', marginBottom: 8 },
+  sectionValue: { fontSize: 16, color: '#111', lineHeight: 22 },
+  clothCard: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginTop: 8, borderWidth: 1, borderColor: '#ececec' },
+  clothCategory: { fontSize: 12, color: '#888', marginBottom: 4 },
+  clothName: { fontSize: 15, fontWeight: '600', color: '#222', marginBottom: 4 },
+  clothColor: { fontSize: 13, color: '#666' },
+  emptyText: { fontSize: 14, color: '#777' },
 });
