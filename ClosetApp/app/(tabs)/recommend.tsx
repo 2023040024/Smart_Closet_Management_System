@@ -2,7 +2,6 @@ import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 import {
   Alert,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
   View
 } from 'react-native';
 
+import { OutfitItemCard } from '../../components/recommend/OutfitItemCard'; // ✨ Commit 1: 외부 컴포넌트 import
 import { RecommendFilter } from '../../components/recommend/RecommendFilter';
 import api from '../_api';
 import { ClothesItem, useCloset } from '../_closetStore';
@@ -22,56 +22,6 @@ type OutfitSet = {
   shoes?: ClothesItem;
   reason?: string;
 };
-
-const API_BASE_URL = 'http://192.168.1.122:8000';
-
-function resolveImageUri(image?: string | null) {
-  if (!image) return '';
-  if (image.startsWith('http') || image.startsWith('file://')) return image;
-  return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
-}
-
-/**
- * ✅ 수정 1: 타입 캐스팅(as any)을 통해 TypeScript 에러(Line 41) 해결
- */
-function OutfitItemCard({ label, item }: { label: string; item?: ClothesItem }) {
-  if (!item) return null;
-
-  // 데이터가 어느 경로에 있든 가져올 수 있게 any로 우회 처리
-  const category = (item as any).category || item.tags?.category || ''; 
-  const fitText = category === '상의' ? item.tags?.topFit :
-                  category === '하의' ? item.tags?.bottomFit : '';
-
-  return (
-    <View style={styles.itemCard}>
-      <View style={styles.itemHeaderRow}>
-        <Text style={styles.itemBadge}>{label}</Text>
-      </View>
-
-      {item.image ? (
-        <View style={styles.itemImageContainer}>
-          <Image
-            source={{ uri: resolveImageUri(item.image) }}
-            style={styles.itemImage}
-            resizeMode="contain"
-          />
-        </View>
-      ) : (
-        <View style={styles.imagePlaceholder}>
-          <Text style={styles.imagePlaceholderText}>이미지 없음</Text>
-        </View>
-      )}
-
-      <Text style={styles.itemName}>{`${item.tags?.color || ''} ${category}`}</Text>
-      <View style={styles.tagRow}>
-        {item.tags?.style ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.style}</Text></View> : null}
-        {item.tags?.mood ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.mood}</Text></View> : null}
-        {fitText ? <View style={styles.tagChip}><Text style={styles.tagText}>{fitText}</Text></View> : null}
-        {item.tags?.tpo ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.tpo}</Text></View> : null}
-      </View>
-    </View>
-  );
-}
 
 function SkeletonLoader() {
   return (
@@ -99,6 +49,9 @@ export default function RecommendScreen() {
   const [apiRecommendations, setApiRecommendations] = useState<OutfitSet[] | null>(null);
   const [aiMessage, setAiMessage] = useState('');
   const [displayFilter, setDisplayFilter] = useState('전체');
+  
+  // ✨ Commit 2: 정보 그룹화를 위한 컨텍스트 상태 추가
+  const [recommendContext, setRecommendContext] = useState({ situation: '', address: '' });
 
   useEffect(() => {
     if (clothes.length === 0 && fetchClothes) {
@@ -121,18 +74,16 @@ export default function RecommendScreen() {
 
       const response = await api.get('/recommend/today', { params: { situation, address } });
 
+      // ✨ Commit 2: 추천 결과 컨텍스트(맥락) 저장
+      setRecommendContext({ situation, address });
       setAiMessage(response.data.ai_message || '');
+      
       const matched = response.data.outfits.map((outfit: any) => {
         const set: OutfitSet = { reason: outfit.reason };
         outfit.items.forEach((item: any) => {
           const myCloth = clothes.find(c => Number(c.id) === Number(item.clothes_id));
           if (myCloth) {
-            console.log(`[ID: ${myCloth.id}] 상세 데이터:`, JSON.stringify(myCloth));
-            
             const cat = (myCloth as any).category || myCloth.tags?.category || (item as any).category;
-            
-            console.log(`[ID: ${myCloth.id}] 최종 결정된 카테고리:`, cat);
-
             if (cat === '상의') set.top = myCloth;
             else if (cat === '하의') set.bottom = myCloth;
             else if (cat === '아우터') set.outer = myCloth;
@@ -167,8 +118,17 @@ export default function RecommendScreen() {
         {!apiLoading && apiRecommendations && (
           <View style={{ marginTop: 24 }}>
             <Text style={styles.sectionTitle}>✨ AI 추천 결과</Text>
+            
+            {/* ✨ Commit 2: 정보 그룹화 UI 추가 (날씨/위치 + TPO 맥락 표시) */}
+            <View style={styles.contextGroup}>
+              <Text style={styles.contextGroupText}>
+                📍 {recommendContext.address || '위치 알 수 없음'} · 🎯 {recommendContext.situation}
+              </Text>
+            </View>
+
             <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
             {aiMessage && <View style={styles.aiMessageBox}><Text style={styles.aiMessageText}>💬 {aiMessage}</Text></View>}
+            
             {apiRecommendations.map((outfit, index) => (
               <View key={index} style={styles.outfitCard}>
                 <Text style={styles.outfitCardTitle}>AI 추천 코디 {index + 1}</Text>
@@ -196,22 +156,17 @@ const styles = StyleSheet.create({
   textInput: { fontSize: 16, color: '#111827', fontWeight: '600' },
   actionButton: { backgroundColor: '#111827', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
   actionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  
+  // ✨ 정보 그룹화 스타일
+  contextGroup: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
+  contextGroupText: { fontSize: 14, fontWeight: '700', color: '#475569' },
+
   aiMessageBox: { backgroundColor: '#EEF2FF', padding: 20, borderRadius: 16, marginBottom: 20 },
   aiMessageText: { fontSize: 15, color: '#3730A3', lineHeight: 24, fontWeight: '600' },
   outfitCard: { marginBottom: 24, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' },
   outfitCardTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 8 },
   outfitDescription: { fontSize: 14, color: '#64748B', marginBottom: 16, lineHeight: 22 },
-  itemCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#EEF2F7' },
-  itemHeaderRow: { marginBottom: 10 },
-  itemBadge: { backgroundColor: '#E8EEF9', color: '#2563EB', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, fontSize: 12, fontWeight: '700' },
-  itemImageContainer: { width: '100%', height: 200, backgroundColor: '#F3F4F6', borderRadius: 12, marginBottom: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  itemImage: { width: '100%', height: '100%' },
-  imagePlaceholder: { width: '100%', height: 200, borderRadius: 12, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  imagePlaceholderText: { fontSize: 13, color: '#6B7280' },
-  itemName: { fontSize: 17, fontWeight: '800', color: '#111827', marginBottom: 10 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tagChip: { backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  tagText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
+  
   skeletonBase: { backgroundColor: '#E5E7EB', borderRadius: 8 },
   aiMessageBoxSkeleton: { backgroundColor: '#F3F4F6', padding: 20, borderRadius: 16, marginBottom: 20 },
   outfitCardSkeleton: { marginBottom: 24, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20 },
