@@ -2,6 +2,7 @@ import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,7 +11,7 @@ import {
   View
 } from 'react-native';
 
-import { OutfitItemCard } from '../../components/recommend/OutfitItemCard'; // ✨ Commit 1: 외부 컴포넌트 import
+import { OutfitItemCard } from '../../components/recommend/OutfitItemCard';
 import { RecommendFilter } from '../../components/recommend/RecommendFilter';
 import api from '../_api';
 import { ClothesItem, useCloset } from '../_closetStore';
@@ -23,6 +24,11 @@ type OutfitSet = {
   reason?: string;
 };
 
+// 기기 화면 너비를 가져와서 카드 크기를 비율로 설정합니다.
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// 섹션 패딩 등을 고려하여 카드가 화면에 꽉 차지 않고 옆 카드가 살짝 보이도록 설정 (약 75% 너비)
+const CARD_WIDTH = SCREEN_WIDTH * 0.75; 
+
 function SkeletonLoader() {
   return (
     <View style={{ marginTop: 24 }}>
@@ -32,12 +38,15 @@ function SkeletonLoader() {
         <View style={[styles.skeletonBase, { width: '90%', height: 16, marginBottom: 8 }]} />
         <View style={[styles.skeletonBase, { width: '60%', height: 16 }]} />
       </View>
-      {[1, 2].map((i) => (
-        <View key={i} style={styles.outfitCardSkeleton}>
-          <View style={[styles.skeletonBase, { width: 120, height: 24, marginBottom: 15 }]} />
-          <View style={[styles.skeletonBase, { width: '100%', height: 180, borderRadius: 12 }]} />
-        </View>
-      ))}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {[1, 2, 3].map((i) => (
+          <View key={i} style={[styles.outfitCardSkeleton, { width: CARD_WIDTH, marginRight: 16 }]}>
+            <View style={[styles.skeletonBase, { width: 120, height: 24, marginBottom: 15 }]} />
+            <View style={[styles.skeletonBase, { width: '100%', height: 180, borderRadius: 12, marginBottom: 12 }]} />
+            <View style={[styles.skeletonBase, { width: '100%', height: 180, borderRadius: 12 }]} />
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -50,7 +59,6 @@ export default function RecommendScreen() {
   const [aiMessage, setAiMessage] = useState('');
   const [displayFilter, setDisplayFilter] = useState('전체');
   
-  // ✨ Commit 2: 정보 그룹화를 위한 컨텍스트 상태 추가
   const [recommendContext, setRecommendContext] = useState({ situation: '', address: '' });
 
   useEffect(() => {
@@ -74,7 +82,6 @@ export default function RecommendScreen() {
 
       const response = await api.get('/recommend/today', { params: { situation, address } });
 
-      // ✨ Commit 2: 추천 결과 컨텍스트(맥락) 저장
       setRecommendContext({ situation, address });
       setAiMessage(response.data.ai_message || '');
       
@@ -102,7 +109,7 @@ export default function RecommendScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>코디 추천</Text>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
@@ -119,7 +126,6 @@ export default function RecommendScreen() {
           <View style={{ marginTop: 24 }}>
             <Text style={styles.sectionTitle}>✨ AI 추천 결과</Text>
             
-            {/* ✨ Commit 2: 정보 그룹화 UI 추가 (날씨/위치 + TPO 맥락 표시) */}
             <View style={styles.contextGroup}>
               <Text style={styles.contextGroupText}>
                 📍 {recommendContext.address || '위치 알 수 없음'} · 🎯 {recommendContext.situation}
@@ -129,16 +135,30 @@ export default function RecommendScreen() {
             <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
             {aiMessage && <View style={styles.aiMessageBox}><Text style={styles.aiMessageText}>💬 {aiMessage}</Text></View>}
             
-            {apiRecommendations.map((outfit, index) => (
-              <View key={index} style={styles.outfitCard}>
-                <Text style={styles.outfitCardTitle}>AI 추천 코디 {index + 1}</Text>
-                {outfit.reason && <Text style={styles.outfitDescription}>{outfit.reason}</Text>}
-                {(displayFilter === '전체' || displayFilter === '상의') && outfit.top && <OutfitItemCard label="상의" item={outfit.top} />}
-                {(displayFilter === '전체' || displayFilter === '하의') && outfit.bottom && <OutfitItemCard label="하의" item={outfit.bottom} />}
-                {(displayFilter === '전체' || displayFilter === '아우터') && outfit.outer && <OutfitItemCard label="아우터" item={outfit.outer} />}
-                {(displayFilter === '전체' || displayFilter === '신발') && outfit.shoes && <OutfitItemCard label="신발" item={outfit.shoes} />}
-              </View>
-            ))}
+            {/* ✨ 여기가 좌우 스와이프(Carousel)로 변경된 영역입니다 ✨ */}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={CARD_WIDTH + 16} // 카드 너비 + 마진값 (스와이프 시 딱딱 걸리게)
+              decelerationRate="fast"
+              contentContainerStyle={{ paddingRight: 16, paddingBottom: 10 }} // 마지막 카드 우측 여백
+            >
+              {apiRecommendations.map((outfit, index) => (
+                <View key={index} style={[styles.outfitCard, { width: CARD_WIDTH }]}>
+                  <View style={styles.outfitCardHeader}>
+                    <Text style={styles.outfitCardTitle}>추천 코디 {index + 1}</Text>
+                  </View>
+                  {outfit.reason && <Text style={styles.outfitDescription}>{outfit.reason}</Text>}
+                  
+                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                    {(displayFilter === '전체' || displayFilter === '상의') && outfit.top && <OutfitItemCard label="상의" item={outfit.top} />}
+                    {(displayFilter === '전체' || displayFilter === '하의') && outfit.bottom && <OutfitItemCard label="하의" item={outfit.bottom} />}
+                    {(displayFilter === '전체' || displayFilter === '아우터') && outfit.outer && <OutfitItemCard label="아우터" item={outfit.outer} />}
+                    {(displayFilter === '전체' || displayFilter === '신발') && outfit.shoes && <OutfitItemCard label="신발" item={outfit.shoes} />}
+                  </ScrollView>
+                </View>
+              ))}
+            </ScrollView>
           </View>
         )}
       </View>
@@ -157,17 +177,19 @@ const styles = StyleSheet.create({
   actionButton: { backgroundColor: '#111827', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
   actionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   
-  // ✨ 정보 그룹화 스타일
   contextGroup: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
   contextGroupText: { fontSize: 14, fontWeight: '700', color: '#475569' },
 
   aiMessageBox: { backgroundColor: '#EEF2FF', padding: 20, borderRadius: 16, marginBottom: 20 },
   aiMessageText: { fontSize: 15, color: '#3730A3', lineHeight: 24, fontWeight: '600' },
-  outfitCard: { marginBottom: 24, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' },
-  outfitCardTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  
+  // 아웃핏 카드 스타일 수정 (높이 제한 추가 및 오른쪽 마진 추가)
+  outfitCard: { marginRight: 16, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', maxHeight: 600 }, 
+  outfitCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  outfitCardTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
   outfitDescription: { fontSize: 14, color: '#64748B', marginBottom: 16, lineHeight: 22 },
   
   skeletonBase: { backgroundColor: '#E5E7EB', borderRadius: 8 },
   aiMessageBoxSkeleton: { backgroundColor: '#F3F4F6', padding: 20, borderRadius: 16, marginBottom: 20 },
-  outfitCardSkeleton: { marginBottom: 24, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20 },
+  outfitCardSkeleton: { padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' },
 });
