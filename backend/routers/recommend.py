@@ -284,8 +284,6 @@ def recommend_today(
     weather_condition = weather_condition or "sunny"
 
     # 2. 사용자 옷 데이터 조회
-    all_clothes = db.query(Clothes).filter(Clothes.user_id == current_user.id).all()
-    
     user_id = current_user.id
     try:
         all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
@@ -293,15 +291,10 @@ def recommend_today(
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered = filter_clothes(all_clothes, temperature, weather_condition, body.situation or "데일리")
+    filtered = filter_clothes(all_clothes, temperature, weather_condition, situation or "데일리")
     if len(filtered) < 2:
         return {
             "outfits": [],
-            "ai_message": "날씨·상태 조건에 맞는 옷이 부족합니다"
-        }
-    if len(filtered) < 2:
-        return {
-            "outfits": [], 
             "ai_message": "날씨·상태 조건에 맞는 옷이 부족합니다"
         }
     prompt = build_prompt(filtered, situation or "daily", temperature, weather_condition, current_user)
