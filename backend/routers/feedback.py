@@ -83,11 +83,10 @@ def create_feedback(
     # 4. DB에 변경사항 저장
     db.commit()
     db.refresh(history)
-    if user:
-        db.refresh(user) # User 테이블 변경사항 확정
+    db.refresh(current_user) # current_user 테이블 변경사항 확정
     
     return {
         "message": "피드백 저장 및 사용자 온도 민감도 보정이 완료되었습니다.",
         "history_id": history.history_id,
-        "new_temp_sensitivity": getattr(user, 'temp_sensitivity', None) if user else None
+        "new_temp_sensitivity": current_user.temp_sensitivity # 단순화된 반환 로직
     }
