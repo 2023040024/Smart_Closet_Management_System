@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-
+from routers.auth import get_current_user  
 
 from database import get_db
 from models import WearHistory, Clothes, User, TpoScore  
@@ -9,17 +9,24 @@ from schemas import FeedbackCreate, FeedbackTempEnum, FeedbackTpoEnum
 router = APIRouter(prefix="/feedback", tags=["피드백"])
 
 @router.post("", status_code=status.HTTP_200_OK)
-def create_feedback(feedback_data: FeedbackCreate, db: Session = Depends(get_db)):
+def create_feedback(
+    feedback_data: FeedbackCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 인증 주입 추가
+):
     """
-    착용 피드백을 저장하고, 사용자(User)의 전반적인 온도 민감도(temp_sensitivity)를 조정하는 API
+    착용 피드백을 저장하고, 사용자의 전반적인 온도 민감도를 보정하는 API
     """
-    # 1. DB에서 해당 history_id를 가진 착용 기록 조회
-    history = db.query(WearHistory).filter(WearHistory.history_id == feedback_data.history_id).first()
+    # 1. 내 착용 기록만 조회하도록 조건 추가
+    history = db.query(WearHistory).filter(
+        WearHistory.history_id == feedback_data.history_id,
+        WearHistory.user_id == current_user.id  # 본인 검증 추가
+    ).first()
     
     if not history:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
-            detail="해당 착용 기록을 찾을 수 없습니다."
+            detail="해당 착용 기록을 찾을 수 없거나 접근 권한이 없습니다." # 에러 메시지 보강
         )
         
     # 2. 해당 기록과 연결된 옷(Clothes), 그리고 그 옷의 소유자(User) 조회
