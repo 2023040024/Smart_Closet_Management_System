@@ -83,9 +83,9 @@ function mapApiHistoryToUi(item: HistoryApiItem): WearHistoryItem {
     id: item.history_id.toString(),
     date: formatDate(item.worn_date),
     clothesIds: clothesId ? [clothesId] : [],
-    style: item.style ?? item.feedback_fit ?? '',
+    style: item.style ?? item.feedback_tpo ?? '',
     mood: item.mood ?? item.feedback_temperature ?? '',
-    tpo: item.tpo ?? item.feedback_tpo ?? '',
+    tpo: item.tpo ?? '',
     memo: item.memo ?? '',
   };
 }
@@ -286,6 +286,8 @@ export default function HistoryScreen() {
         editDate: group.date,
         editMemo: group.memo ?? '',
         editTpo: group.tpo ?? '',
+        editFit: group.style ?? '',
+        editTemperature: group.mood ?? '',
         editClothes: JSON.stringify(clothes),
       },
     });

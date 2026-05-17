@@ -42,6 +42,8 @@ export default function HistoryCreateScreen() {
     editDate?: string;
     editMemo?: string;
     editTpo?: string;
+    editFit?: string;
+    editTemperature?: string;
     editClothes?: string;
   }>();
 
@@ -64,6 +66,8 @@ export default function HistoryCreateScreen() {
     if (isEditMode) {
       if (params.editMemo) setMemo(params.editMemo);
       if (params.editTpo) setTpo(params.editTpo);
+      if (params.editFit) setFit(params.editFit);
+      if (params.editTemperature) setTemperature(params.editTemperature);
       if (params.editClothes) {
         try {
           const parsedClothes: ClothingItem[] = JSON.parse(params.editClothes);
@@ -73,7 +77,7 @@ export default function HistoryCreateScreen() {
         }
       }
     }
-  }, [isEditMode, params.editMemo, params.editTpo, params.editClothes])
+  }, [isEditMode, params.editMemo, params.editTpo, params.editFit, params.editTemperature, params.editClothes]);
 
   useEffect(() => {
     const fetchClothes = async () => {
