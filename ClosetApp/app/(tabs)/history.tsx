@@ -46,7 +46,6 @@ type HistoryApiItem = {
     name?: string;
     category?: string;
     color?: string;
-    // ✅ Commit 1: 백엔드 태그 계층화 구조에 대응하기 위해 tags 추가
     tags?: {
       category?: string;
       color?: string;
@@ -73,6 +72,7 @@ function formatDate(dateString?: string) {
   return dateString.slice(0, 10);
 }
 
+// API 데이터를 UI 데이터 구조로 변환
 function mapApiHistoryToUi(item: HistoryApiItem): WearHistoryItem {
   const clothesId =
     item.clothes?.clothes_id?.toString() ??
@@ -106,6 +106,7 @@ export default function HistoryScreen() {
       .filter(Boolean) as ClothingItem[];
   };
 
+  // 기록 목록 불러오기
   const fetchHistoryList = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -129,7 +130,6 @@ export default function HistoryScreen() {
 
         if (!clothesId) return;
 
-        // ✅ Commit 1: 데이터 바인딩 오류 수정 (tags 내부 값 우선 탐색 후 기본값 매핑)
         const category = item.clothes?.category ?? item.clothes?.tags?.category ?? '미분류';
         const color = item.clothes?.color ?? item.clothes?.tags?.color ?? '색상 정보 없음';
 
@@ -164,6 +164,7 @@ export default function HistoryScreen() {
     }, [fetchHistoryList])
   );
 
+  // 같은 날짜끼리 그룹화 처리
   const groupedHistoryData = useMemo(() => {
     const filtered =
       selectedFilter === '전체'
@@ -273,6 +274,23 @@ export default function HistoryScreen() {
     });
   };
 
+  // ✅ 새로 추가: 수정 버튼 눌렀을 때 실행되는 함수 (날짜 기반 데이터 전달)
+  const handleEditPress = (group: GroupedWearHistoryItem) => {
+    const clothes = getClothesByIds(group.clothesIds);
+
+    router.push({
+      pathname: '/history-create',
+      params: {
+        editMode: 'true',
+        editId: group.id,
+        editDate: group.date,
+        editMemo: group.memo ?? '',
+        editTpo: group.tpo ?? '',
+        editClothes: JSON.stringify(clothes),
+      },
+    });
+  };
+
   const handleCreatePress = () => {
     router.push('/history-create');
   };
@@ -293,7 +311,6 @@ export default function HistoryScreen() {
           {clothes.length > 0 ? (
             clothes.map((cloth) => (
               <View key={cloth.id} style={styles.clothBox}>
-                {/* 수정한 카테고리가 정상적으로 매핑되어 나옵니다 */}
                 <Text style={styles.clothCategory}>{cloth.category}</Text>
                 <Text style={styles.clothName}>{cloth.name}</Text>
               </View>
@@ -309,9 +326,15 @@ export default function HistoryScreen() {
         <Text style={styles.tags}>{tagText}</Text>
         <Text style={styles.memo}>{item.memo || '메모 없음'}</Text>
 
+        {/* ✅ 수정된 버튼 레이아웃 영역 */}
         <View style={styles.actionRow}>
           <Pressable style={styles.actionButton} onPress={() => handleDetailPress(item)} disabled={deletingId === item.id}>
             <Text style={styles.actionButtonText}>상세보기</Text>
+          </Pressable>
+
+          {/* ✅ 상세보기와 삭제 사이에 수정 버튼 추가 */}
+          <Pressable style={styles.actionButton} onPress={() => handleEditPress(item)} disabled={deletingId === item.id}>
+            <Text style={styles.actionButtonText}>수정</Text>
           </Pressable>
 
           <Pressable style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)} disabled={deletingId === item.id}>
