@@ -75,8 +75,8 @@ TPO_RULES = {
         "activity": "medium",
         "description": "깔끔하고 꾸민 느낌의 스타일 추천"
     },
-    "모임": {
-        "name_kr": "모임",
+    "미팅": {
+        "name_kr": "미팅",
         "preferred_styles": ["세미캐주얼", "캐주얼", "미니멀"],
         "avoid_styles": ["스포티"],
         "preferred_thickness": ["얇음", "보통"],
@@ -135,7 +135,7 @@ _EN_TO_KR = {
     "funeral":   "장례식",
     "exercise":  "운동",
     "date":      "데이트",
-    "meeting":   "모임",
+    "meeting":   "미팅",
     "travel":    "여행",
     "school":    "데일리",
     "cafe":      "데일리",
