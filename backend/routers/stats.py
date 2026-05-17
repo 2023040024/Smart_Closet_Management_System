@@ -73,19 +73,19 @@ def get_disposal_recommendation(
     return disposal_targets
 
 # 가성비 계산 API
-@router.get("/cost-efficiency")
-def get_cost_efficiency(db: Session = Depends(get_db)):
-    current_user_id = 1
-    
-    # 가격 정보가 있고 한 번이라도 입은 옷 필터링
+@router.get("/cost-per-wear")
+def get_cost_efficiency(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     clothes = db.query(Clothes).filter(
-        Clothes.user_id == current_user_id,
-        Clothes.purchase_price > 0,
+        Clothes.user_id == current_user.id,
+        Clothes.price > 0,  # purchase_price 오타 수정
         Clothes.wear_count > 0
     ).all()
 
-    sorted_clothes = sorted(clothes, key=lambda x: x.cost_per_wear)
-
+    validated_clothes = [ClothesResponse.model_validate(c) for c in clothes]
+    sorted_clothes = sorted(validated_clothes, key=lambda x: x.cost_per_wear)
     worst_items = sorted_clothes[-3:] if len(sorted_clothes) > 3 else []
 
     return {
@@ -94,7 +94,7 @@ def get_cost_efficiency(db: Session = Depends(get_db)):
         "worst_efficiency": worst_items, 
         "ai_summary": { 
             "most_efficient_item": sorted_clothes[0].name if sorted_clothes else None,
-            "total_investment_on_worst": sum(c.purchase_price for c in worst_items)
+            "total_investment_on_worst": sum(c.price for c in worst_items)
         }
     }
 
