@@ -100,18 +100,19 @@ def get_cost_efficiency(
 
 
 # 옷장 과부하 분석 API
-@router.get("/overload-analysis")
-def get_closet_overload(threshold: int = 3, db: Session = Depends(get_db)):
-    current_user_id = 1
-    
-    # 카테고리/색상별 그룹화 및 threshold 이상 중복 감지
+@router.get("/overload")
+def get_closet_overload(
+    threshold: int = 3, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     overloaded_groups = (
         db.query(
             Clothes.category, 
             Clothes.color, 
             func.count(Clothes.clothes_id).label("count")
         )
-        .filter(Clothes.user_id == current_user_id)
+        .filter(Clothes.user_id == current_user.id)
         .group_by(Clothes.category, Clothes.color)
         .having(func.count(Clothes.clothes_id) >= threshold)
         .all()
@@ -120,7 +121,7 @@ def get_closet_overload(threshold: int = 3, db: Session = Depends(get_db)):
     detailed_data = []
     for group in overloaded_groups:
         items = db.query(Clothes).filter(
-            Clothes.user_id == current_user_id,
+            Clothes.user_id == current_user.id,
             Clothes.category == group.category,
             Clothes.color == group.color
         ).all()
@@ -128,13 +129,11 @@ def get_closet_overload(threshold: int = 3, db: Session = Depends(get_db)):
             "category": group.category,
             "color": group.color,
             "count": group.count,
-            "items": items
+            "items": [ClothesResponse.model_validate(item).model_dump(by_alias=True) for item in items]
         })
-
 
     return {
         "message": f"과다 보유 리포트: {len(detailed_data)}건 발견",
         "overload_details": detailed_data,
         "ai_insight": f"사용자는 현재 {len(detailed_data)}개의 스타일에서 중복 구매 패턴을 보입니다."
     }
-
