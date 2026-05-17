@@ -4,30 +4,37 @@ from sqlalchemy import func
 from typing import List
 from datetime import datetime, timedelta, date 
 from database import get_db
-from models import Clothes, SeasonEnum
+from models import Clothes, SeasonEnum, User
+from routers.auth import get_current_user
+from schemas import ClothesResponse
 
 
 router = APIRouter(prefix="/stats", tags=["통계 및 분석"])
 
 
 # 미착용 옷/ 재활용 옷 우선순위 추출 API
-@router.get("/unworn/priority")
-def get_underutilized_clothes(current_season: SeasonEnum, db: Session = Depends(get_db)):
-    current_user_id = 1 
+@router.get("/unworn", response_model=List[ClothesResponse])
+def get_unworn_clothes(
+    current_season: SeasonEnum, 
+    days: int = 30, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    cutoff_date = (datetime.now() - timedelta(days=days)).date()
     
-    priority_clothes = (
+    unworn_clothes = (
         db.query(Clothes)
         .filter(
-            Clothes.user_id == current_user_id,
-            # 현재 계절이거나 사계절용 옷 모두 포함
-            (Clothes.season == current_season) | (Clothes.season == SeasonEnum.all_year) 
+            Clothes.user_id == current_user.id,
+            (Clothes.season == current_season) | (Clothes.season == SeasonEnum.all_year),
+            (Clothes.last_worn_date <= cutoff_date) | (Clothes.last_worn_date.is_(None)) 
         )
         .order_by(Clothes.wear_count.asc())
         .limit(10)
         .all()
     )
 
-    return {"message": f"우선 추천 후보 추출 완료", "data": priority_clothes}
+    return unworn_clothes
 
 # 착용 빈도 통계 API
 @router.get("/frequency/top")
