@@ -37,31 +37,21 @@ def create_feedback(
             detail="해당 기록에 연결된 옷 정보를 찾을 수 없습니다."
         )
     
-    # 옷 정보 가져오기.
-    user = db.query(User).filter(User.user_id == cloth.user_id).first()
-    
     # 3. 데이터 업데이트
     if feedback_data.feedback_temperature is not None:
         history.feedback_temperature = feedback_data.feedback_temperature
         
-        # 💡 [협업 맞춤형 로직] 사용자의 온도 민감도(temp_sensitivity) 보정
-        if user:
-            # 기본값이 없으면 0.0으로 시작
-            current_sensitivity = getattr(user, 'temp_sensitivity', 0.0) or 0.0
-            
-            # 추웠다면 -> 추위를 타는 편 -> 민감도 증가 (+1)
-            # 팀원 코드: 민감도가 높아지면 아우터 추천 기준 온도(outer_threshold)가 올라감!
-            if feedback_data.feedback_temperature == FeedbackTempEnum.cold:
-                user.temp_sensitivity = current_sensitivity + 1
-            
-            # 더웠다면 -> 더위를 타는 편 -> 민감도 감소 (-1)
-            elif feedback_data.feedback_temperature == FeedbackTempEnum.hot:
-                user.temp_sensitivity = current_sensitivity - 1
-                
-            # 적당함 -> 현재 민감도 유지
-            elif feedback_data.feedback_temperature == FeedbackTempEnum.good:
-                user.temp_sensitivity = current_sensitivity
+        # current_user를 직접 사용하여 로직 간소화
+        current_sensitivity = current_user.temp_sensitivity or 0.0
+        
+        if feedback_data.feedback_temperature == FeedbackTempEnum.cold:
+            current_user.temp_sensitivity = current_sensitivity + 1
+        elif feedback_data.feedback_temperature == FeedbackTempEnum.hot:
+            current_user.temp_sensitivity = current_sensitivity - 1
+        elif feedback_data.feedback_temperature == FeedbackTempEnum.good:
+            current_user.temp_sensitivity = current_sensitivity
 
+    
     if feedback_data.feedback_tpo is not None:
         history.feedback_tpo = feedback_data.feedback_tpo
         
