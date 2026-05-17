@@ -214,9 +214,9 @@ def build_prompt(clothes_list: list[Clothes], situation: str, temperature: float
 5. {situation_kr} 상황과 사용자 선호 스타일({preferred_style})에 맞게 선택하세요
 6. 면접이면 포멀 위주, 운동이면 활동성 우선
 7. 면접 상황에서 레드·핑크 계열 색상은 피하세요 (고채도 충돌 C=60 감점 적용)
-7. 코디 3가지는 서로 겹치는 옷이 없어야 합니다
-8. items 배열이 절대 비어있으면 안 됩니다
-9. reason은 반드시 한국어 2~3문장으로 작성하세요
+8. 코디 3가지는 서로 겹치는 옷이 없어야 합니다
+9. items 배열이 절대 비어있으면 안 됩니다
+10. reason은 반드시 한국어 2~3문장으로 작성하세요
 [응답 형식] 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만:
 {{
   "outfits": [
