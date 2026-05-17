@@ -11,6 +11,9 @@ import {
   View,
 } from 'react-native';
 
+// ✅ api 인터셉터 가져오기 (경로 주의)
+import api from '../_api';
+
 type ClothingItem = {
   id: string;
   name: string;
@@ -60,8 +63,6 @@ type GroupedWearHistoryItem = {
 
 const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여행', '운동', '모임'];
 
-const API_BASE_URL = 'http://192.168.1.122:8000';
-
 function formatDate(dateString?: string) {
   if (!dateString) return '날짜 없음';
   return dateString.slice(0, 10);
@@ -95,12 +96,12 @@ export default function HistoryScreen() {
 
   const getClothesByIds = (ids: string[]) => {
     const uniqueIds = Array.from(new Set(ids));
-
     return uniqueIds
       .map((id) => clothesMap[id])
       .filter(Boolean) as ClothingItem[];
   };
 
+  // ✅ 인터셉터가 적용된 fetchHistoryList
   const fetchHistoryList = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -108,27 +109,13 @@ export default function HistoryScreen() {
       } else {
         setLoading(true);
       }
-
       setErrorMessage('');
 
-      const response = await fetch(`${API_BASE_URL}/history`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      let data: HistoryApiItem[] = [];
-
-      try {
-        data = await response.json();
-      } catch {
-        data = [];
-      }
-
-      if (!response.ok) {
-        throw new Error(`기록 조회 실패 (${response.status})`);
-      }
+      // api.get을 사용하여 자동으로 헤더에 토큰이 들어갑니다.
+      const response = await api.get('/history');
+      
+      // 안전장치: 데이터가 배열인지 확인
+      const data: HistoryApiItem[] = Array.isArray(response.data) ? response.data : [];
 
       const mappedHistoryList = data.map(mapApiHistoryToUi);
 
@@ -151,13 +138,17 @@ export default function HistoryScreen() {
 
       setHistoryList(mappedHistoryList);
       setClothesMap(nextClothesMap);
-    } catch (error) {
+    } catch (error: any) {
       console.error('기록 불러오기 실패:', error);
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : '기록을 불러오지 못했습니다.'
-      );
+      
+      // 401 에러에 대한 명확한 피드백 제공
+      if (error.response?.status === 401) {
+        setErrorMessage('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
+      } else {
+        setErrorMessage(
+          error.response?.data?.detail || error.message || '기록을 불러오지 못했습니다.'
+        );
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -201,15 +192,12 @@ export default function HistoryScreen() {
       if (!groupedMap[key].style && item.style) {
         groupedMap[key].style = item.style;
       }
-
       if (!groupedMap[key].mood && item.mood) {
         groupedMap[key].mood = item.mood;
       }
-
       if (!groupedMap[key].tpo && item.tpo) {
         groupedMap[key].tpo = item.tpo;
       }
-
       if (!groupedMap[key].memo && item.memo) {
         groupedMap[key].memo = item.memo;
       }
@@ -225,30 +213,14 @@ export default function HistoryScreen() {
       throw new Error('유효하지 않은 기록 ID입니다.');
     }
 
-    const response = await fetch(`${API_BASE_URL}/history/${numericId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    let responseData: any = null;
-
     try {
-      responseData = await response.json();
-    } catch {
-      responseData = null;
-    }
-
-    if (!response.ok) {
+      const response = await api.delete(`/history/${numericId}`);
+      return response.data;
+    } catch (error: any) {
       const message =
-        responseData?.detail ||
-        responseData?.message ||
-        `삭제 실패 (${response.status})`;
+        error.response?.data?.detail || error.message || '삭제 실패';
       throw new Error(message);
     }
-
-    return responseData;
   };
 
   const handleDelete = (group: GroupedWearHistoryItem) => {
@@ -311,9 +283,9 @@ export default function HistoryScreen() {
     const clothes = getClothesByIds(item.clothesIds);
 
     const tagText =
-  [item.style, item.mood, item.tpo]
-    .filter((value) => value && value.trim() !== '')
-    .join(' · ') || '태그 없음';
+      [item.style, item.mood, item.tpo]
+        .filter((value) => value && value.trim() !== '')
+        .join(' · ') || '태그 없음';
 
     return (
       <View style={styles.card}>
@@ -464,171 +436,36 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  header: {
-    marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111',
-  },
-  headerAddButton: {
-    backgroundColor: '#111',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  headerAddButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  filterChip: {
-    backgroundColor: '#f1f1f1',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  filterChipSelected: {
-    backgroundColor: '#111',
-  },
-  filterChipText: {
-    fontSize: 13,
-    color: '#333',
-    fontWeight: '500',
-  },
-  filterChipTextSelected: {
-    color: '#fff',
-  },
-  listContent: {
-    paddingBottom: 24,
-  },
-  emptyListContent: {
-    flexGrow: 1,
-  },
-  card: {
-    backgroundColor: '#f7f7f7',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-  },
-  date: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111',
-    marginBottom: 10,
-  },
-  clothesColumn: {
-    gap: 8,
-    marginBottom: 10,
-  },
-  clothBox: {
-    minHeight: 72,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 12,
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  clothCategory: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 4,
-  },
-  clothName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#222',
-  },
-  tags: {
-    fontSize: 14,
-    color: '#444',
-    marginBottom: 6,
-  },
-  memo: {
-    fontSize: 14,
-    color: '#666',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 12,
-  },
-  actionButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  actionButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-  },
-  deleteButton: {
-    borderColor: '#f0caca',
-  },
-  deleteButtonText: {
-    color: '#c0392b',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#222',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyDescription: {
-    fontSize: 14,
-    color: '#777',
-    textAlign: 'center',
-  },
-  emptyAddButton: {
-    marginTop: 16,
-    backgroundColor: '#111',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  emptyAddButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  errorButtonRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 16,
-  },
+  container: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16 },
+  header: { marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title: { fontSize: 28, fontWeight: '700', color: '#111' },
+  headerAddButton: { backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
+  headerAddButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  filterChip: { backgroundColor: '#f1f1f1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  filterChipSelected: { backgroundColor: '#111' },
+  filterChipText: { fontSize: 13, color: '#333', fontWeight: '500' },
+  filterChipTextSelected: { color: '#fff' },
+  listContent: { paddingBottom: 24 },
+  emptyListContent: { flexGrow: 1 },
+  card: { backgroundColor: '#f7f7f7', borderRadius: 14, padding: 16, marginBottom: 12 },
+  date: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 10 },
+  clothesColumn: { gap: 8, marginBottom: 10 },
+  clothBox: { minHeight: 72, backgroundColor: '#fff', borderRadius: 10, padding: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#eee' },
+  clothCategory: { fontSize: 12, color: '#888', marginBottom: 4 },
+  clothName: { fontSize: 13, fontWeight: '600', color: '#222' },
+  tags: { fontSize: 14, color: '#444', marginBottom: 6 },
+  memo: { fontSize: 14, color: '#666' },
+  actionRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
+  actionButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  actionButtonText: { fontSize: 13, fontWeight: '600', color: '#333' },
+  deleteButton: { borderColor: '#f0caca' },
+  deleteButtonText: { color: '#c0392b' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#222', marginBottom: 8, textAlign: 'center' },
+  emptyDescription: { fontSize: 14, color: '#777', textAlign: 'center' },
+  emptyAddButton: { marginTop: 16, backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  emptyAddButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  errorButtonRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
 });

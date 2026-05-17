@@ -120,7 +120,7 @@ class SituationEnum(str, enum.Enum):
     funeral = "장례식"
     exercise = "운동"
     date     = "데이트"
-    meeting = "모임"
+    meeting = "미팅"
     travel   = "여행"
 
 class FeedbackTempEnum(str, enum.Enum):
@@ -167,12 +167,13 @@ class Clothes(Base):
     style          = Column(Enum(StyleEnum), nullable=False)
     tone           = Column(Enum(ToneEnum), nullable=True)
     mood           = Column(Enum(MoodEnum), nullable=True)
-    material       = Column(Enum(MaterialEnum), nullable=True)   # 면, 폴리, 울, 니트 등
+    material       = Column(String, nullable=True)   # 면, 폴리, 울, 니트 등
+    situation      = Column(Enum(SituationEnum), nullable=True)
     point          = Column(Enum(PointEnum), nullable=True)
     thickness      = Column(Enum(ThicknessEnum), nullable=True)
-    purchase_price = Column(Integer, nullable=True)       # 가성비 계산용 (0원 허용)
+    price          = Column(Integer, default=0, nullable=True)       # 가성비 계산용 (0원 허용)
     image_url      = Column(String(255), nullable=True)
-    status         = Column(Enum(StatusEnum), default=StatusEnum.wearable)
+    status         = Column(Enum(StatusEnum), default=StatusEnum.wearable, nullable=True)
     wear_count     = Column(Integer, default=0)
     last_worn_date = Column(Date, nullable=True)
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
@@ -180,15 +181,16 @@ class Clothes(Base):
     owner        = relationship("User", back_populates="clothes")
     wear_history = relationship("WearHistory", back_populates="clothes", cascade="all, delete-orphan")
     outfit_items = relationship("OutfitClothes", back_populates="clothes")
+    tpo_scores = relationship("TpoScore", back_populates="clothes", cascade="all, delete-orphan")
 
     @property
     def cost_per_wear(self):
         """가성비 계산: wear_count=0이면 None 반환"""
-        if self.purchase_price is None:
+        if self.price is None:
             return None
         if self.wear_count == 0:
             return None  # "계산불가" 처리
-        return round(self.purchase_price / self.wear_count, 0)
+        return round(self.price / self.wear_count, 0)
 
 
 class WearHistory(Base):
@@ -238,3 +240,13 @@ class OutfitClothes(Base):
 
     outfit  = relationship("Outfit", back_populates="items")
     clothes = relationship("Clothes", back_populates="outfit_items")
+
+class TpoScore(Base):
+    """옷의 상황(TPO)별 점수를 저장하는 테이블"""
+    __tablename__ = "tpo_scores"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    clothes_id = Column(Integer, ForeignKey("clothes.clothes_id", ondelete="CASCADE"), nullable=False)
+    tpo_name   = Column(String, nullable=False)
+    scor       = Column(Integer, default=100, nullable=False)
+    clothes    = relationship("Clothes", back_populates="tpo_scores")

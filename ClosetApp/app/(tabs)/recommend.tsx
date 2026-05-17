@@ -1,169 +1,44 @@
-import { useMemo, useState } from 'react';
+import * as Location from 'expo-location';
+import { useEffect, useState } from 'react';
 import {
+  Alert,
   Image,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  View,
-  useWindowDimensions,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
-import { ClothesItem, TAG_OPTIONS, useCloset } from '../_closetStore';
+import { RecommendFilter } from '../../components/recommend/RecommendFilter';
+import api from '../_api';
+import { ClothesItem, useCloset } from '../_closetStore';
 
 type OutfitSet = {
-  outer?: ClothesItem;
   top?: ClothesItem;
   bottom?: ClothesItem;
+  outer?: ClothesItem;
   shoes?: ClothesItem;
+  reason?: string;
 };
 
-type RecommendFilterType = {
-  category: string[];
-  season: string[];
-  style: string[];
-  mood: string[];
-  tpo: string[];
-};
+const API_BASE_URL = 'http://192.168.1.122:8000';
 
-const FILTER_OPTIONS = {
-  category: [...TAG_OPTIONS.category],
-  season: [...TAG_OPTIONS.season],
-  style: [...TAG_OPTIONS.style],
-  mood: [...TAG_OPTIONS.mood],
-  tpo: [...TAG_OPTIONS.tpo],
-};
-
-const FILTER_LABELS: Record<keyof RecommendFilterType, string> = {
-  category: '카테고리',
-  season: '계절',
-  style: '스타일',
-  mood: '분위기',
-  tpo: 'TPO',
-};
-
-const INITIAL_FILTERS: RecommendFilterType = {
-  category: [],
-  season: [],
-  style: [],
-  mood: [],
-  tpo: [],
-};
-
-const INITIAL_EXPANDED: Record<keyof RecommendFilterType, boolean> = {
-  category: true,
-  season: true,
-  style: true,
-  mood: false,
-  tpo: true,
-};
-
-function includesAny(source?: string, targets?: string[]) {
-  if (!targets || targets.length === 0) return true;
-  if (!source || source.trim() === '') return false;
-  return targets.includes(source);
+function resolveImageUri(image?: string | null) {
+  if (!image) return '';
+  if (image.startsWith('http') || image.startsWith('file://')) return image;
+  return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
 }
 
-function filterItems(items: ClothesItem[], filters: RecommendFilterType) {
-  return items.filter((item) => {
-    const categoryMatch =
-      filters.category.length === 0 || filters.category.includes(item.tags.category);
-
-    const seasonMatch =
-      filters.season.length === 0 || includesAny(item.tags.season, filters.season);
-
-    const styleMatch =
-      filters.style.length === 0 || includesAny(item.tags.style, filters.style);
-
-    const moodMatch =
-      filters.mood.length === 0 || includesAny(item.tags.mood, filters.mood);
-
-    const tpoMatch =
-      filters.tpo.length === 0 || includesAny(item.tags.tpo, filters.tpo);
-
-    return (
-      categoryMatch &&
-      seasonMatch &&
-      styleMatch &&
-      moodMatch &&
-      tpoMatch
-    );
-  });
-}
-
-function createOutfits(items: ClothesItem[]): OutfitSet[] {
-  const tops = items.filter((item) => item.tags.category === '상의');
-  const bottoms = items.filter((item) => item.tags.category === '하의');
-  const outers = items.filter((item) => item.tags.category === '아우터');
-  const shoes = items.filter((item) => item.tags.category === '신발');
-
-  const outfits: OutfitSet[] = [];
-
-  for (let i = 0; i < tops.length; i++) {
-    for (let j = 0; j < bottoms.length; j++) {
-      if (outfits.length >= 3) break;
-
-      outfits.push({
-        outer: outers.length > 0 ? outers[(i + j) % outers.length] : undefined,
-        top: tops[i],
-        bottom: bottoms[j],
-        shoes: shoes.length > 0 ? shoes[(i + j) % shoes.length] : undefined,
-      });
-    }
-
-    if (outfits.length >= 3) break;
-  }
-
-  return outfits;
-}
-
-function TagChip({ text }: { text: string }) {
-  if (!text) return null;
-  return <Text style={styles.tag}>{text}</Text>;
-}
-
-function getItemTitle(item: ClothesItem) {
-  const color = item.tags.color || '무색상';
-  const category = item.tags.category || '옷';
-  return `${color} ${category}`;
-}
-
-function buildRecommendReason(filters: RecommendFilterType, outfit: OutfitSet) {
-  const reasons: string[] = [];
-
-  if (filters.season.length > 0) {
-    reasons.push(`선택한 계절(${filters.season.join(', ')}) 조건을 반영했습니다`);
-  }
-
-  if (filters.style.length > 0) {
-    reasons.push(`선택한 스타일(${filters.style.join(', ')})에 맞는 조합을 우선 고려했습니다`);
-  }
-
-  if (filters.mood.length > 0) {
-    reasons.push(`선택한 분위기(${filters.mood.join(', ')})와 어울리는 아이템을 반영했습니다`);
-  }
-
-  if (filters.tpo.length > 0) {
-    reasons.push(`TPO(${filters.tpo.join(', ')})에 맞는 코디를 기준으로 추천했습니다`);
-  }
-
-  if (outfit.outer) {
-    reasons.push('아우터부터 보기 쉬운 순서로 정리했습니다');
-  } else {
-    reasons.push('현재 보유한 옷 기준으로 자연스러운 조합을 구성했습니다');
-  }
-
-  return reasons.join('. ') + '.';
-}
-
-function OutfitItemCard({
-  label,
-  item,
-}: {
-  label: string;
-  item?: ClothesItem;
-}) {
+/**
+ * ✅ 1단계: 빈 태그 박스 노출 방지 로직 적용
+ */
+function OutfitItemCard({ label, item }: { label: string; item?: ClothesItem }) {
   if (!item) return null;
+
+  const fitText = item.tags.category === '상의' ? item.tags.topFit :
+                  item.tags.category === '하의' ? item.tags.bottomFit : '';
 
   return (
     <View style={styles.itemCard}>
@@ -172,9 +47,9 @@ function OutfitItemCard({
       </View>
 
       {item.image ? (
-        <View style={styles.imageBox}>
+        <View style={styles.itemImageContainer}>
           <Image
-            source={{ uri: item.image }}
+            source={{ uri: resolveImageUri(item.image) }}
             style={styles.itemImage}
             resizeMode="contain"
           />
@@ -185,190 +60,123 @@ function OutfitItemCard({
         </View>
       )}
 
-      <Text style={styles.itemName}>{getItemTitle(item)}</Text>
-
+      <Text style={styles.itemName}>{`${item.tags.color || ''} ${item.tags.category}`}</Text>
       <View style={styles.tagRow}>
-        <TagChip text={item.tags.style} />
-        <TagChip text={item.tags.mood} />
-        <TagChip text={item.tags.tpo} />
+        {/* ✅ 데이터가 있을 때만 렌더링되도록 수정 */}
+        {item.tags.style ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.style}</Text></View> : null}
+        {item.tags.mood ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.mood}</Text></View> : null}
+        {fitText ? <View style={styles.tagChip}><Text style={styles.tagText}>{fitText}</Text></View> : null}
+        {item.tags.tpo ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.tpo}</Text></View> : null}
       </View>
     </View>
   );
 }
 
+/**
+ * ✅ 2단계: 스켈레톤 UI 컴포넌트 추가
+ */
+function SkeletonLoader() {
+  return (
+    <View style={{ marginTop: 24 }}>
+      <View style={[styles.skeletonBase, { width: 150, height: 28, marginBottom: 15 }]} />
+      <View style={styles.aiMessageBoxSkeleton}>
+        <View style={[styles.skeletonBase, { width: '100%', height: 16, marginBottom: 8 }]} />
+        <View style={[styles.skeletonBase, { width: '90%', height: 16, marginBottom: 8 }]} />
+        <View style={[styles.skeletonBase, { width: '60%', height: 16 }]} />
+      </View>
+      {[1, 2].map((i) => (
+        <View key={i} style={styles.outfitCardSkeleton}>
+          <View style={[styles.skeletonBase, { width: 120, height: 24, marginBottom: 15 }]} />
+          <View style={[styles.skeletonBase, { width: '100%', height: 180, borderRadius: 12 }]} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function RecommendScreen() {
-  const { clothes } = useCloset();
-  const { width } = useWindowDimensions();
+  const { clothes, fetchClothes } = useCloset();
+  const [situation, setSituation] = useState('');
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiRecommendations, setApiRecommendations] = useState<OutfitSet[] | null>(null);
+  const [aiMessage, setAiMessage] = useState('');
+  const [displayFilter, setDisplayFilter] = useState('전체');
 
-  const [filters, setFilters] = useState<RecommendFilterType>(INITIAL_FILTERS);
-  const [expanded, setExpanded] =
-    useState<Record<keyof RecommendFilterType, boolean>>(INITIAL_EXPANDED);
-  const [recommendedOutfits, setRecommendedOutfits] = useState<OutfitSet[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
+  useEffect(() => {
+    if (clothes.length === 0 && fetchClothes) {
+      fetchClothes();
+    }
+  }, [clothes.length]);
 
-  const toggleExpand = (key: keyof RecommendFilterType) => {
-    setExpanded((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+  const fetchTodayRecommendation = async () => {
+    if (clothes.length === 0) return Alert.alert('알림', '옷장 데이터를 먼저 불러와주세요.');
+    if (!situation.trim()) return Alert.alert('입력 필요', '상황을 입력해주세요.');
+
+    try {
+      setApiLoading(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return Alert.alert('권한 필요', '위치 권한이 필요합니다.');
+
+      const location = await Location.getCurrentPositionAsync({});
+      const geocode = await Location.reverseGeocodeAsync(location.coords);
+      const address = `${geocode[0]?.region || ''} ${geocode[0]?.city || ''}`;
+
+      const response = await api.get('/recommend/today', { params: { situation, address } });
+
+      setAiMessage(response.data.ai_message || '');
+      const matched = response.data.outfits.map((outfit: any) => {
+        const set: OutfitSet = { reason: outfit.reason };
+        outfit.items.forEach((item: any) => {
+          const myCloth = clothes.find(c => Number(c.id) === Number(item.clothes_id));
+          if (myCloth) {
+            const cat = item.category;
+            if (cat === '상의') set.top = myCloth;
+            else if (cat === '하의') set.bottom = myCloth;
+            else if (cat === '아우터') set.outer = myCloth;
+            else if (cat === '신발') set.shoes = myCloth;
+          }
+        });
+        return set;
+      });
+      setApiRecommendations(matched);
+    } catch (error) {
+      Alert.alert('오류', '추천을 불러오지 못했습니다.');
+    } finally {
+      setApiLoading(false);
+    }
   };
-
-  const toggleFilter = (key: keyof RecommendFilterType, value: string) => {
-    setFilters((prev) => {
-      const exists = prev[key].includes(value);
-
-      return {
-        ...prev,
-        [key]: exists
-          ? prev[key].filter((item) => item !== value)
-          : [...prev[key], value],
-      };
-    });
-  };
-
-  const selectedSummary = useMemo(() => {
-    const allSelected = Object.values(filters).flat();
-    return allSelected.length > 0 ? allSelected.join(', ') : '선택된 조건이 없습니다';
-  }, [filters]);
-
-  const handleRecommend = () => {
-    const filteredItems = filterItems(clothes, filters);
-    const outfits = createOutfits(filteredItems);
-
-    setRecommendedOutfits(outfits);
-    setHasSearched(true);
-  };
-
-  const resetFilters = () => {
-    setFilters(INITIAL_FILTERS);
-    setRecommendedOutfits([]);
-    setHasSearched(false);
-  };
-
-  const pageWidth = width - 64;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>코디 추천</Text>
-      <Text style={styles.subtitle}>
-        추천 조건을 직접 선택하고 코디를 추천받아보세요.
-      </Text>
-
-      <View style={styles.summaryBox}>
-        <Text style={styles.summaryLabel}>현재 선택 조건</Text>
-        <Text style={styles.summaryText}>{selectedSummary}</Text>
-      </View>
-
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>추천 조건</Text>
-
-        {(Object.keys(FILTER_OPTIONS) as Array<keyof RecommendFilterType>).map((key) => (
-          <View key={key} style={styles.filterSection}>
-            <Pressable
-              style={styles.filterHeader}
-              onPress={() => toggleExpand(key)}
-            >
-              <Text style={styles.filterTitle}>{FILTER_LABELS[key]}</Text>
-              <Text style={styles.arrowText}>{expanded[key] ? '▲' : '▼'}</Text>
-            </Pressable>
-
-            {expanded[key] && (
-              <View style={styles.filterChipWrap}>
-                {FILTER_OPTIONS[key].map((option) => {
-                  const isSelected = filters[key].includes(option);
-
-                  return (
-                    <Pressable
-                      key={option}
-                      style={[
-                        styles.filterChip,
-                        isSelected && styles.filterChipSelected,
-                      ]}
-                      onPress={() => toggleFilter(key, option)}
-                    >
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          isSelected && styles.filterChipTextSelected,
-                        ]}
-                      >
-                        {option}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-        ))}
-
-        <View style={styles.actionRow}>
-          <Pressable style={styles.resetButton} onPress={resetFilters}>
-            <Text style={styles.resetButtonText}>초기화</Text>
-          </Pressable>
-
-          <Pressable style={styles.recommendButton} onPress={handleRecommend}>
-            <Text style={styles.recommendButtonText}>추천 받기</Text>
-          </Pressable>
+        <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
+        <View style={styles.inputBox}>
+          <TextInput style={styles.textInput} value={situation} onChangeText={setSituation} placeholder="예: 데이트, 출근, 미팅" placeholderTextColor="#9CA3AF" />
         </View>
-      </View>
+        <TouchableOpacity style={styles.actionButton} onPress={fetchTodayRecommendation} disabled={apiLoading}>
+          <Text style={styles.actionButtonText}>{apiLoading ? '불러오는 중...' : '코디 추천받기'}</Text>
+        </TouchableOpacity>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>추천 결과</Text>
+        {/* ✅ 로딩 중일 때 스켈레톤 UI 표시 */}
+        {apiLoading && <SkeletonLoader />}
 
-        {!hasSearched ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>아직 추천 결과가 없습니다</Text>
-            <Text style={styles.emptyText}>
-              추천 조건을 선택한 뒤 추천 받기를 눌러주세요.
-            </Text>
+        {!apiLoading && apiRecommendations && (
+          <View style={{ marginTop: 24 }}>
+            <Text style={styles.sectionTitle}>✨ AI 추천 결과</Text>
+            <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
+            {aiMessage && <View style={styles.aiMessageBox}><Text style={styles.aiMessageText}>💬 {aiMessage}</Text></View>}
+            {apiRecommendations.map((outfit, index) => (
+              <View key={index} style={styles.outfitCard}>
+                <Text style={styles.outfitCardTitle}>AI 추천 코디 {index + 1}</Text>
+                {outfit.reason && <Text style={styles.outfitDescription}>{outfit.reason}</Text>}
+                {(displayFilter === '전체' || displayFilter === '상의') && outfit.top && <OutfitItemCard label="상의" item={outfit.top} />}
+                {(displayFilter === '전체' || displayFilter === '하의') && outfit.bottom && <OutfitItemCard label="하의" item={outfit.bottom} />}
+                {(displayFilter === '전체' || displayFilter === '아우터') && outfit.outer && <OutfitItemCard label="아우터" item={outfit.outer} />}
+                {(displayFilter === '전체' || displayFilter === '신발') && outfit.shoes && <OutfitItemCard label="신발" item={outfit.shoes} />}
+              </View>
+            ))}
           </View>
-        ) : recommendedOutfits.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>추천 결과가 없습니다</Text>
-            <Text style={styles.emptyText}>
-              등록된 옷의 카테고리나 선택한 조건을 확인해주세요.
-            </Text>
-            <Text style={styles.emptyText}>
-              최소 상의 1개와 하의 1개가 있어야 코디를 만들 수 있습니다.
-            </Text>
-          </View>
-        ) : (
-          <>
-            <Text style={styles.swipeHint}>
-              좌우로 넘겨서 다른 추천 코디를 확인하세요.
-            </Text>
-
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              nestedScrollEnabled
-              decelerationRate="fast"
-              snapToInterval={pageWidth}
-              snapToAlignment="start"
-              contentContainerStyle={styles.outfitSliderContent}
-            >
-              {recommendedOutfits.map((outfit, index) => (
-                <View
-                  key={index}
-                  style={[styles.outfitSlide, { width: pageWidth }]}
-                >
-                  <View style={styles.outfitCard}>
-                    <Text style={styles.outfitTitle}>추천 코디 {index + 1}</Text>
-                    <Text style={styles.outfitDescription}>
-                      {buildRecommendReason(filters, outfit)}
-                    </Text>
-
-                    <OutfitItemCard label="아우터" item={outfit.outer} />
-                    <OutfitItemCard label="상의" item={outfit.top} />
-                    <OutfitItemCard label="하의" item={outfit.bottom} />
-                    <OutfitItemCard label="신발" item={outfit.shoes} />
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          </>
         )}
       </View>
     </ScrollView>
@@ -376,250 +184,33 @@ export default function RecommendScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F4F6F8',
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#6B7280',
-    marginBottom: 24,
-    lineHeight: 22,
-  },
-  summaryBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 20,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#4B5563',
-    marginBottom: 6,
-  },
-  summaryText: {
-    fontSize: 15,
-    color: '#111827',
-    lineHeight: 22,
-    fontWeight: '600',
-  },
-  section: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  filterSection: {
-    marginBottom: 12,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#EEF2F7',
-  },
-  filterHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  filterTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  arrowText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  filterChipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 10,
-    gap: 8,
-  },
-  filterChip: {
-    backgroundColor: '#EEF2F7',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  filterChipSelected: {
-    backgroundColor: '#111827',
-  },
-  filterChipText: {
-    fontSize: 13,
-    color: '#374151',
-    fontWeight: '600',
-  },
-  filterChipTextSelected: {
-    color: '#FFFFFF',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 8,
-  },
-  resetButton: {
-    flex: 1,
-    backgroundColor: '#E5E7EB',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  resetButtonText: {
-    color: '#374151',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  recommendButton: {
-    flex: 1,
-    backgroundColor: '#111827',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  recommendButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  swipeHint: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 12,
-    fontWeight: '600',
-  },
-  outfitSliderContent: {
-    paddingRight: 8,
-  },
-  outfitSlide: {
-    marginRight: 12,
-  },
-  outfitCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  outfitTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 6,
-  },
-  outfitDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 14,
-    lineHeight: 20,
-  },
-  itemCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#EEF2F7',
-  },
-  itemHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    marginBottom: 10,
-  },
-  itemBadge: {
-    backgroundColor: '#E8EEF9',
-    color: '#2563EB',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  imageBox: {
-    width: '100%',
-    height: 220,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-    marginBottom: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  itemImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imagePlaceholder: {
-    width: '100%',
-    height: 220,
-    borderRadius: 12,
-    backgroundColor: '#E5E7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  imagePlaceholderText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  itemName: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 10,
-  },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  tag: {
-    backgroundColor: '#EEF2FF',
-    color: '#4F46E5',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  emptyBox: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 22,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EEF2F7',
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 4,
-  },
+  container: { flex: 1, backgroundColor: '#F4F6F8' },
+  content: { padding: 16, paddingBottom: 40 },
+  title: { fontSize: 30, fontWeight: '800', color: '#111827', marginBottom: 20 },
+  section: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, marginBottom: 20 },
+  sectionTitle: { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  inputBox: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F1F5F9' },
+  textInput: { fontSize: 16, color: '#111827', fontWeight: '600' },
+  actionButton: { backgroundColor: '#111827', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+  actionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  aiMessageBox: { backgroundColor: '#EEF2FF', padding: 20, borderRadius: 16, marginBottom: 20 },
+  aiMessageText: { fontSize: 15, color: '#3730A3', lineHeight: 24, fontWeight: '600' },
+  outfitCard: { marginBottom: 24, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' },
+  outfitCardTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  outfitDescription: { fontSize: 14, color: '#64748B', marginBottom: 16, lineHeight: 22 },
+  itemCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#EEF2F7' },
+  itemHeaderRow: { marginBottom: 10 },
+  itemBadge: { backgroundColor: '#E8EEF9', color: '#2563EB', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, fontSize: 12, fontWeight: '700' },
+  itemImageContainer: { width: '100%', height: 200, backgroundColor: '#F3F4F6', borderRadius: 12, marginBottom: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  itemImage: { width: '100%', height: '100%' },
+  imagePlaceholder: { width: '100%', height: 200, borderRadius: 12, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  imagePlaceholderText: { fontSize: 13, color: '#6B7280' },
+  itemName: { fontSize: 17, fontWeight: '800', color: '#111827', marginBottom: 10 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tagChip: { backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  tagText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
+  // ✅ 스켈레톤 전용 스타일
+  skeletonBase: { backgroundColor: '#E5E7EB', borderRadius: 8 },
+  aiMessageBoxSkeleton: { backgroundColor: '#F3F4F6', padding: 20, borderRadius: 16, marginBottom: 20 },
+  outfitCardSkeleton: { marginBottom: 24, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20 },
 });

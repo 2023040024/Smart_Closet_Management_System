@@ -12,6 +12,9 @@ import {
   View,
 } from 'react-native';
 
+// ✅ 1. 인터셉터 가져오기 (파일 위치가 app 폴더 안이라면 ./_api)
+import api from './_api';
+
 type ClothingItem = {
   id: string;
   name: string;
@@ -28,27 +31,11 @@ type ClothesApiItem = {
 };
 
 const tpoOptions = [
-  '데일리',
-  '비즈니스',
-  '면접',
-  '결혼식',
-  '장례식',
-  '운동',
-  '데이트',
-  '모임',
-  '여행',
+  '데일리', '비즈니스', '면접', '결혼식', '장례식', '운동', '데이트', '모임', '여행',
 ];
 
 const fitOptions = ['잘맞음', '보통', '안맞음'];
 const temperatureOptions = ['추움', '적당함', '더움'];
-
-
-/**
- * 실제 폰(Expo Go) 테스트 시 PC IPv4 주소로 수정
- */
-const API_BASE_URL = 'http://192.168.1.122:8000';
-
-const MOCK_CLOTHES_IDS = ['1', '2', '3', '4'];
 
 function formatToday() {
   return new Date().toISOString().slice(0, 10);
@@ -56,60 +43,12 @@ function formatToday() {
 
 function normalizeCategory(category?: string) {
   const value = (category || '').trim().toLowerCase();
-
-  if (value === '상의' || value === 'top' || value === 'tops' || value === 'shirt') {
-    return '상의';
-  }
-
-  if (value === '하의' || value === 'bottom' || value === 'bottoms' || value === 'pants') {
-    return '하의';
-  }
-
-  if (value === '아우터' || value === 'outer' || value === 'outerwear' || value === 'jacket') {
-    return '아우터';
-  }
-
-  if (value === '신발' || value === 'shoe' || value === 'shoes' || value === 'sneakers') {
-    return '신발';
-  }
-
-  if (
-    value === '악세사리' ||
-    value === '악세서리' ||
-    value === '액세서리' ||
-    value === 'accessory' ||
-    value === 'accessories'
-  ) {
-    return '악세사리';
-  }
-
+  if (value === '상의' || value === 'top' || value === 'tops' || value === 'shirt') return '상의';
+  if (value === '하의' || value === 'bottom' || value === 'bottoms' || value === 'pants') return '하의';
+  if (value === '아우터' || value === 'outer' || value === 'outerwear' || value === 'jacket') return '아우터';
+  if (value === '신발' || value === 'shoe' || value === 'shoes' || value === 'sneakers') return '신발';
+  if (value === '악세사리' || value === '악세서리' || value === '액세서리' || value === 'accessory' || value === 'accessories') return '악세사리';
   return '기타';
-}
-
-function stringifyErrorDetail(responseData: any, status: number) {
-  if (typeof responseData?.detail === 'string') {
-    return responseData.detail;
-  }
-
-  if (Array.isArray(responseData?.detail)) {
-    return responseData.detail
-      .map((item: any) => {
-        if (typeof item === 'string') return item;
-        if (item?.msg) return item.msg;
-        return JSON.stringify(item);
-      })
-      .join('\n');
-  }
-
-  if (responseData?.detail && typeof responseData.detail === 'object') {
-    return JSON.stringify(responseData.detail);
-  }
-
-  if (typeof responseData?.message === 'string') {
-    return responseData.message;
-  }
-
-  return `저장 실패 (${status})`;
 }
 
 export default function HistoryCreateScreen() {
@@ -126,97 +65,63 @@ export default function HistoryCreateScreen() {
   const [saving, setSaving] = useState(false);
   const [isUsingMockData, setIsUsingMockData] = useState(false);
 
-useEffect(() => {
-  const fetchClothes = async () => {
-    try {
-      setLoadingClothes(true);
-      console.log('API 주소:', `${API_BASE_URL}/clothes`);
-
-      const response = await fetch(`${API_BASE_URL}/clothes`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('status:', response.status);
-
-      let data: ClothesApiItem[] = [];
-
+  // ✅ 옷 목록 불러오기 (인터셉터 적용)
+  useEffect(() => {
+    const fetchClothes = async () => {
       try {
-        data = await response.json();
-        console.log('clothes api data:', data);
-      } catch (jsonError) {
-        data = [];
-      }
+        setLoadingClothes(true);
+        // api.get을 사용하면 자동으로 헤더에 토큰이 들어갑니다.
+        const response = await api.get('/clothes');
+        const data: ClothesApiItem[] = response.data;
 
-      if (!response.ok) {
-        throw new Error(`옷 목록 조회 실패 (${response.status})`);
-      }
+        const mapped: ClothingItem[] = data
+          .map((item, index) => {
+            const rawId = item.clothes_id ?? item.id;
+            if (rawId === undefined || rawId === null) return null;
 
-      const mapped: ClothingItem[] = data
-        .map((item, index) => {
-          const rawId = item.clothes_id ?? item.id;
+            return {
+              id: String(rawId),
+              name: item.name?.trim() || `옷 ${index + 1}`,
+              category: normalizeCategory(item.category),
+              color: item.color ?? '',
+            };
+          })
+          .filter(Boolean) as ClothingItem[];
 
-          if (rawId === undefined || rawId === null) {
-            return null;
-          }
-
-          return {
-            id: String(rawId),
-            name: item.name?.trim() || `옷 ${index + 1}`,
-            category: normalizeCategory(item.category),
-            color: item.color ?? '',
-          };
-        })
-        .filter(Boolean) as ClothingItem[];
-
-
-      if (mapped.length === 0) {
+        if (mapped.length === 0) {
+          setIsUsingMockData(true);
+          setClothesList([
+            { id: '1', name: '블랙 셔츠', category: '상의' },
+            { id: '2', name: '베이지 슬랙스', category: '하의' },
+          ]);
+        } else {
+          setIsUsingMockData(false);
+          setClothesList(mapped);
+        }
+      } catch (error: any) {
+        console.error('옷 목록 불러오기 실패:', error);
+        
+        // 401 에러 시 더미 데이터로 전환하며 안내
         setIsUsingMockData(true);
-        setClothesList([
-          { id: '1', name: '블랙 셔츠', category: '상의' },
-          { id: '2', name: '베이지 슬랙스', category: '하의' },
-          { id: '3', name: '화이트 스니커즈', category: '신발' },
-          { id: '4', name: '네이비 자켓', category: '아우터' },
-        ]);
-      } else {
-        setIsUsingMockData(false);
-        setClothesList(mapped);
+        if (error.response?.status === 401) {
+          Alert.alert('인증 오류', '세션이 만료되었습니다. 다시 로그인해주세요.');
+        }
+      } finally {
+        setLoadingClothes(false);
       }
-    } catch (error) {
-      console.error('옷 목록 불러오기 실패:', error);
-
-      setIsUsingMockData(true);
-      setClothesList([
-        { id: '1', name: '블랙 셔츠', category: '상의' },
-        { id: '2', name: '베이지 슬랙스', category: '하의' },
-        { id: '3', name: '화이트 스니커즈', category: '신발' },
-        { id: '4', name: '네이비 자켓', category: '아우터' },
-      ]);
-
-      Alert.alert(
-        '안내',
-        '옷 목록 API를 불러오지 못해 임시 데이터로 표시합니다.'
-      );
-    } finally {
-      setLoadingClothes(false);
-    }
-  };
-
-  fetchClothes();
-}, []);
-
-  const groupedClothes = useMemo(() => {
-    return {
-      상의: clothesList.filter((item) => item.category === '상의'),
-      하의: clothesList.filter((item) => item.category === '하의'),
-      아우터: clothesList.filter((item) => item.category === '아우터'),
-      신발: clothesList.filter((item) => item.category === '신발'),
-      악세사리: clothesList.filter((item) => item.category === '악세사리'),
-      기타: clothesList.filter((item) => item.category === '기타'),
     };
-  }, [clothesList]);
+
+    fetchClothes();
+  }, []);
+
+  const groupedClothes = useMemo(() => ({
+    상의: clothesList.filter((item) => item.category === '상의'),
+    하의: clothesList.filter((item) => item.category === '하의'),
+    아우터: clothesList.filter((item) => item.category === '아우터'),
+    신발: clothesList.filter((item) => item.category === '신발'),
+    악세사리: clothesList.filter((item) => item.category === '악세사리'),
+    기타: clothesList.filter((item) => item.category === '기타'),
+  }), [clothesList]);
 
   const toggleCloth = (id: string) => {
     setSelectedClothes((prev) =>
@@ -224,83 +129,26 @@ useEffect(() => {
     );
   };
 
-  const renderChips = (
-    options: string[],
-    selected: string,
-    setValue: (value: string) => void
-  ) => {
-    return (
-      <View style={styles.chipRow}>
-        {options.map((option) => {
-          const isSelected = selected === option;
+  const renderChips = (options: string[], selected: string, setValue: (value: string) => void) => (
+    <View style={styles.chipRow}>
+      {options.map((option) => (
+        <Pressable
+          key={option}
+          style={[styles.chip, selected === option && styles.chipSelected]}
+          onPress={() => setValue(option)}
+        >
+          <Text style={[styles.chipText, selected === option && styles.chipTextSelected]}>
+            {option}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
 
-          return (
-            <Pressable
-              key={option}
-              style={[styles.chip, isSelected && styles.chipSelected]}
-              onPress={() => setValue(option)}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  isSelected && styles.chipTextSelected,
-                ]}
-              >
-                {option}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    );
-  };
-
-const saveHistory = async () => {
-  const payload = selectedClothes.map((clothesId) => ({
-    clothes_id: Number(clothesId),
-    worn_date: today,
-    tpo: tpo || null,
-    style: null,
-    mood: null,
-    feedback_temperature: temperature || null, // 추움 / 적당함 / 더움
-    feedback_tpo: fit || null,                 // 잘맞음 / 보통 / 안맞음
-    memo: memo.trim() || null,
-  }));
-
-  console.log('history save payload:', payload);
-
-  const response = await fetch(`${API_BASE_URL}/history`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  let responseData: any = null;
-
-  try {
-    responseData = await response.json();
-  } catch {
-    responseData = null;
-  }
-
-  console.log('history save response:', responseData);
-
-  if (!response.ok) {
-    const message = stringifyErrorDetail(responseData, response.status);
-    throw new Error(message);
-  }
-
-  return responseData;
-};
-
+  // ✅ 기록 저장 (인터셉터 적용)
   const handleSave = async () => {
     if (isUsingMockData) {
-      Alert.alert(
-        '안내',
-        '현재는 더미 데이터 사용 중이라 기록을 실제로 저장할 수 없습니다.'
-      );
+      Alert.alert('안내', '현재는 더미 데이터 상태라 저장이 불가능합니다. 다시 로그인해주세요.');
       return;
     }
 
@@ -311,24 +159,26 @@ const saveHistory = async () => {
 
     try {
       setSaving(true);
+      const payload = selectedClothes.map((clothesId) => ({
+        clothes_id: Number(clothesId),
+        worn_date: today,
+        tpo: tpo || null,
+        style: null,
+        mood: null,
+        feedback_temperature: temperature || null,
+        feedback_tpo: fit || null,
+        memo: memo.trim() || null,
+      }));
 
-      await saveHistory();
+      // ✅ fetch 대신 api.post 사용
+      await api.post('/history', payload);
 
       Alert.alert('저장 완료', '착용 기록이 저장되었습니다.', [
-        {
-          text: '확인',
-          onPress: () => {
-            router.replace('/(tabs)/history');
-          },
-        },
+        { text: '확인', onPress: () => router.replace('/(tabs)/history') },
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('착용 기록 저장 실패:', error);
-
-      Alert.alert(
-        '저장 실패',
-        error instanceof Error ? error.message : JSON.stringify(error)
-      );
+      Alert.alert('저장 실패', error.response?.data?.detail || '서버 오류가 발생했습니다.');
     } finally {
       setSaving(false);
     }
@@ -337,7 +187,6 @@ const saveHistory = async () => {
   return (
     <>
       <Stack.Screen options={{ title: '착용 기록 추가' }} />
-
       <SafeAreaView style={styles.container}>
         {loadingClothes ? (
           <View style={styles.loadingContainer}>
@@ -353,54 +202,29 @@ const saveHistory = async () => {
 
             <View style={styles.section}>
               <Text style={styles.title}>오늘 입은 옷</Text>
-
               {isUsingMockData && (
-                <Text style={styles.mockWarningText}>
-                  ⚠️ 현재 더미 데이터 사용 중 (백엔드 /clothes 미연동)
-                </Text>
+                <Text style={styles.mockWarningText}>⚠️ 서버 연결 안됨 (더미 데이터 표시 중)</Text>
               )}
-
-              {clothesList.length === 0 && (
-                <Text style={styles.emptyClothesText}>
-                  등록된 옷이 없습니다.
-                </Text>
-              )}
-
-              {Object.entries(groupedClothes).map(([category, items]) => {
-                if (items.length === 0) return null;
-
-                return (
+              {Object.entries(groupedClothes).map(([category, items]) => (
+                items.length > 0 && (
                   <View key={category} style={styles.categoryBlock}>
                     <Text style={styles.subTitle}>{category}</Text>
-
                     <View style={styles.clothRow}>
-                      {items.map((item) => {
-                        const isSelected = selectedClothes.includes(item.id);
-
-                        return (
-                          <Pressable
-                            key={item.id}
-                            style={[
-                              styles.clothBox,
-                              isSelected && styles.clothBoxSelected,
-                            ]}
-                            onPress={() => toggleCloth(item.id)}
-                          >
-                            <Text
-                              style={[
-                                styles.clothName,
-                                isSelected && styles.clothNameSelected,
-                              ]}
-                            >
-                              {item.name}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
+                      {items.map((item) => (
+                        <Pressable
+                          key={item.id}
+                          style={[styles.clothBox, selectedClothes.includes(item.id) && styles.clothBoxSelected]}
+                          onPress={() => toggleCloth(item.id)}
+                        >
+                          <Text style={[styles.clothName, selectedClothes.includes(item.id) && styles.clothNameSelected]}>
+                            {item.name}
+                          </Text>
+                        </Pressable>
+                      ))}
                     </View>
                   </View>
-                );
-              })}
+                )
+              ))}
             </View>
 
             <View style={styles.section}>
@@ -430,21 +254,11 @@ const saveHistory = async () => {
             </View>
 
             <Pressable
-              style={[
-                styles.saveButton,
-                (saving || clothesList.length === 0 || isUsingMockData) &&
-                  styles.saveButtonDisabled,
-              ]}
+              style={[styles.saveButton, (saving || isUsingMockData) && styles.saveButtonDisabled]}
               onPress={handleSave}
-              disabled={saving || clothesList.length === 0 || isUsingMockData}
+              disabled={saving || isUsingMockData}
             >
-              <Text style={styles.saveText}>
-                {saving
-                  ? '저장 중...'
-                  : isUsingMockData
-                  ? '더미 데이터 상태에서는 저장 불가'
-                  : '저장하기'}
-              </Text>
+              <Text style={styles.saveText}>{saving ? '저장 중...' : '저장하기'}</Text>
             </Pressable>
           </ScrollView>
         )}
@@ -453,138 +267,30 @@ const saveHistory = async () => {
   );
 }
 
+// 스타일 시트는 기존 것 유지
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 16, paddingBottom: 40 },
-
-  section: {
-    marginBottom: 20,
-  },
-
-  categoryBlock: {
-    marginTop: 10,
-  },
-
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-
-  subTitle: {
-    fontSize: 13,
-    color: '#666',
-    marginBottom: 6,
-  },
-
-  value: {
-    fontSize: 15,
-    color: '#111',
-  },
-
-  clothRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-
-  clothBox: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#f1f1f1',
-  },
-
-  clothBoxSelected: {
-    backgroundColor: '#111',
-  },
-
-  clothName: {
-    color: '#333',
-    fontSize: 13,
-  },
-
-  clothNameSelected: {
-    color: '#fff',
-  },
-
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: '#f1f1f1',
-  },
-
-  chipSelected: {
-    backgroundColor: '#111',
-  },
-
-  chipText: {
-    fontSize: 13,
-    color: '#333',
-  },
-
-  chipTextSelected: {
-    color: '#fff',
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    padding: 12,
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-
-  saveButton: {
-    marginTop: 10,
-    backgroundColor: '#111',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-
-  saveText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#777',
-  },
-
-  emptyClothesText: {
-    fontSize: 14,
-    color: '#777',
-    marginTop: 8,
-    lineHeight: 20,
-  },
-
-  mockWarningText: {
-    fontSize: 13,
-    color: '#c0392b',
-    marginBottom: 8,
-    lineHeight: 18,
-  },
+  section: { marginBottom: 20 },
+  categoryBlock: { marginTop: 10 },
+  title: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  subTitle: { fontSize: 13, color: '#666', marginBottom: 6 },
+  value: { fontSize: 15, color: '#111' },
+  clothRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  clothBox: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#f1f1f1' },
+  clothBoxSelected: { backgroundColor: '#111' },
+  clothName: { color: '#333', fontSize: 13 },
+  clothNameSelected: { color: '#fff' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f1f1f1' },
+  chipSelected: { backgroundColor: '#111' },
+  chipText: { fontSize: 13, color: '#333' },
+  chipTextSelected: { color: '#fff' },
+  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, minHeight: 80, textAlignVertical: 'top' },
+  saveButton: { marginTop: 10, backgroundColor: '#111', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  saveButtonDisabled: { opacity: 0.6 },
+  saveText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  loadingText: { marginTop: 12, fontSize: 14, color: '#777' },
+  mockWarningText: { fontSize: 13, color: '#c0392b', marginBottom: 8, lineHeight: 18 },
 });

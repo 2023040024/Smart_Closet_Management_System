@@ -2,7 +2,11 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from routers import stats, history
+from routers import (
+    stats,
+    history,
+    feedback
+)
 
 load_dotenv()  # .env 파일 자동 로드
 
@@ -37,6 +41,7 @@ app.include_router(vision.router)
 # C 담당자가 추가할 라우터
 app.include_router(history.router)
 app.include_router(stats.router)
+app.include_router(feedback.router)
 
 @app.get("/")
 def root():
