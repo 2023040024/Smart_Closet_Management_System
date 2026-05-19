@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native';
 
-// ✅ api 인터셉터 가져오기 (경로 주의)
 import api from '../_api';
 
 type ClothingItem = {
@@ -47,6 +46,12 @@ type HistoryApiItem = {
     name?: string;
     category?: string;
     color?: string;
+    // ✅ Commit 1: 백엔드 태그 계층화 구조에 대응하기 위해 tags 추가
+    tags?: {
+      category?: string;
+      color?: string;
+      [key: string]: any;
+    };
   };
 };
 
@@ -101,7 +106,6 @@ export default function HistoryScreen() {
       .filter(Boolean) as ClothingItem[];
   };
 
-  // ✅ 인터셉터가 적용된 fetchHistoryList
   const fetchHistoryList = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -111,10 +115,7 @@ export default function HistoryScreen() {
       }
       setErrorMessage('');
 
-      // api.get을 사용하여 자동으로 헤더에 토큰이 들어갑니다.
       const response = await api.get('/history');
-      
-      // 안전장치: 데이터가 배열인지 확인
       const data: HistoryApiItem[] = Array.isArray(response.data) ? response.data : [];
 
       const mappedHistoryList = data.map(mapApiHistoryToUi);
@@ -128,11 +129,15 @@ export default function HistoryScreen() {
 
         if (!clothesId) return;
 
+        // ✅ Commit 1: 데이터 바인딩 오류 수정 (tags 내부 값 우선 탐색 후 기본값 매핑)
+        const category = item.clothes?.category ?? item.clothes?.tags?.category ?? '미분류';
+        const color = item.clothes?.color ?? item.clothes?.tags?.color ?? '색상 정보 없음';
+
         nextClothesMap[clothesId] = {
           id: clothesId,
           name: item.clothes?.name ?? `옷 ${clothesId}`,
-          category: item.clothes?.category ?? '미분류',
-          color: item.clothes?.color ?? '',
+          category: category,
+          color: color,
         };
       });
 
@@ -140,8 +145,6 @@ export default function HistoryScreen() {
       setClothesMap(nextClothesMap);
     } catch (error: any) {
       console.error('기록 불러오기 실패:', error);
-      
-      // 401 에러에 대한 명확한 피드백 제공
       if (error.response?.status === 401) {
         setErrorMessage('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
       } else {
@@ -217,8 +220,7 @@ export default function HistoryScreen() {
       const response = await api.delete(`/history/${numericId}`);
       return response.data;
     } catch (error: any) {
-      const message =
-        error.response?.data?.detail || error.message || '삭제 실패';
+      const message = error.response?.data?.detail || error.message || '삭제 실패';
       throw new Error(message);
     }
   };
@@ -234,11 +236,9 @@ export default function HistoryScreen() {
         onPress: async () => {
           try {
             setDeletingId(group.id);
-
             for (const historyId of group.historyIds) {
               await deleteHistoryByApi(historyId);
             }
-
             setHistoryList((prev) =>
               prev.filter((item) => !group.historyIds.includes(item.id))
             );
@@ -246,9 +246,7 @@ export default function HistoryScreen() {
             console.error('삭제 실패:', error);
             Alert.alert(
               '삭제 실패',
-              error instanceof Error
-                ? error.message
-                : '서버에서 기록을 삭제하지 못했습니다.'
+              error instanceof Error ? error.message : '서버에서 기록을 삭제하지 못했습니다.'
             );
           } finally {
             setDeletingId(null);
@@ -295,6 +293,7 @@ export default function HistoryScreen() {
           {clothes.length > 0 ? (
             clothes.map((cloth) => (
               <View key={cloth.id} style={styles.clothBox}>
+                {/* 수정한 카테고리가 정상적으로 매핑되어 나옵니다 */}
                 <Text style={styles.clothCategory}>{cloth.category}</Text>
                 <Text style={styles.clothName}>{cloth.name}</Text>
               </View>
@@ -311,19 +310,11 @@ export default function HistoryScreen() {
         <Text style={styles.memo}>{item.memo || '메모 없음'}</Text>
 
         <View style={styles.actionRow}>
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => handleDetailPress(item)}
-            disabled={deletingId === item.id}
-          >
+          <Pressable style={styles.actionButton} onPress={() => handleDetailPress(item)} disabled={deletingId === item.id}>
             <Text style={styles.actionButtonText}>상세보기</Text>
           </Pressable>
 
-          <Pressable
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDelete(item)}
-            disabled={deletingId === item.id}
-          >
+          <Pressable style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)} disabled={deletingId === item.id}>
             <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
               {deletingId === item.id ? '삭제 중...' : '삭제'}
             </Text>
@@ -336,10 +327,7 @@ export default function HistoryScreen() {
   const EmptyState = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyTitle}>해당 조건의 착용 기록이 없습니다</Text>
-      <Text style={styles.emptyDescription}>
-        다른 필터를 선택하거나 새 기록을 추가해보세요.
-      </Text>
-
+      <Text style={styles.emptyDescription}>다른 필터를 선택하거나 새 기록을 추가해보세요.</Text>
       <Pressable style={styles.emptyAddButton} onPress={handleCreatePress}>
         <Text style={styles.emptyAddButtonText}>기록 추가</Text>
       </Pressable>
@@ -360,22 +348,12 @@ export default function HistoryScreen() {
       <SafeAreaView style={styles.loadingContainer}>
         <Text style={styles.emptyTitle}>기록을 불러오지 못했습니다</Text>
         <Text style={styles.emptyDescription}>{errorMessage}</Text>
-
         <View style={styles.errorButtonRow}>
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => fetchHistoryList()}
-          >
+          <Pressable style={styles.actionButton} onPress={() => fetchHistoryList()}>
             <Text style={styles.actionButtonText}>다시 시도</Text>
           </Pressable>
-
-          <Pressable
-            style={[styles.actionButton, styles.headerAddButton]}
-            onPress={handleCreatePress}
-          >
-            <Text style={[styles.actionButtonText, styles.headerAddButtonText]}>
-              기록 추가
-            </Text>
+          <Pressable style={[styles.actionButton, styles.headerAddButton]} onPress={handleCreatePress}>
+            <Text style={[styles.actionButtonText, styles.headerAddButtonText]}>기록 추가</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -386,7 +364,6 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>착용 기록</Text>
-
         <Pressable style={styles.headerAddButton} onPress={handleCreatePress}>
           <Text style={styles.headerAddButtonText}>기록 추가</Text>
         </Pressable>
@@ -395,24 +372,9 @@ export default function HistoryScreen() {
       <View style={styles.filterRow}>
         {filterOptions.map((filter) => {
           const isSelected = selectedFilter === filter;
-
           return (
-            <Pressable
-              key={filter}
-              style={[
-                styles.filterChip,
-                isSelected && styles.filterChipSelected,
-              ]}
-              onPress={() => setSelectedFilter(filter)}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  isSelected && styles.filterChipTextSelected,
-                ]}
-              >
-                {filter}
-              </Text>
+            <Pressable key={filter} style={[styles.filterChip, isSelected && styles.filterChipSelected]} onPress={() => setSelectedFilter(filter)}>
+              <Text style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{filter}</Text>
             </Pressable>
           );
         })}
@@ -424,10 +386,7 @@ export default function HistoryScreen() {
         renderItem={renderItem}
         onRefresh={() => fetchHistoryList(true)}
         refreshing={refreshing}
-        contentContainerStyle={[
-          styles.listContent,
-          groupedHistoryData.length === 0 && styles.emptyListContent,
-        ]}
+        contentContainerStyle={[styles.listContent, groupedHistoryData.length === 0 && styles.emptyListContent]}
         ListEmptyComponent={<EmptyState />}
         showsVerticalScrollIndicator={false}
       />
