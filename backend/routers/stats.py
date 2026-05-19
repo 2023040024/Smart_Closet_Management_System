@@ -75,23 +75,26 @@ def get_disposal_recommendation(db: Session = Depends(get_db)):
 def get_cost_efficiency(db: Session = Depends(get_db)):
     current_user_id = 1
     
-    # 가격 정보가 있고 한 번이라도 입은 옷 필터링
-    clothes = db.query(Clothes).filter(
-        Clothes.user_id == current_user_id,
-        Clothes.purchase_price > 0,
-        Clothes.wear_count > 0
-    ).all()
+    # DB 엔진에서 (가격 / 착용 횟수)를 직접 연산하여 오름차순으로 정렬 후 가져옴
+    clothes = (
+        db.query(Clothes)
+        .filter(
+            Clothes.user_id == current_user_id,
+            Clothes.purchase_price > 0,
+            Clothes.wear_count > 0
+        )
+        .order_by((Clothes.purchase_price / Clothes.wear_count).asc())
+        .all()
+    )
 
-    sorted_clothes = sorted(clothes, key=lambda x: x.cost_per_wear)
-
-    worst_items = sorted_clothes[-3:] if len(sorted_clothes) > 3 else []
+    worst_items = clothes[-3:] if len(clothes) > 3 else []
 
     return {
         "message": "가성비 분석 완료",
-        "best_efficiency": sorted_clothes[:3], 
+        "best_efficiency": clothes[:3], 
         "worst_efficiency": worst_items, 
         "ai_summary": { 
-            "most_efficient_item": sorted_clothes[0].name if sorted_clothes else None,
+            "most_efficient_item": clothes[0].name if clothes else None,
             "total_investment_on_worst": sum(c.purchase_price for c in worst_items)
         }
     }
@@ -102,33 +105,36 @@ def get_cost_efficiency(db: Session = Depends(get_db)):
 def get_closet_overload(threshold: int = 3, db: Session = Depends(get_db)):
     current_user_id = 1
     
-    # 카테고리/색상별 그룹화 및 threshold 이상 중복 감지
-    overloaded_groups = (
-        db.query(
-            Clothes.category, 
-            Clothes.color, 
-            func.count(Clothes.clothes_id).label("count")
-        )
+    # 1. 서브쿼리로 중복 횟수가 threshold 이상인 카테고리와 색상 조합만 찾기
+    subquery = (
+        db.query(Clothes.category, Clothes.color)
         .filter(Clothes.user_id == current_user_id)
         .group_by(Clothes.category, Clothes.color)
         .having(func.count(Clothes.clothes_id) >= threshold)
-        .all()
+        .subquery()
     )
 
-    detailed_data = []
-    for group in overloaded_groups:
-        items = db.query(Clothes).filter(
-            Clothes.user_id == current_user_id,
-            Clothes.category == group.category,
-            Clothes.color == group.color
-        ).all()
-        detailed_data.append({
-            "category": group.category,
-            "color": group.color,
-            "count": group.count,
-            "items": items
-        })
+    overloaded_items = (
+        db.query(Clothes)
+        .join(subquery, (Clothes.category == subquery.c.category) & (Clothes.color == subquery.c.color))
+        .all()
+    )
+    grouped_data = {}
+    for item in overloaded_items:
+        key = (item.category, item.color)
+        if key not in grouped_data:
+            grouped_data[key] = []
+        grouped_data[key].append(item)
 
+    detailed_data = [
+        {
+            "category": key[0],
+            "color": key[1],
+            "count": len(items),
+            "items": items
+        }
+        for key, items in grouped_data.items()
+    ]
 
     return {
         "message": f"과다 보유 리포트: {len(detailed_data)}건 발견",
