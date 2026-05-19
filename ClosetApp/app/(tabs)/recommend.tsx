@@ -2,7 +2,7 @@ import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 import {
   Alert,
-  Image,
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +11,7 @@ import {
   View
 } from 'react-native';
 
+import { OutfitItemCard } from '../../components/recommend/OutfitItemCard';
 import { RecommendFilter } from '../../components/recommend/RecommendFilter';
 import api from '../_api';
 import { ClothesItem, useCloset } from '../_closetStore';
@@ -23,58 +24,11 @@ type OutfitSet = {
   reason?: string;
 };
 
-const API_BASE_URL = 'http://192.168.1.122:8000';
+// 기기 화면 너비를 가져와서 카드 크기를 비율로 설정합니다.
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// 섹션 패딩 등을 고려하여 카드가 화면에 꽉 차지 않고 옆 카드가 살짝 보이도록 설정 (약 75% 너비)
+const CARD_WIDTH = SCREEN_WIDTH * 0.75; 
 
-function resolveImageUri(image?: string | null) {
-  if (!image) return '';
-  if (image.startsWith('http') || image.startsWith('file://')) return image;
-  return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
-}
-
-/**
- * ✅ 1단계: 빈 태그 박스 노출 방지 로직 적용
- */
-function OutfitItemCard({ label, item }: { label: string; item?: ClothesItem }) {
-  if (!item) return null;
-
-  const fitText = item.tags.category === '상의' ? item.tags.topFit :
-                  item.tags.category === '하의' ? item.tags.bottomFit : '';
-
-  return (
-    <View style={styles.itemCard}>
-      <View style={styles.itemHeaderRow}>
-        <Text style={styles.itemBadge}>{label}</Text>
-      </View>
-
-      {item.image ? (
-        <View style={styles.itemImageContainer}>
-          <Image
-            source={{ uri: resolveImageUri(item.image) }}
-            style={styles.itemImage}
-            resizeMode="contain"
-          />
-        </View>
-      ) : (
-        <View style={styles.imagePlaceholder}>
-          <Text style={styles.imagePlaceholderText}>이미지 없음</Text>
-        </View>
-      )}
-
-      <Text style={styles.itemName}>{`${item.tags.color || ''} ${item.tags.category}`}</Text>
-      <View style={styles.tagRow}>
-        {/* ✅ 데이터가 있을 때만 렌더링되도록 수정 */}
-        {item.tags.style ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.style}</Text></View> : null}
-        {item.tags.mood ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.mood}</Text></View> : null}
-        {fitText ? <View style={styles.tagChip}><Text style={styles.tagText}>{fitText}</Text></View> : null}
-        {item.tags.tpo ? <View style={styles.tagChip}><Text style={styles.tagText}>{item.tags.tpo}</Text></View> : null}
-      </View>
-    </View>
-  );
-}
-
-/**
- * ✅ 2단계: 스켈레톤 UI 컴포넌트 추가
- */
 function SkeletonLoader() {
   return (
     <View style={{ marginTop: 24 }}>
@@ -84,12 +38,15 @@ function SkeletonLoader() {
         <View style={[styles.skeletonBase, { width: '90%', height: 16, marginBottom: 8 }]} />
         <View style={[styles.skeletonBase, { width: '60%', height: 16 }]} />
       </View>
-      {[1, 2].map((i) => (
-        <View key={i} style={styles.outfitCardSkeleton}>
-          <View style={[styles.skeletonBase, { width: 120, height: 24, marginBottom: 15 }]} />
-          <View style={[styles.skeletonBase, { width: '100%', height: 180, borderRadius: 12 }]} />
-        </View>
-      ))}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {[1, 2, 3].map((i) => (
+          <View key={i} style={[styles.outfitCardSkeleton, { width: CARD_WIDTH, marginRight: 16 }]}>
+            <View style={[styles.skeletonBase, { width: 120, height: 24, marginBottom: 15 }]} />
+            <View style={[styles.skeletonBase, { width: '100%', height: 180, borderRadius: 12, marginBottom: 12 }]} />
+            <View style={[styles.skeletonBase, { width: '100%', height: 180, borderRadius: 12 }]} />
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -101,6 +58,8 @@ export default function RecommendScreen() {
   const [apiRecommendations, setApiRecommendations] = useState<OutfitSet[] | null>(null);
   const [aiMessage, setAiMessage] = useState('');
   const [displayFilter, setDisplayFilter] = useState('전체');
+  
+  const [recommendContext, setRecommendContext] = useState({ situation: '', address: '' });
 
   useEffect(() => {
     if (clothes.length === 0 && fetchClothes) {
@@ -123,13 +82,15 @@ export default function RecommendScreen() {
 
       const response = await api.get('/recommend/today', { params: { situation, address } });
 
+      setRecommendContext({ situation, address });
       setAiMessage(response.data.ai_message || '');
+      
       const matched = response.data.outfits.map((outfit: any) => {
         const set: OutfitSet = { reason: outfit.reason };
         outfit.items.forEach((item: any) => {
           const myCloth = clothes.find(c => Number(c.id) === Number(item.clothes_id));
           if (myCloth) {
-            const cat = item.category;
+            const cat = (myCloth as any).category || myCloth.tags?.category || (item as any).category;
             if (cat === '상의') set.top = myCloth;
             else if (cat === '하의') set.bottom = myCloth;
             else if (cat === '아우터') set.outer = myCloth;
@@ -140,6 +101,7 @@ export default function RecommendScreen() {
       });
       setApiRecommendations(matched);
     } catch (error) {
+      console.error(error);
       Alert.alert('오류', '추천을 불러오지 못했습니다.');
     } finally {
       setApiLoading(false);
@@ -147,7 +109,7 @@ export default function RecommendScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>코디 추천</Text>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
@@ -158,24 +120,45 @@ export default function RecommendScreen() {
           <Text style={styles.actionButtonText}>{apiLoading ? '불러오는 중...' : '코디 추천받기'}</Text>
         </TouchableOpacity>
 
-        {/* ✅ 로딩 중일 때 스켈레톤 UI 표시 */}
         {apiLoading && <SkeletonLoader />}
 
         {!apiLoading && apiRecommendations && (
           <View style={{ marginTop: 24 }}>
             <Text style={styles.sectionTitle}>✨ AI 추천 결과</Text>
+            
+            <View style={styles.contextGroup}>
+              <Text style={styles.contextGroupText}>
+                📍 {recommendContext.address || '위치 알 수 없음'} · 🎯 {recommendContext.situation}
+              </Text>
+            </View>
+
             <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
             {aiMessage && <View style={styles.aiMessageBox}><Text style={styles.aiMessageText}>💬 {aiMessage}</Text></View>}
-            {apiRecommendations.map((outfit, index) => (
-              <View key={index} style={styles.outfitCard}>
-                <Text style={styles.outfitCardTitle}>AI 추천 코디 {index + 1}</Text>
-                {outfit.reason && <Text style={styles.outfitDescription}>{outfit.reason}</Text>}
-                {(displayFilter === '전체' || displayFilter === '상의') && outfit.top && <OutfitItemCard label="상의" item={outfit.top} />}
-                {(displayFilter === '전체' || displayFilter === '하의') && outfit.bottom && <OutfitItemCard label="하의" item={outfit.bottom} />}
-                {(displayFilter === '전체' || displayFilter === '아우터') && outfit.outer && <OutfitItemCard label="아우터" item={outfit.outer} />}
-                {(displayFilter === '전체' || displayFilter === '신발') && outfit.shoes && <OutfitItemCard label="신발" item={outfit.shoes} />}
-              </View>
-            ))}
+            
+            {/* ✨ 여기가 좌우 스와이프(Carousel)로 변경된 영역입니다 ✨ */}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={CARD_WIDTH + 16} // 카드 너비 + 마진값 (스와이프 시 딱딱 걸리게)
+              decelerationRate="fast"
+              contentContainerStyle={{ paddingRight: 16, paddingBottom: 10 }} // 마지막 카드 우측 여백
+            >
+              {apiRecommendations.map((outfit, index) => (
+                <View key={index} style={[styles.outfitCard, { width: CARD_WIDTH }]}>
+                  <View style={styles.outfitCardHeader}>
+                    <Text style={styles.outfitCardTitle}>추천 코디 {index + 1}</Text>
+                  </View>
+                  {outfit.reason && <Text style={styles.outfitDescription}>{outfit.reason}</Text>}
+                  
+                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                    {(displayFilter === '전체' || displayFilter === '상의') && outfit.top && <OutfitItemCard label="상의" item={outfit.top} />}
+                    {(displayFilter === '전체' || displayFilter === '하의') && outfit.bottom && <OutfitItemCard label="하의" item={outfit.bottom} />}
+                    {(displayFilter === '전체' || displayFilter === '아우터') && outfit.outer && <OutfitItemCard label="아우터" item={outfit.outer} />}
+                    {(displayFilter === '전체' || displayFilter === '신발') && outfit.shoes && <OutfitItemCard label="신발" item={outfit.shoes} />}
+                  </ScrollView>
+                </View>
+              ))}
+            </ScrollView>
           </View>
         )}
       </View>
@@ -193,24 +176,20 @@ const styles = StyleSheet.create({
   textInput: { fontSize: 16, color: '#111827', fontWeight: '600' },
   actionButton: { backgroundColor: '#111827', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
   actionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  
+  contextGroup: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
+  contextGroupText: { fontSize: 14, fontWeight: '700', color: '#475569' },
+
   aiMessageBox: { backgroundColor: '#EEF2FF', padding: 20, borderRadius: 16, marginBottom: 20 },
   aiMessageText: { fontSize: 15, color: '#3730A3', lineHeight: 24, fontWeight: '600' },
-  outfitCard: { marginBottom: 24, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' },
-  outfitCardTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  
+  // 아웃핏 카드 스타일 수정 (높이 제한 추가 및 오른쪽 마진 추가)
+  outfitCard: { marginRight: 16, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', maxHeight: 600 }, 
+  outfitCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  outfitCardTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
   outfitDescription: { fontSize: 14, color: '#64748B', marginBottom: 16, lineHeight: 22 },
-  itemCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#EEF2F7' },
-  itemHeaderRow: { marginBottom: 10 },
-  itemBadge: { backgroundColor: '#E8EEF9', color: '#2563EB', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, fontSize: 12, fontWeight: '700' },
-  itemImageContainer: { width: '100%', height: 200, backgroundColor: '#F3F4F6', borderRadius: 12, marginBottom: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  itemImage: { width: '100%', height: '100%' },
-  imagePlaceholder: { width: '100%', height: 200, borderRadius: 12, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  imagePlaceholderText: { fontSize: 13, color: '#6B7280' },
-  itemName: { fontSize: 17, fontWeight: '800', color: '#111827', marginBottom: 10 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tagChip: { backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  tagText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
-  // ✅ 스켈레톤 전용 스타일
+  
   skeletonBase: { backgroundColor: '#E5E7EB', borderRadius: 8 },
   aiMessageBoxSkeleton: { backgroundColor: '#F3F4F6', padding: 20, borderRadius: 16, marginBottom: 20 },
-  outfitCardSkeleton: { marginBottom: 24, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20 },
+  outfitCardSkeleton: { padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' },
 });

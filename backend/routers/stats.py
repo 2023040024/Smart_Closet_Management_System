@@ -78,23 +78,41 @@ def get_cost_efficiency(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    clothes = db.query(Clothes).filter(
-        Clothes.user_id == current_user.id,
-        Clothes.price > 0,  # purchase_price 오타 수정
-        Clothes.wear_count > 0
-    ).all()
+    # [97번 최적화] DB 엔진에서 직접 나누기 연산 후 정렬하여 가져옴
+    clothes = (
+        db.query(Clothes)
+        .filter(
+            Clothes.user_id == current_user.id,
+            Clothes.price > 0,
+            Clothes.wear_count > 0
+        )
+        .order_by((Clothes.price / Clothes.wear_count).asc())
+        .all()
+    )
 
+    # 프론트엔드 규격을 위한 Pydantic 검증
     validated_clothes = [ClothesResponse.model_validate(c) for c in clothes]
-    sorted_clothes = sorted(validated_clothes, key=lambda x: x.cost_per_wear)
-    worst_items = sorted_clothes[-3:] if len(sorted_clothes) > 3 else []
+    
+    # 6개 미만 시 발생하는 중복/누락 방지 동적 분할 알고리즘
+    total_items = len(validated_clothes)
+    if total_items >= 6:
+        best_items = validated_clothes[:3]
+        worst_items = validated_clothes[-3:]
+    else:
+        mid_index = (total_items + 1) // 2
+        best_items = validated_clothes[:mid_index]
+        worst_items = validated_clothes[mid_index:]
+
+    best_item_name = best_items[0].name if best_items else None
+    worst_total_price = sum(c.price for c in worst_items)
 
     return {
         "message": "가성비 분석 완료",
-        "best_efficiency": sorted_clothes[:3], 
+        "best_efficiency": best_items, 
         "worst_efficiency": worst_items, 
         "ai_summary": { 
-            "most_efficient_item": sorted_clothes[0].name if sorted_clothes else None,
-            "total_investment_on_worst": sum(c.price for c in worst_items)
+            "most_efficient_item": best_item_name,
+            "total_investment_on_worst": worst_total_price
         }
     }
 
@@ -106,31 +124,39 @@ def get_closet_overload(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    overloaded_groups = (
-        db.query(
-            Clothes.category, 
-            Clothes.color, 
-            func.count(Clothes.clothes_id).label("count")
-        )
+    # [97번 최적화] 서브쿼리로 중복 횟수가 threshold 이상인 카테고리와 색상 조합만 찾기
+    subquery = (
+        db.query(Clothes.category, Clothes.color)
         .filter(Clothes.user_id == current_user.id)
         .group_by(Clothes.category, Clothes.color)
         .having(func.count(Clothes.clothes_id) >= threshold)
-        .all()
+        .subquery()
     )
 
-    detailed_data = []
-    for group in overloaded_groups:
-        items = db.query(Clothes).filter(
-            Clothes.user_id == current_user.id,
-            Clothes.category == group.category,
-            Clothes.color == group.color
-        ).all()
-        detailed_data.append({
-            "category": group.category,
-            "color": group.color,
-            "count": group.count,
+    overloaded_items = (
+        db.query(Clothes)
+        .join(subquery, (Clothes.category == subquery.c.category) & (Clothes.color == subquery.c.color))
+        .all()
+    )
+    
+    # [97번 최적화] 메모리 내 그룹화로 DB 부하 감소
+    grouped_data = {}
+    for item in overloaded_items:
+        key = (item.category, item.color)
+        if key not in grouped_data:
+            grouped_data[key] = []
+        grouped_data[key].append(item)
+
+    # 리턴 시 Pydantic 스키마(ClothesResponse) 적용
+    detailed_data = [
+        {
+            "category": key[0],
+            "color": key[1],
+            "count": len(items),
             "items": [ClothesResponse.model_validate(item).model_dump(by_alias=True) for item in items]
-        })
+        }
+        for key, items in grouped_data.items()
+    ]
 
     return {
         "message": f"과다 보유 리포트: {len(detailed_data)}건 발견",
