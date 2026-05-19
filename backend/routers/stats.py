@@ -92,8 +92,9 @@ def get_cost_efficiency(
         best_items = sorted_clothes[:3]
         worst_items = sorted_clothes[-3:]
     else:
-        best_items = sorted_clothes[:3]
-        worst_items = []
+        mid_index = (total_items + 1) // 2
+        best_items = sorted_clothes[:mid_index]
+        worst_items = sorted_clothes[mid_index:]
 
     return {
         "message": "가성비 분석 완료",
