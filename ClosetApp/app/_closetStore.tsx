@@ -59,50 +59,40 @@ type ClosetContextType = {
   addClothes: (item: ClothesItem) => void;
   deleteClothes: (id: string) => void;
   updateClothes: (id: string, updated: Partial<ClothesItem>) => void;
-  fetchClothes: (forceRefresh?: boolean) => Promise<void>;
+  fetchClothes: () => Promise<void>;
 };
 
-const STORAGE_KEY = 'clothes-v3'; 
+const STORAGE_KEY = 'clothes-v2';
 const ClosetContext = createContext<ClosetContextType | null>(null);
-
-const API_BASE_URL = 'http://192.168.1.122:8000';
-
-// ✅ 하얗게 뜨는 이미지 문제 해결을 위한 URL 변환 함수
-function resolveImageUri(image?: string | null) {
-  if (!image) return '';
-  if (image.startsWith('http') || image.startsWith('file://')) return image;
-  return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
-}
 
 function normalizeClothesItem(raw: any): ClothesItem | null {
   if (!raw || typeof raw !== 'object') return null;
 
-  const id = String(raw.id || raw.clothes_id || '');
-  const image = raw.image || raw.image_url;
+  const id = String(raw.clothes_id || raw.id || '');
+  const image = raw.image_url || raw.image;
 
   if (!id || typeof image !== 'string') return null;
 
-  const s = raw.tags || {}; 
-
   const tags: ClothesTags = {
-    category: s.category || raw.category || '',
-    topFit: s.top_fit || s.topFit || raw.top_fit || raw.topFit || '',
-    bottomFit: s.bottom_fit || s.bottomFit || raw.bottom_fit || raw.bottomFit || '',
-    color: s.color || raw.color || '',
-    season: s.season || raw.season || '',
-    tone: s.tone || raw.tone || '',
-    style: s.style || raw.style || '',
-    mood: s.mood || raw.mood || '',
-    material: s.material || raw.material || '',
-    thickness: s.thickness || raw.thickness || '',
-    point: s.point || raw.point || '',
-    tpo: s.situation || s.tpo || raw.situation || raw.tpo || '',
+    category: raw.category || '',
+    topFit: raw.top_fit || raw.topFit || '',
+    bottomFit: raw.bottom_fit || raw.bottomFit || '',
+    color: raw.color || '',
+    season: raw.season || '',
+    tone: raw.tone || '',
+    style: raw.style || '',
+    mood: raw.mood || '',
+    material: raw.material || '',
+    thickness: raw.thickness || '',
+    point: raw.point || '',
+    // ✅ 서버 스키마 필드명인 'situation'을 우선 확인
+    tpo: raw.situation || raw.tpo || '',
   };
 
   return {
     id,
     name: raw.name || '이름 없음',
-    image: resolveImageUri(image), // ✅ 이미지 경로 정상화
+    image: image,
     createdAt: raw.created_at || raw.createdAt || new Date().toISOString(),
     tags: tags,
   };
@@ -112,7 +102,7 @@ export function ClosetProvider({ children }: { children: React.ReactNode }) {
   const [clothes, setClothes] = useState<ClothesItem[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  const fetchClothes = async (forceRefresh = false) => {
+  const fetchClothes = async () => {
     try {
       const response = await api.get('/clothes');
       if (response.data && Array.isArray(response.data)) {
@@ -126,37 +116,40 @@ export function ClosetProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const loadData = async () => {
+    const loadLocalData = async () => {
       try {
         const data = await AsyncStorage.getItem(STORAGE_KEY);
         if (data) {
           const parsed = JSON.parse(data);
-          setClothes(parsed.map(normalizeClothesItem).filter(Boolean));
+          if (Array.isArray(parsed)) {
+            setClothes(parsed.map(normalizeClothesItem).filter(Boolean) as ClothesItem[]);
+          }
         }
-        await fetchClothes();
-      } catch (e) {
-        console.log('로드 실패:', e);
+      } catch (error) {
+        console.log('로컬 로드 실패:', error);
       } finally {
         setLoaded(true);
       }
     };
-    loadData();
+    loadLocalData();
   }, []);
 
   useEffect(() => {
-    if (loaded) {
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(clothes));
-    }
+    if (!loaded) return;
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(clothes)).catch(console.log);
   }, [clothes, loaded]);
 
-  const value = useMemo<ClosetContextType>(() => ({
-    clothes,
-    addClothes: (item: ClothesItem) => setClothes(prev => [item, ...prev]),
-    deleteClothes: (id: string) => setClothes(prev => prev.filter(i => i.id !== id)),
-    updateClothes: (id: string, updated: Partial<ClothesItem>) =>
-      setClothes(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i)),
-    fetchClothes,
-  }), [clothes]);
+  const value = useMemo<ClosetContextType>(
+    () => ({
+      clothes,
+      addClothes: (item) => setClothes((prev) => [item, ...prev]),
+      deleteClothes: (id) => setClothes((prev) => prev.filter((item) => item.id !== id)),
+      updateClothes: (id, updated) =>
+        setClothes((prev) => prev.map((item) => (item.id === id ? { ...item, ...updated } : item))),
+      fetchClothes,
+    }),
+    [clothes]
+  );
 
   return <ClosetContext.Provider value={value}>{children}</ClosetContext.Provider>;
 }

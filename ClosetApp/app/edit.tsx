@@ -41,6 +41,7 @@ function Chip({
 
 export default function EditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  // ✅ fetchClothes를 함께 가져옵니다.
   const { updateClothes, fetchClothes } = useCloset(); 
 
   const [loading, setLoading] = useState(true);
@@ -66,8 +67,8 @@ export default function EditScreen() {
         const data = Array.isArray(response.data) ? response.data : [];
 
         const foundItem =
-          data.find((c: any) => String(c.id) === String(id)) ??
-          data.find((c: any) => String(c.clothes_id) === String(id));
+          data.find((c: any) => String(c.clothes_id) === String(id)) ??
+          data.find((c: any) => String(c.id) === String(id));
 
         if (!foundItem) {
           setErrorMessage('데이터가 없습니다.');
@@ -75,30 +76,25 @@ export default function EditScreen() {
           return;
         }
 
-        // ⭐ 핵심 수정: 계층화된 tags 객체에서 데이터를 먼저 찾도록 수정
-        const s = foundItem.tags || {};
-
         setName(foundItem.name || '');
         setSelected({
-          category: s.category || foundItem.category || '',
-          topFit: s.top_fit || s.topFit || foundItem.top_fit || foundItem.fit || '',
-          bottomFit: s.bottom_fit || s.bottomFit || foundItem.bottom_fit || foundItem.fit || '',
-          color: s.color || foundItem.color || '',
-          season: s.season || foundItem.season || '',
-          tone: s.tone || foundItem.tone || '',
-          style: s.style || foundItem.style || '',
-          mood: s.mood || foundItem.mood || '',
-          material: s.material || foundItem.material || '',
-          thickness: s.thickness || foundItem.thickness || '',
-          point: s.point || foundItem.point || '',
-          tpo: s.situation || s.tpo || foundItem.situation || foundItem.tpo || '', 
+          category: foundItem.category || '',
+          topFit: foundItem.top_fit || foundItem.fit || '',
+          bottomFit: foundItem.bottom_fit || foundItem.fit || '',
+          color: foundItem.color || '',
+          season: foundItem.season || '',
+          tone: foundItem.tone || '',
+          style: foundItem.style || '',
+          mood: foundItem.mood || '',
+          material: foundItem.material || '',
+          thickness: foundItem.thickness || '',
+          point: foundItem.point || '',
+          tpo: foundItem.situation || foundItem.tpo || '', 
         });
 
         const rawPrice = foundItem.price ?? foundItem.purchase_price;
         setPrice(rawPrice != null ? String(rawPrice) : '');
-        
-        // 이미지 필드명 변경 대응 (image 우선)
-        setImageUri(resolveImageUri(foundItem.image ?? foundItem.image_url));
+        setImageUri(resolveImageUri(foundItem.image_url ?? foundItem.image));
 
       } catch (error: any) {
         setErrorMessage('데이터 로드 실패');
@@ -160,8 +156,13 @@ export default function EditScreen() {
         status: null, 
       };
 
+      // 1. 서버에 수정 요청 전송
       await api.put(`/clothes/${id}`, updateData);
+      
+      // ✅ 2. 서버 데이터와 로컬 상태를 강제로 재동기화 (중요)
       await fetchClothes(); 
+      
+      // 3. 로컬 Context 업데이트
       updateClothes(String(id), { name, tags: selected });
 
       Alert.alert('수정 완료', '성공적으로 수정되었습니다.', [
@@ -248,7 +249,6 @@ export default function EditScreen() {
 }
 
 const styles = StyleSheet.create({
-  // 스타일은 이전과 동일
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 16, paddingBottom: 40 },

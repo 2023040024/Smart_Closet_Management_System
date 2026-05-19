@@ -16,9 +16,11 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { Category, ClothesItem, EMPTY_TAGS, TAG_OPTIONS } from '../_closetStore';
+// 1. 전역 api 모듈 임포트
 import api from '../_api';
-import { Category, ClothesItem, TAG_OPTIONS, useCloset } from '../_closetStore';
 
+// api.ts에서 처리하므로 내부 변수는 제거하거나 api 객체 내 설정을 따름
 const CATEGORY_ORDER: Array<'전체' | Category> = ['전체', ...TAG_OPTIONS.category];
 
 type FilterType = {
@@ -35,6 +37,28 @@ type FilterType = {
   tpo: string;
 };
 
+type ClothesApiItem = {
+  clothes_id?: number;
+  id?: number;
+  name?: string;
+  category?: string;
+  color?: string;
+  season?: string;
+  tone?: string;
+  style?: string;
+  mood?: string;
+  material?: string;
+  thickness?: string;
+  point?: string;
+  tpo?: string;
+  situation?: string;
+  fit?: string;
+  top_fit?: string | null;
+  bottom_fit?: string | null;
+  image?: string;
+  image_url?: string;
+};
+
 const FILTER_OPTIONS = {
   color: [...TAG_OPTIONS.color],
   season: [...TAG_OPTIONS.season],
@@ -49,12 +73,11 @@ const FILTER_OPTIONS = {
   tpo: [...TAG_OPTIONS.tpo],
 };
 
-// ✅ 에러 해결 핵심: FILTER_SECTIONS에 명시적 타입 할당
 const FILTER_SECTIONS: Array<{
   title: string;
   items: Array<{
     label: string;
-    key: keyof FilterType; // 이 부분이 정확해야 renderSection 호출 시 에러가 나지 않습니다.
+    key: keyof FilterType;
     options: string[];
   }>;
 }> = [
@@ -86,13 +109,81 @@ const FILTER_SECTIONS: Array<{
   },
 ];
 
+function normalizeCategory(category?: string): Category {
+  const value = (category || '').trim().toLowerCase();
+  if (value === '상의' || value === 'top' || value === 'tops' || value === 'shirt') return '상의';
+  if (value === '하의' || value === 'bottom' || value === 'bottoms' || value === 'pants') return '하의';
+  if (value === '아우터' || value === 'outer' || value === 'outerwear' || value === 'jacket') return '아우터';
+  if (value === '신발' || value === 'shoe' || value === 'shoes' || value === 'sneakers') return '신발';
+  return '악세사리';
+}
+
+// 이미지 경로는 api 인스턴스의 baseURL을 활용하도록 수정 가능
+function resolveImageUri(image?: string) {
+  if (!image) return '';
+  if (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('file://')) return image;
+  
+  // api.defaults.baseURL을 활용하거나 직접 base 경로 지정
+  const baseUrl = 'http://192.168.1.122:8000'; 
+  return image.startsWith('/') ? `${baseUrl}${image}` : `${baseUrl}/${image}`;
+}
+
+function pickValidTag<T extends readonly string[]>(options: T, value?: string | null): T[number] | '' {
+  if (!value) return '';
+  return options.includes(value) ? (value as T[number]) : '';
+}
+
+function mapApiItemToClothesItem(item: ClothesApiItem): ClothesItem | null {
+  const rawId = item.clothes_id ?? item.id;
+  if (!rawId) return null;
+
+  const category = normalizeCategory(item.category);
+  const fitValue = item.fit ?? item.top_fit ?? item.bottom_fit ?? '';
+
+  const color = pickValidTag(TAG_OPTIONS.color, item.color);
+  const season = pickValidTag(TAG_OPTIONS.season, item.season);
+  const tone = pickValidTag(TAG_OPTIONS.tone, item.tone);
+  const style = pickValidTag(TAG_OPTIONS.style, item.style);
+  const mood = pickValidTag(TAG_OPTIONS.mood, item.mood);
+  const material = pickValidTag(TAG_OPTIONS.material, item.material);
+  const thickness = pickValidTag(TAG_OPTIONS.thickness, item.thickness);
+  const point = pickValidTag(TAG_OPTIONS.point, item.point);
+  const tpo = pickValidTag(TAG_OPTIONS.tpo, item.tpo ?? item.situation);
+
+  const topFit = category === '상의' ? pickValidTag(TAG_OPTIONS.topFit, fitValue) : '';
+  const bottomFit = category === '하의' ? pickValidTag(TAG_OPTIONS.bottomFit, fitValue) : '';
+
+  return {
+    id: String(rawId),
+    name: item.name || '이름 없음',
+    image: resolveImageUri(item.image_url ?? item.image),
+    createdAt: new Date().toISOString(),
+    tags: {
+      ...EMPTY_TAGS,
+      category,
+      color,
+      season,
+      tone,
+      style,
+      mood,
+      material,
+      thickness,
+      point,
+      tpo,
+      topFit,
+      bottomFit,
+    },
+  };
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const filterScrollRef = useRef<ScrollView | null>(null);
 
-  const { clothes, fetchClothes } = useCloset();
-  const [loading, setLoading] = useState(false);
+  const [clothes, setClothes] = useState<ClothesItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const [selectedType, setSelectedType] = useState<'전체' | Category>('전체');
   const [showFilter, setShowFilter] = useState(false);
@@ -113,16 +204,43 @@ export default function HomeScreen() {
 
   const [showAllOptions, setShowAllOptions] = useState<Partial<Record<keyof FilterType, boolean>>>({});
 
+  // 2. 옷 목록 가져오기 로직을 api 모듈로 수정
+  const fetchClothes = useCallback(async () => {
+    try {
+      setLoading(true);
+      setErrorMessage('');
+
+      // api.get 사용 (인터셉터에 의해 토큰 자동 포함)
+      const response = await api.get('/clothes');
+      const data: ClothesApiItem[] = response.data;
+
+      const mapped = data
+        .map(mapApiItemToClothesItem)
+        .filter(Boolean) as ClothesItem[];
+
+      setClothes(mapped);
+    } catch (error: any) {
+      console.error('옷 목록 불러오기 실패:', error);
+      setErrorMessage(
+        error.response?.status === 401 
+          ? '인증이 만료되었습니다. 다시 로그인해주세요.' 
+          : '옷 목록을 불러오지 못했습니다.'
+      );
+      setClothes([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      const load = async () => {
-        setLoading(true);
-        await fetchClothes();
-        setLoading(false);
-      };
-      load();
+      fetchClothes();
     }, [fetchClothes])
   );
+
+  const activeFilterCount = useMemo(() => {
+    return Object.values(filter).filter(Boolean).length;
+  }, [filter]);
 
   const filteredClothes = useMemo(() => {
     return clothes.filter((item) => {
@@ -130,16 +248,24 @@ export default function HomeScreen() {
       const matchFilter =
         (!filter.style || item.tags.style === filter.style) &&
         (!filter.mood || item.tags.mood === filter.mood) &&
+        (!filter.thickness || item.tags.thickness === filter.thickness) &&
+        (!filter.topFit || item.tags.topFit === filter.topFit) &&
+        (!filter.bottomFit || item.tags.bottomFit === filter.bottomFit) &&
+        (!filter.material || item.tags.material === filter.material) &&
+        (!filter.point || item.tags.point === filter.point) &&
         (!filter.color || item.tags.color === filter.color) &&
+        (!filter.season || item.tags.season === filter.season) &&
+        (!filter.tone || item.tags.tone === filter.tone) &&
         (!filter.tpo || item.tags.tpo === filter.tpo);
       return matchType && matchFilter;
     });
   }, [clothes, selectedType, filter]);
 
-  const activeFilterCount = useMemo(() => Object.values(filter).filter(Boolean).length, [filter]);
-
   const toggleFilter = (category: keyof FilterType, value: string) => {
-    setFilter((prev) => ({ ...prev, [category]: prev[category] === value ? '' : value }));
+    setFilter((prev) => ({
+      ...prev,
+      [category]: prev[category] === value ? '' : value,
+    }));
   };
 
   const toggleExpand = (category: keyof FilterType) => {
@@ -147,16 +273,33 @@ export default function HomeScreen() {
   };
 
   const resetFilters = () => {
-    setFilter({ style: '', mood: '', thickness: '', topFit: '', bottomFit: '', material: '', point: '', color: '', season: '', tone: '', tpo: '' });
+    setFilter({
+      style: '', mood: '', thickness: '', topFit: '', bottomFit: '',
+      material: '', point: '', color: '', season: '', tone: '', tpo: '',
+    });
   };
 
-  const openMenu = (item: ClothesItem) => { setSelectedItem(item); setMenuVisible(true); };
-  const closeMenu = () => { setMenuVisible(false); setSelectedItem(null); };
+  const openMenu = (item: ClothesItem) => {
+    setSelectedItem(item);
+    setMenuVisible(true);
+  };
 
-  const goDetail = () => { if (!selectedItem) return; const id = selectedItem.id; closeMenu(); router.push({ pathname: '/detail', params: { id } }); };
+  const closeMenu = () => {
+    setMenuVisible(false);
+    setSelectedItem(null);
+  };
 
+  const goDetail = () => {
+    if (!selectedItem) return;
+    const id = selectedItem.id;
+    closeMenu();
+    router.push({ pathname: '/detail', params: { id } });
+  };
+
+  // 3. 삭제 로직을 api 모듈로 수정
   const handleDelete = () => {
     if (!selectedItem || deletingId) return;
+
     Alert.alert('삭제 확인', '이 옷을 삭제할까요?', [
       { text: '취소', style: 'cancel' },
       {
@@ -165,20 +308,31 @@ export default function HomeScreen() {
         onPress: async () => {
           try {
             setDeletingId(selectedItem.id);
-            await api.delete(`/clothes/${selectedItem.id}`);
+            // api.delete 사용
+            await api.delete(`/clothes/${Number(selectedItem.id)}`);
+
             closeMenu();
             await fetchClothes();
-          } catch (e) { Alert.alert('삭제 실패'); }
-          finally { setDeletingId(null); }
+          } catch (error: any) {
+            console.error('옷 삭제 실패:', error);
+            Alert.alert('삭제 실패', error.response?.data?.detail || '옷을 삭제하지 못했습니다.');
+          } finally {
+            setDeletingId(null);
+          }
         },
       },
     ]);
   };
 
+  const goRecommend = () => {
+    router.push('/(tabs)/recommend');
+  };
+
   const handleFilterPageChange = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const pageWidthSize = width - 32;
     const offsetX = e.nativeEvent.contentOffset.x;
-    setCurrentFilterPage(Math.round(offsetX / pageWidthSize));
+    const nextPage = Math.round(offsetX / pageWidthSize);
+    setCurrentFilterPage(nextPage);
   };
 
   const moveToFilterPage = (pageIndex: number) => {
@@ -194,21 +348,37 @@ export default function HomeScreen() {
         <TouchableOpacity style={styles.filterItemHeader} onPress={() => toggleExpand(key)} activeOpacity={0.85}>
           <View style={styles.filterItemHeaderLeft}>
             <Text style={styles.filterItemLabel}>{label}</Text>
-            {!!filter[key] && <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>선택됨</Text></View>}
+            {!!filter[key] && (
+              <View style={styles.activeBadge}>
+                <Text style={styles.activeBadgeText}>선택됨</Text>
+              </View>
+            )}
           </View>
           <Text style={styles.arrowText}>{expanded[key] ? '▲' : '▼'}</Text>
         </TouchableOpacity>
         {expanded[key] && (
           <View>
             <View style={styles.optionWrap}>
-              {visibleOptions.map((item, index) => (
-                <TouchableOpacity key={`${key}-${item}-${index}`} style={[styles.optionChip, filter[key] === item && styles.optionChipSelected]} onPress={() => toggleFilter(key, item)} activeOpacity={0.85}>
-                  <Text style={[styles.optionChipText, filter[key] === item && styles.optionChipTextSelected]}>{item}</Text>
-                </TouchableOpacity>
-              ))}
+              {visibleOptions.map((item, index) => {
+                const isSelected = filter[key] === item;
+                return (
+                  <TouchableOpacity
+                    key={`${key}-${item}-${index}`}
+                    style={[styles.optionChip, isSelected && styles.optionChipSelected]}
+                    onPress={() => toggleFilter(key, item)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.optionChipText, isSelected && styles.optionChipTextSelected]}>{item}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
             {options.length > 5 && (
-              <TouchableOpacity style={styles.moreButton} onPress={() => setShowAllOptions((prev) => ({ ...prev, [key]: !prev[key] }))} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={styles.moreButton}
+                onPress={() => setShowAllOptions((prev) => ({ ...prev, [key]: !prev[key] }))}
+                activeOpacity={0.85}
+              >
                 <Text style={styles.moreButtonText}>{showAllOptions[key] ? '접기' : `더보기 +${options.length - 5}`}</Text>
               </TouchableOpacity>
             )}
@@ -219,24 +389,39 @@ export default function HomeScreen() {
   };
 
   const renderCard = (item: ClothesItem) => (
-    <TouchableOpacity key={item.id} style={styles.card} activeOpacity={0.9} onLongPress={() => openMenu(item)} onPress={() => router.push({ pathname: '/detail', params: { id: item.id } })} delayLongPress={250}>
+    <TouchableOpacity key={item.id} style={styles.card} activeOpacity={0.9} onLongPress={() => openMenu(item)} delayLongPress={250}>
       <View style={styles.cardImageWrap}>
-        <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="contain" />
+        {item.image ? (
+          <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="contain" />
+        ) : (
+          <View style={styles.imageFallback}>
+            <Ionicons name="image-outline" size={28} color="#888" />
+            <Text style={styles.imageFallbackText}>이미지 없음</Text>
+          </View>
+        )}
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle}>{item.tags.category || '미분류'}</Text>
         <View style={styles.cardTagRow}>
           {!!item.tags.color && <Text style={styles.cardTag}>{item.tags.color}</Text>}
+          {!!item.tags.season && <Text style={styles.cardTag}>{item.tags.season}</Text>}
           {!!item.tags.style && <Text style={styles.cardTag}>{item.tags.style}</Text>}
-          {!!item.tags.tpo && <Text style={[styles.cardTag, styles.tpoTag]}>{item.tags.tpo}</Text>}
         </View>
         <Text style={styles.cardHint}>길게 눌러 상세 메뉴 보기</Text>
       </View>
     </TouchableOpacity>
   );
 
-  if (loading && clothes.length === 0) {
-    return <View style={styles.loadingContainer}><ActivityIndicator size="large" /></View>;
+  const pageWidthSize = width - 32;
+  const innerCardWidth = pageWidthSize - 4;
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.loadingText}>옷 목록 불러오는 중...</Text>
+      </View>
+    );
   }
 
   return (
@@ -247,13 +432,17 @@ export default function HomeScreen() {
             <Text style={styles.title}>내 옷장</Text>
             <Text style={styles.subtitle}>등록한 옷을 확인하고 관리해보세요.</Text>
           </View>
-          <TouchableOpacity style={styles.moveRecommendBtn} onPress={() => router.push('/(tabs)/recommend')}>
+          <TouchableOpacity style={styles.moveRecommendBtn} onPress={goRecommend}>
             <Text style={styles.moveRecommendText}>추천</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.actionRow}>
-          <TouchableOpacity style={[styles.primaryActionBtn, showFilter && styles.primaryActionBtnActive]} onPress={() => setShowFilter((prev) => !prev)} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={[styles.primaryActionBtn, showFilter && styles.primaryActionBtnActive]}
+            onPress={() => setShowFilter((prev) => !prev)}
+            activeOpacity={0.85}
+          >
             <Ionicons name={showFilter ? 'close-outline' : 'options-outline'} size={18} color="#fff" style={styles.primaryActionIcon} />
             <Text style={styles.primaryActionText}>{showFilter ? '닫기' : '필터'}</Text>
           </TouchableOpacity>
@@ -265,22 +454,46 @@ export default function HomeScreen() {
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeScrollContent} style={styles.typeScroll}>
-          {CATEGORY_ORDER.map((type) => (
-            <TouchableOpacity key={type} style={[styles.typeBtn, selectedType === type && styles.typeBtnSelected]} onPress={() => setSelectedType(type)} activeOpacity={0.85}>
-              <Text style={[styles.typeText, selectedType === type && styles.typeTextSelected]}>{type}</Text>
-            </TouchableOpacity>
-          ))}
+          {CATEGORY_ORDER.map((type) => {
+            const isSelected = selectedType === type;
+            return (
+              <TouchableOpacity
+                key={type}
+                style={[styles.typeBtn, isSelected && styles.typeBtnSelected]}
+                onPress={() => setSelectedType(type)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.typeText, isSelected && styles.typeTextSelected]}>{type}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
 
         {showFilter && (
           <View style={styles.filterPanel}>
-            <ScrollView ref={filterScrollRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={handleFilterPageChange}>
+            <View style={styles.filterPanelHeader}>
+              <View style={styles.filterPanelHeaderText}>
+                <Text style={styles.filterPanelTitle}>상세 필터</Text>
+                <Text style={styles.filterPanelSubtitle}>좌우로 넘기면서 그룹별로 필터를 볼 수 있어요.</Text>
+              </View>
+              <View style={styles.filterCountBadge}>
+                <Text style={styles.filterCountBadgeText}>{activeFilterCount}개 선택</Text>
+              </View>
+            </View>
+            <ScrollView
+              ref={filterScrollRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={handleFilterPageChange}
+              style={styles.filterSlider}
+            >
               {FILTER_SECTIONS.map((section, index) => (
-                <View key={index} style={{ width: width - 32 }}>
-                  <View style={styles.filterSectionCard}>
+                <View key={`${section.title}-${index}`} style={[styles.filterSlide, { width: pageWidthSize }]}>
+                  <View style={[styles.filterSectionCard, { width: innerCardWidth }]}>
                     <Text style={styles.filterSectionTitle}>{section.title}</Text>
                     {section.items.map((sectionItem, idx) => (
-                      <View key={idx}>
+                      <View key={`${section.title}-${sectionItem.key}-${idx}`}>
                         {renderSection(sectionItem.label, sectionItem.key, sectionItem.options)}
                       </View>
                     ))}
@@ -290,7 +503,12 @@ export default function HomeScreen() {
             </ScrollView>
             <View style={styles.paginationWrap}>
               {FILTER_SECTIONS.map((_, index) => (
-                <View key={index} style={[styles.paginationDot, currentFilterPage === index && styles.paginationDotActive]} />
+                <TouchableOpacity
+                  key={index}
+                  activeOpacity={0.8}
+                  onPress={() => moveToFilterPage(index)}
+                  style={[styles.paginationDot, currentFilterPage === index && styles.paginationDotActive]}
+                />
               ))}
             </View>
           </View>
@@ -301,20 +519,35 @@ export default function HomeScreen() {
           <Text style={styles.resultCount}>{filteredClothes.length}개</Text>
         </View>
 
-        <View style={styles.grid}>
-          {filteredClothes.map((item) => renderCard(item))}
-        </View>
+        {errorMessage ? (
+          <View style={styles.messageBox}>
+            <Text style={styles.errorText}>{errorMessage}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={fetchClothes}>
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredClothes.length === 0 ? (
+          <Text style={styles.emptyText}>조건에 맞는 옷이 없습니다.</Text>
+        ) : (
+          <View style={styles.grid}>
+            {filteredClothes.map((item) => renderCard(item))}
+          </View>
+        )}
       </ScrollView>
 
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={closeMenu}>
         <Pressable style={styles.modalOverlay} onPress={closeMenu}>
           <Pressable style={styles.modalBox} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.modalTitle}>메뉴</Text>
-            <TouchableOpacity style={styles.modalButton} onPress={goDetail}><Text style={styles.modalButtonText}>상세 보기</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.modalButton} onPress={goDetail}>
+              <Text style={styles.modalButtonText}>상세 보기</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.modalButton, styles.deleteMenuButton]} onPress={handleDelete} disabled={!!deletingId}>
               <Text style={styles.deleteMenuText}>{deletingId ? '삭제 중...' : '삭제하기'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelButton} onPress={closeMenu}><Text style={styles.cancelButtonText}>닫기</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.cancelButton} onPress={closeMenu}>
+              <Text style={styles.cancelButtonText}>닫기</Text>
+            </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
@@ -345,6 +578,14 @@ const styles = StyleSheet.create({
   typeText: { color: '#222', fontSize: 14, fontWeight: '600' },
   typeTextSelected: { color: '#fff' },
   filterPanel: { marginBottom: 16 },
+  filterPanelHeader: { marginBottom: 10, paddingHorizontal: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  filterPanelHeaderText: { flex: 1 },
+  filterPanelTitle: { fontSize: 18, fontWeight: '800', color: '#111', marginBottom: 2 },
+  filterPanelSubtitle: { fontSize: 13, color: '#777', lineHeight: 18 },
+  filterCountBadge: { backgroundColor: '#111', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start' },
+  filterCountBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  filterSlider: { marginHorizontal: -2 },
+  filterSlide: { alignItems: 'center' },
   filterSectionCard: { backgroundColor: '#fafafa', borderWidth: 1, borderColor: '#ededed', borderRadius: 18, padding: 14 },
   filterSectionTitle: { fontSize: 15, fontWeight: '800', color: '#111', marginBottom: 10 },
   filterItemBlock: { marginBottom: 10 },
@@ -361,20 +602,30 @@ const styles = StyleSheet.create({
   optionChipTextSelected: { color: '#fff', fontWeight: '800' },
   moreButton: { marginTop: 6, alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 2 },
   moreButtonText: { fontSize: 12, color: '#555', fontWeight: '700' },
+  paginationWrap: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, gap: 6 },
+  paginationDot: { width: 8, height: 8, borderRadius: 999, backgroundColor: '#d5d5d5' },
+  paginationDotActive: { width: 20, backgroundColor: '#111' },
   resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingHorizontal: 2 },
   resultTitle: { fontSize: 17, fontWeight: '800', color: '#111' },
   resultCount: { fontSize: 13, color: '#666', fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   card: { width: '48.2%', backgroundColor: '#fff', borderRadius: 18, marginBottom: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#ededed' },
-  cardImageWrap: { width: '100%', height: 180, backgroundColor: '#f9fafb', justifyContent: 'center', alignItems: 'center' },
-  cardImage: { width: '100%', height: '100%' },
+  cardImageWrap: { width: '100%', height: 180, backgroundColor: '#f7f7f7', justifyContent: 'center', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#efefef' },
+  cardImage: { width: '100%', height: 180, backgroundColor: '#f2f2f2' },
+  imageFallback: { width: '100%', height: 180, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f2f2f2', gap: 6 },
+  imageFallbackText: { fontSize: 12, color: '#777', fontWeight: '600' },
   cardBody: { padding: 12 },
-  cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  cardTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  cardTag: { fontSize: 12, color: '#4b5563', backgroundColor: '#f3f4f6', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, fontWeight: '500' },
-  tpoTag: { backgroundColor: '#eef2ff', color: '#4f46e5' },
-  cardHint: { fontSize: 11, color: '#7a7a7a', marginTop: 8 },
-  loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
+  cardTitle: { fontSize: 15, fontWeight: '800', marginBottom: 8, color: '#111' },
+  cardTagRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
+  cardTag: { fontSize: 12, color: '#444', backgroundColor: '#f2f2f2', paddingVertical: 5, paddingHorizontal: 8, borderRadius: 12, marginRight: 6, marginBottom: 6, fontWeight: '600' },
+  cardHint: { fontSize: 11, color: '#7a7a7a' },
+  emptyText: { color: '#666', fontSize: 14, fontWeight: '500', textAlign: 'center', paddingVertical: 40 },
+  messageBox: { paddingVertical: 28, alignItems: 'center', justifyContent: 'center' },
+  errorText: { color: '#c0392b', fontSize: 14, fontWeight: '600', textAlign: 'center', marginBottom: 12 },
+  retryButton: { backgroundColor: '#111', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 },
+  retryButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  loadingText: { marginTop: 12, fontSize: 14, color: '#777' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modalBox: { width: '100%', backgroundColor: '#fff', borderRadius: 20, padding: 18 },
   modalTitle: { fontSize: 18, fontWeight: '800', marginBottom: 14, textAlign: 'center', color: '#111' },
@@ -384,7 +635,4 @@ const styles = StyleSheet.create({
   deleteMenuText: { color: '#d11a2a', fontSize: 15, fontWeight: '700' },
   cancelButton: { paddingVertical: 12, alignItems: 'center' },
   cancelButtonText: { color: '#666', fontSize: 14, fontWeight: '600' },
-  paginationWrap: { flexDirection: 'row', justifyContent: 'center', marginTop: 12, gap: 6 },
-  paginationDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ddd' },
-  paginationDotActive: { backgroundColor: '#111', width: 20 },
 });

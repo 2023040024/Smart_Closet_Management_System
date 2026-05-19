@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+// ✅ 1. 인터셉터 가져오기 (파일 위치가 app 폴더 안이라면 ./_api)
 import api from './_api';
 
 type ClothingItem = {
@@ -27,14 +28,12 @@ type ClothesApiItem = {
   name?: string;
   category?: string;
   color?: string;
-  tags?: {
-    category?: string;
-    color?: string;
-    [key: string]: any;
-  };
 };
 
-const tpoOptions = ['데일리', '비즈니스', '면접', '결혼식', '장례식', '운동', '데이트', '모임', '여행'];
+const tpoOptions = [
+  '데일리', '비즈니스', '면접', '결혼식', '장례식', '운동', '데이트', '모임', '여행',
+];
+
 const fitOptions = ['잘맞음', '보통', '안맞음'];
 const temperatureOptions = ['추움', '적당함', '더움'];
 
@@ -66,10 +65,12 @@ export default function HistoryCreateScreen() {
   const [saving, setSaving] = useState(false);
   const [isUsingMockData, setIsUsingMockData] = useState(false);
 
+  // ✅ 옷 목록 불러오기 (인터셉터 적용)
   useEffect(() => {
     const fetchClothes = async () => {
       try {
         setLoadingClothes(true);
+        // api.get을 사용하면 자동으로 헤더에 토큰이 들어갑니다.
         const response = await api.get('/clothes');
         const data: ClothesApiItem[] = response.data;
 
@@ -78,14 +79,11 @@ export default function HistoryCreateScreen() {
             const rawId = item.clothes_id ?? item.id;
             if (rawId === undefined || rawId === null) return null;
 
-            const rawCategory = item.category ?? item.tags?.category;
-            const rawColor = item.color ?? item.tags?.color ?? '';
-
             return {
               id: String(rawId),
               name: item.name?.trim() || `옷 ${index + 1}`,
-              category: normalizeCategory(rawCategory),
-              color: rawColor,
+              category: normalizeCategory(item.category),
+              color: item.color ?? '',
             };
           })
           .filter(Boolean) as ClothingItem[];
@@ -102,6 +100,8 @@ export default function HistoryCreateScreen() {
         }
       } catch (error: any) {
         console.error('옷 목록 불러오기 실패:', error);
+        
+        // 401 에러 시 더미 데이터로 전환하며 안내
         setIsUsingMockData(true);
         if (error.response?.status === 401) {
           Alert.alert('인증 오류', '세션이 만료되었습니다. 다시 로그인해주세요.');
@@ -114,17 +114,14 @@ export default function HistoryCreateScreen() {
     fetchClothes();
   }, []);
 
-  const groupedClothes = useMemo(() => {
-    const groups = [
-      { title: '아우터', items: clothesList.filter((item) => item.category === '아우터') },
-      { title: '상의', items: clothesList.filter((item) => item.category === '상의') },
-      { title: '하의', items: clothesList.filter((item) => item.category === '하의') },
-      { title: '신발', items: clothesList.filter((item) => item.category === '신발') },
-      { title: '악세사리', items: clothesList.filter((item) => item.category === '악세사리') },
-      { title: '기타', items: clothesList.filter((item) => item.category === '기타') },
-    ];
-    return groups.filter((g) => g.items.length > 0);
-  }, [clothesList]);
+  const groupedClothes = useMemo(() => ({
+    상의: clothesList.filter((item) => item.category === '상의'),
+    하의: clothesList.filter((item) => item.category === '하의'),
+    아우터: clothesList.filter((item) => item.category === '아우터'),
+    신발: clothesList.filter((item) => item.category === '신발'),
+    악세사리: clothesList.filter((item) => item.category === '악세사리'),
+    기타: clothesList.filter((item) => item.category === '기타'),
+  }), [clothesList]);
 
   const toggleCloth = (id: string) => {
     setSelectedClothes((prev) =>
@@ -148,6 +145,7 @@ export default function HistoryCreateScreen() {
     </View>
   );
 
+  // ✅ 기록 저장 (인터셉터 적용)
   const handleSave = async () => {
     if (isUsingMockData) {
       Alert.alert('안내', '현재는 더미 데이터 상태라 저장이 불가능합니다. 다시 로그인해주세요.');
@@ -172,6 +170,7 @@ export default function HistoryCreateScreen() {
         memo: memo.trim() || null,
       }));
 
+      // ✅ fetch 대신 api.post 사용
       await api.post('/history', payload);
 
       Alert.alert('저장 완료', '착용 기록이 저장되었습니다.', [
@@ -191,7 +190,7 @@ export default function HistoryCreateScreen() {
       <SafeAreaView style={styles.container}>
         {loadingClothes ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#111" />
+            <ActivityIndicator size="large" />
             <Text style={styles.loadingText}>옷 목록 불러오는 중...</Text>
           </View>
         ) : (
@@ -206,14 +205,12 @@ export default function HistoryCreateScreen() {
               {isUsingMockData && (
                 <Text style={styles.mockWarningText}>⚠️ 서버 연결 안됨 (더미 데이터 표시 중)</Text>
               )}
-              
-              {groupedClothes.length > 0 ? (
-                groupedClothes.map((group) => (
-                  <View key={group.title} style={styles.categoryBlock}>
-                    {/* ✅ 대괄호([]) 문자를 제거하고 제목 텍스트만 깔끔하게 노출 */}
-                    <Text style={styles.subTitle}>{group.title}</Text>
+              {Object.entries(groupedClothes).map(([category, items]) => (
+                items.length > 0 && (
+                  <View key={category} style={styles.categoryBlock}>
+                    <Text style={styles.subTitle}>{category}</Text>
                     <View style={styles.clothRow}>
-                      {group.items.map((item) => (
+                      {items.map((item) => (
                         <Pressable
                           key={item.id}
                           style={[styles.clothBox, selectedClothes.includes(item.id) && styles.clothBoxSelected]}
@@ -226,10 +223,8 @@ export default function HistoryCreateScreen() {
                       ))}
                     </View>
                   </View>
-                ))
-              ) : (
-                !isUsingMockData && <Text style={styles.emptyText}>선택할 수 있는 옷이 없습니다.</Text>
-              )}
+                )
+              ))}
             </View>
 
             <View style={styles.section}>
@@ -272,24 +267,25 @@ export default function HistoryCreateScreen() {
   );
 }
 
+// 스타일 시트는 기존 것 유지
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 16, paddingBottom: 40 },
   section: { marginBottom: 20 },
-  categoryBlock: { marginTop: 12 },
+  categoryBlock: { marginTop: 10 },
   title: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  subTitle: { fontSize: 14, fontWeight: '600', color: '#555', marginBottom: 8 },
+  subTitle: { fontSize: 13, color: '#666', marginBottom: 6 },
   value: { fontSize: 15, color: '#111' },
   clothRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   clothBox: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#f1f1f1' },
   clothBoxSelected: { backgroundColor: '#111' },
   clothName: { color: '#333', fontSize: 13 },
-  clothNameSelected: { color: '#fff', fontWeight: '600' },
+  clothNameSelected: { color: '#fff' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f1f1f1' },
   chipSelected: { backgroundColor: '#111' },
   chipText: { fontSize: 13, color: '#333' },
-  chipTextSelected: { color: '#fff', fontWeight: '600' },
+  chipTextSelected: { color: '#fff' },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, minHeight: 80, textAlignVertical: 'top' },
   saveButton: { marginTop: 10, backgroundColor: '#111', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.6 },
@@ -297,5 +293,4 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   loadingText: { marginTop: 12, fontSize: 14, color: '#777' },
   mockWarningText: { fontSize: 13, color: '#c0392b', marginBottom: 8, lineHeight: 18 },
-  emptyText: { fontSize: 14, color: '#888', marginTop: 4 },
 });

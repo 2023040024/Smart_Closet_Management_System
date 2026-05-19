@@ -1,5 +1,5 @@
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'; // ✅ useFocusEffect 추가
+import { useCallback, useMemo, useState } from 'react'; // ✅ useCallback 추가
 import {
   ActivityIndicator,
   Image,
@@ -10,43 +10,37 @@ import {
   View,
 } from 'react-native';
 
+// ✅ api 인터셉터 가져오기
 import api from './_api';
 
+// 이미지 경로 처리를 위해 베이스 URL은 남겨둡니다.
 const API_BASE_URL = 'http://192.168.1.122:8000';
 
-// ✅ 빨간 줄 에러를 해결하기 위해 최상위에 situation, tpo 추가
 type DetailApiItem = {
-  id?: number;
   clothes_id?: number;
+  id?: number;
   name?: string;
-  image?: string | null;
-  image_url?: string | null;
-  purchase_price?: number | null;
-  price?: number | null;
-  last_worn_date?: string | null;
-  situation?: string | null; 
-  tpo?: string | null;
-  tags?: {
-    category?: string;
-    color?: string;
-    season?: string;
-    tone?: string | null;
-    style?: string;
-    mood?: string | null;
-    material?: string | null;
-    thickness?: string | null;
-    point?: string | null;
-    situation?: string | null;
-    tpo?: string | null;
-    top_fit?: string | null;
-    bottom_fit?: string | null;
-    topFit?: string | null;
-    bottomFit?: string | null;
-  };
   category?: string;
   color?: string;
   season?: string;
+  tone?: string | null;
   style?: string;
+  mood?: string | null;
+  material?: string | null;
+  thickness?: string | null;
+  point?: string | null;
+  tpo?: string | null;
+  situation?: string | null;
+  fit?: string | null;
+  top_fit?: string | null;
+  bottom_fit?: string | null;
+  image?: string | null;
+  image_url?: string | null;
+  status?: string | null;
+  wear_count?: number | null;
+  last_worn_date?: string | null;
+  purchase_price?: number | null;
+  created_at?: string | null;
 };
 
 function resolveImageUri(image?: string | null) {
@@ -64,6 +58,7 @@ export default function DetailScreen() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // ✅ 1. 데이터를 불러오는 로직을 useCallback으로 감싸 재사용 가능하게 만듭니다.
   const fetchDetail = useCallback(async () => {
     if (!id) {
       setErrorMessage('옷 ID가 없습니다.');
@@ -79,8 +74,8 @@ export default function DetailScreen() {
       const data: DetailApiItem[] = response.data;
 
       const foundItem =
-        data.find((clothesItem) => String(clothesItem.id) === String(id)) ??
         data.find((clothesItem) => String(clothesItem.clothes_id) === String(id)) ??
+        data.find((clothesItem) => String(clothesItem.id) === String(id)) ??
         null;
 
       if (!foundItem) {
@@ -103,6 +98,7 @@ export default function DetailScreen() {
     }
   }, [id]);
 
+  // ✅ 2. useFocusEffect를 사용하여 화면이 보일 때마다 fetchDetail을 실행합니다.
   useFocusEffect(
     useCallback(() => {
       fetchDetail();
@@ -112,29 +108,26 @@ export default function DetailScreen() {
   const visibleTags = useMemo(() => {
     if (!item) return [];
 
-    const s = item.tags || {};
-    const fitValue = s.top_fit ?? s.topFit ?? s.bottom_fit ?? s.bottomFit ?? '';
+    const fitValue = item.fit ?? item.top_fit ?? item.bottom_fit ?? '';
+    const tpoValue = item.tpo ?? item.situation ?? '';
     
-    // ✅ 에러 없이 안전하게 호출 가능
-    const tpoValue = s.situation ?? s.tpo ?? item.situation ?? item.tpo ?? '';
-    
-    const rawPrice = item.price ?? item.purchase_price;
-    const priceValue = (rawPrice !== null && rawPrice !== undefined)
+    const rawPrice = (item as any).price ?? item.purchase_price;
+    const priceValue = rawPrice != null && rawPrice !== ''
       ? `${Number(rawPrice).toLocaleString()}원` 
       : '';
 
     return [
       { label: '이름', value: item.name },
-      { label: '카테고리', value: s.category ?? item.category },
-      { label: '색상', value: s.color ?? item.color },
-      { label: '계절', value: s.season ?? item.season },
-      { label: '톤', value: s.tone },
-      { label: '스타일', value: s.style ?? item.style },
-      { label: '분위기', value: s.mood },
+      { label: '카테고리', value: item.category },
+      { label: '색상', value: item.color },
+      { label: '계절', value: item.season },
+      { label: '톤', value: item.tone },
+      { label: '스타일', value: item.style },
+      { label: '분위기', value: item.mood },
       { label: '핏', value: fitValue },
-      { label: '소재', value: s.material },
-      { label: '두께', value: s.thickness },
-      { label: '포인트', value: s.point },
+      { label: '소재', value: item.material },
+      { label: '두께', value: item.thickness },
+      { label: '포인트', value: item.point },
       { label: 'TPO', value: tpoValue },
       { label: '구매가', value: priceValue },
       { label: '마지막 착용일', value: item.last_worn_date },
@@ -146,7 +139,7 @@ export default function DetailScreen() {
     );
   }, [item]);
 
-  if (loading && !item) {
+  if (loading && !item) { // 이미 데이터가 있는 경우 로딩 인디케이터를 띄우지 않아 깜빡임을 방지할 수 있습니다.
     return (
       <View style={styles.emptyContainer}>
         <ActivityIndicator size="large" />
@@ -163,7 +156,7 @@ export default function DetailScreen() {
     );
   }
 
-  const imageUri = resolveImageUri(item.image ?? item.image_url);
+  const imageUri = resolveImageUri(item.image_url ?? item.image);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -196,7 +189,7 @@ export default function DetailScreen() {
         style={styles.button}
         onPress={() => router.push({ 
           pathname: '/edit', 
-          params: { id: String(item?.id ?? item?.clothes_id) } 
+          params: { id: String(item?.clothes_id ?? item?.id) } 
         })}
       >
         <Text style={styles.buttonText}>수정하기</Text>
