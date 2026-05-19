@@ -86,14 +86,21 @@ def get_cost_efficiency(
 
     validated_clothes = [ClothesResponse.model_validate(c) for c in clothes]
     sorted_clothes = sorted(validated_clothes, key=lambda x: x.cost_per_wear)
-    worst_items = sorted_clothes[-3:] if len(sorted_clothes) > 3 else []
+
+    total_items = len(sorted_clothes)
+    if total_items >= 6:
+        best_items = sorted_clothes[:3]
+        worst_items = sorted_clothes[-3:]
+    else:
+        best_items = sorted_clothes[:3]
+        worst_items = []
 
     return {
         "message": "가성비 분석 완료",
-        "best_efficiency": sorted_clothes[:3], 
+        "best_efficiency": best_items, 
         "worst_efficiency": worst_items, 
         "ai_summary": { 
-            "most_efficient_item": sorted_clothes[0].name if sorted_clothes else None,
+            "most_efficient_item": best_items[0].name if best_items else None, # 💡 변수 적용
             "total_investment_on_worst": sum(c.price for c in worst_items)
         }
     }
