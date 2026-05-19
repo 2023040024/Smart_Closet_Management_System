@@ -25,9 +25,8 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
-    Keyboard.dismiss(); // 가입 버튼 누르면 키보드 내리기
+    Keyboard.dismiss();
 
-    // 유효성 검사
     if (!email.trim() || !password.trim()) {
       Alert.alert('알림', '모든 정보를 입력해주세요.');
       return;
@@ -39,25 +38,18 @@ export default function SignupScreen() {
 
     try {
       setLoading(true);
-
-      // 백엔드 회원가입 API 호출
-      const response = await api.post('/auth/signup', {
-        email,
-        password,
-      });
-
-      // 가입 성공 시 넘어오는 토큰 저장
+      const response = await api.post('/auth/signup', { email, password });
       const token = response.data.access_token;
 
       if (token) {
         await AsyncStorage.setItem('userToken', token);
-        Alert.alert('성공', '회원가입 및 로그인이 완료되었습니다!', [
+        Alert.alert('환영합니다', '회원가입 및 시스템 등록이 완료되었습니다!', [
           { text: '확인', onPress: () => router.replace('/') }
         ]);
       }
     } catch (error: any) {
       console.error('회원가입 에러:', error);
-      Alert.alert('실패', '회원가입 중 오류가 발생했습니다. 이미 존재하는 계정일 수 있습니다.');
+      Alert.alert('가입 실패', '이미 존재하는 계정이거나 서버 오류입니다.');
     } finally {
       setLoading(false);
     }
@@ -71,18 +63,26 @@ export default function SignupScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={styles.content}>
-            <View style={styles.header}>
-              <Text style={styles.title}>회원가입</Text>
-              <Text style={styles.subtitle}>새로운 계정을 만들어보세요 📝</Text>
+            
+            {/* ✨ 브랜드 히어로 섹션 (Login 화면과 통일) */}
+            <View style={styles.heroSection}>
+              <Text style={styles.projectType}>Smart Closet Management System</Text>
+              <View style={styles.brandRow}>
+                <Text style={styles.brandName}>Re</Text>
+                <Text style={styles.brandColon}>:</Text>
+                <Text style={styles.brandAccent}>fit</Text>
+              </View>
+              <View style={styles.decoLine} />
+              <Text style={styles.heroSubtitle}>새로운 사용자를 위한 시스템 계정 등록</Text>
             </View>
 
-            <View style={styles.form}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>이메일</Text>
+            {/* 회원가입 폼 섹션 */}
+            <View style={styles.formCard}>
+              <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="example@email.com"
-                  placeholderTextColor="#9CA3AF"
+                  placeholder="Email Address"
+                  placeholderTextColor="#94a3b8"
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
@@ -90,49 +90,55 @@ export default function SignupScreen() {
                 />
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>비밀번호</Text>
+              <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="비밀번호를 입력해주세요"
-                  placeholderTextColor="#9CA3AF"
+                  placeholder="Password"
+                  placeholderTextColor="#94a3b8"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
                 />
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>비밀번호 확인</Text>
+              <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="비밀번호를 다시 한 번 입력해주세요"
-                  placeholderTextColor="#9CA3AF"
+                  placeholder="Confirm Password"
+                  placeholderTextColor="#94a3b8"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
                 />
               </View>
 
-              <TouchableOpacity 
-                style={[styles.button, loading && styles.buttonDisabled]} 
-                onPress={handleSignup} 
+              <TouchableOpacity
+                style={[styles.signupButton, loading && styles.signupButtonDisabled]}
+                onPress={handleSignup}
                 disabled={loading}
                 activeOpacity={0.8}
               >
                 {loading ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <Text style={styles.buttonText}>가입하기</Text>
+                  <Text style={styles.signupButtonText}>계정 생성</Text>
                 )}
               </TouchableOpacity>
 
-              <View style={styles.loginWrap}>
-                <Text style={styles.loginText}>이미 계정이 있으신가요?</Text>
-                <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
-                  <Text style={styles.loginTextBold}>로그인하기</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity 
+                style={styles.loginLink} 
+                onPress={() => router.back()}
+                activeOpacity={0.6}
+              >
+                <Text style={styles.loginLinkText}>
+                  이미 계정이 있으신가요? <Text style={styles.loginLinkTextBold}>로그인으로 돌아가기</Text>
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 푸터 섹션 */}
+            <View style={styles.footer}>
+                <Text style={styles.footerText}>Secure System Registration</Text>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -144,92 +150,124 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0f172a', // PPT 배경 색상
   },
   container: { 
     flex: 1, 
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 32,
     justifyContent: 'center',
-    paddingBottom: 40,
   },
-  header: { 
-    marginBottom: 40,
+  heroSection: {
+    marginBottom: 48, // 입력창이 3개라 로그인보다는 조금 줄임
   },
-  title: { 
-    fontSize: 32, 
-    fontWeight: '800', 
-    color: '#111827', 
-    marginBottom: 10,
-    letterSpacing: -0.5,
+  projectType: {
+    fontSize: 14,
+    color: '#38bdf8',
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
   },
-  subtitle: { 
-    fontSize: 16, 
-    color: '#6B7280',
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  brandName: {
+    fontSize: 56, // 입력창 공간 확보를 위해 약간 줄임
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -1,
+  },
+  brandColon: {
+    fontSize: 56,
+    fontWeight: '800',
+    color: '#38bdf8',
+  },
+  brandAccent: {
+    fontSize: 56,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -1,
+  },
+  decoLine: {
+    width: 60,
+    height: 4,
+    backgroundColor: '#38bdf8',
+    marginTop: 12,
+    borderRadius: 2,
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    color: '#94a3b8',
+    marginTop: 16,
     fontWeight: '500',
   },
-  form: { 
-    gap: 16,
+  formCard: {
+    gap: 14,
   },
-  inputGroup: {
-    gap: 8,
+  inputContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
   },
-  label: { 
-    fontSize: 14, 
-    fontWeight: '600', 
-    color: '#374151', 
-    marginLeft: 4,
+  input: {
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    fontSize: 16,
+    color: '#FFFFFF',
   },
-  input: { 
-    backgroundColor: '#F9FAFB', 
-    borderWidth: 1, 
-    borderColor: '#E5E7EB', 
-    borderRadius: 14, 
-    paddingHorizontal: 16,
-    paddingVertical: 18, 
-    fontSize: 16, 
-    color: '#111827',
-  },
-  button: { 
-    backgroundColor: '#111827', 
-    borderRadius: 14, 
-    paddingVertical: 18, 
-    alignItems: 'center', 
-    marginTop: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  buttonDisabled: { 
-    backgroundColor: '#9CA3AF',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  buttonText: { 
-    color: '#FFFFFF', 
-    fontSize: 16, 
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  loginWrap: {
-    flexDirection: 'row',
+  signupButton: {
+    backgroundColor: '#38bdf8',
+    borderRadius: 16,
+    paddingVertical: 20,
     alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 12,
+    shadowColor: '#38bdf8',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  signupButtonDisabled: {
+    backgroundColor: '#1e293b',
+    shadowOpacity: 0,
+  },
+  signupButtonText: {
+    color: '#0f172a',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  loginLink: {
     marginTop: 20,
-    gap: 8,
+    alignItems: 'center',
   },
-  loginText: {
+  loginLinkText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#64748b',
   },
-  loginTextBold: {
-    fontSize: 14,
+  loginLinkTextBold: {
+    color: '#38bdf8',
     fontWeight: '700',
-    color: '#111827',
     textDecorationLine: 'underline',
   },
+  footer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  }
 });
