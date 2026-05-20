@@ -14,13 +14,13 @@ import {
 
 import api from './_api';
 
-// ... (타입 정의 및 헬퍼 함수는 기존과 동일하므로 생략 없이 그대로 유지해줘)
 type ClothingItem = { id: string; name: string; category: string; color?: string; };
 type ClothesApiItem = { clothes_id?: number; id?: number; name?: string; category?: string; color?: string; tags?: { category?: string; color?: string; [key: string]: any; }; };
 
 const tpoOptions = ['데일리', '비즈니스', '면접', '결혼식', '장례식', '운동', '데이트', '모임', '여행'];
-const fitOptions = ['잘맞음', '보통', '안맞음'];
-const temperatureOptions = ['추움', '적당함', '더움'];
+const tpoSuitabilityOptions = ['잘 어울림', '보통', '안 어울림']; 
+// ✅ 백엔드 Enum 스펙에 맞춰 '적당' -> '적당함'으로 수정
+const temperatureOptions = ['추움', '적당함', '더움']; 
 
 function formatToday() { return new Date().toISOString().slice(0, 10); }
 
@@ -35,14 +35,13 @@ function normalizeCategory(category?: string) {
 }
 
 export default function HistoryCreateScreen() {
-  // ✅ 파라미터 받아오기 (수정 모드 판별용)
   const params = useLocalSearchParams<{
     editMode?: string;
     editId?: string;
     editDate?: string;
     editMemo?: string;
     editTpo?: string;
-    editFit?: string;
+    editTpoSuitability?: string; 
     editTemperature?: string;
     editClothes?: string;
   }>();
@@ -53,7 +52,7 @@ export default function HistoryCreateScreen() {
   const [clothesList, setClothesList] = useState<ClothingItem[]>([]);
   const [selectedClothes, setSelectedClothes] = useState<string[]>([]);
   const [tpo, setTpo] = useState('');
-  const [fit, setFit] = useState('');
+  const [tpoSuitability, setTpoSuitability] = useState(''); 
   const [temperature, setTemperature] = useState('');
   const [memo, setMemo] = useState('');
 
@@ -61,13 +60,17 @@ export default function HistoryCreateScreen() {
   const [saving, setSaving] = useState(false);
   const [isUsingMockData, setIsUsingMockData] = useState(false);
 
-  // ✅ 수정 모드일 때 넘어온 데이터로 폼 미리 채우기 (Prefill)
   useEffect(() => {
     if (isEditMode) {
       if (params.editMemo) setMemo(params.editMemo);
       if (params.editTpo) setTpo(params.editTpo);
-      if (params.editFit) setFit(params.editFit);
-      if (params.editTemperature) setTemperature(params.editTemperature);
+      if (params.editTpoSuitability) setTpoSuitability(params.editTpoSuitability); 
+      
+      // ✅ 기존 데이터가 '적당'일 경우 '적당함'으로 보정해서 칩 맵칭 보장
+      if (params.editTemperature) {
+        setTemperature(params.editTemperature === '적당' ? '적당함' : params.editTemperature);
+      }
+      
       if (params.editClothes) {
         try {
           const parsedClothes: ClothingItem[] = JSON.parse(params.editClothes);
@@ -77,11 +80,10 @@ export default function HistoryCreateScreen() {
         }
       }
     }
-  }, [isEditMode, params.editMemo, params.editTpo, params.editFit, params.editTemperature, params.editClothes]);
+  }, [isEditMode, params.editMemo, params.editTpo, params.editTpoSuitability, params.editTemperature, params.editClothes]);
 
   useEffect(() => {
     const fetchClothes = async () => {
-      // ... (이 부분은 기존 fetchClothes 로직과 100% 동일하게 유지)
       try {
         setLoadingClothes(true);
         const response = await api.get('/clothes');
@@ -161,26 +163,46 @@ export default function HistoryCreateScreen() {
 
     try {
       setSaving(true);
-      const payload = selectedClothes.map((clothesId) => ({
-        clothes_id: Number(clothesId),
-        worn_date: displayDate, // ✅ 수정 모드면 기존 날짜, 아니면 오늘 날짜
-        tpo: tpo || null,
-        style: null,
-        mood: null,
-        feedback_temperature: temperature || null,
-        feedback_tpo: fit || null,
-        memo: memo.trim() || null,
-      }));
 
-      // ✅ 생성/수정 분기 처리
+      let targetDate = typeof displayDate === 'string' ? displayDate.trim() : String(displayDate);
+      if (targetDate.includes('T')) {
+        targetDate = targetDate.split('T')[0];
+      }
+      targetDate = targetDate.slice(0, 10);
+
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(targetDate)) {
+        Alert.alert('오류', `날짜 형식이 유효하지 않습니다: ${targetDate}`);
+        setSaving(false);
+        return;
+      }
+
+      const payload = selectedClothes.map((clothesId) => {
+        const numericId = Number(clothesId);
+        if (isNaN(numericId)) {
+          throw new Error(`유효하지 않은 옷 ID가 포함되어 있습니다: ${clothesId}`);
+        }
+
+        return {
+          clothes_id: numericId,
+          worn_date: targetDate, 
+          tpo: tpo && tpo.trim() !== "" ? tpo.trim() : null,
+          style: null,
+          mood: null,
+          feedback_temperature: temperature && temperature.trim() !== "" ? temperature.trim() : null,
+          feedback_tpo: tpoSuitability && tpoSuitability.trim() !== "" ? tpoSuitability.trim() : null,
+          memo: memo && memo.trim() !== "" ? memo.trim() : null,
+        };
+      });
+
       if (isEditMode) {
-  // ✅ 1. 주소를 날짜 기반(/history/date/2026-05-17)으로 변경
-  // ✅ 2. payload[0]이 아니라 통째로 배열(payload)을 보냄
-        await api.put(`/history/date/${displayDate}`, payload); 
+        // PUT 요청은 명세서 및 라우터 구조상 리스트 형태 고정 전송
+        await api.put(`/history/date/${targetDate}`, payload); 
         Alert.alert('수정 완료', '착용 기록이 수정되었습니다.', [
           { text: '확인', onPress: () => router.replace('/(tabs)/history') },
         ]);
       } else {
+        // ✅ POST /history 전송 시 Union 검증기 우회를 위해 리스트 래핑 규격 안정화 보장
         await api.post('/history', payload);
         Alert.alert('저장 완료', '착용 기록이 저장되었습니다.', [
           { text: '확인', onPress: () => router.replace('/(tabs)/history') },
@@ -188,7 +210,11 @@ export default function HistoryCreateScreen() {
       }
     } catch (error: any) {
       console.error('착용 기록 저장 실패:', error);
-      Alert.alert('저장 실패', error.response?.data?.detail || '서버 오류가 발생했습니다.');
+      if (error.response && error.response.data) {
+        Alert.alert('저장 실패 (422)', JSON.stringify(error.response.data.detail));
+      } else {
+        Alert.alert('저장 실패', error.message || '서버 오류가 발생했습니다.');
+      }
     } finally {
       setSaving(false);
     }
@@ -196,7 +222,6 @@ export default function HistoryCreateScreen() {
 
   return (
     <>
-      {/* ✅ 타이틀 동적 변경 */}
       <Stack.Screen options={{ title: isEditMode ? '착용 기록 수정' : '착용 기록 추가' }} />
       <SafeAreaView style={styles.container}>
         {loadingClothes ? (
@@ -211,7 +236,6 @@ export default function HistoryCreateScreen() {
               <Text style={styles.value}>{displayDate}</Text>
             </View>
 
-            {/* ... 나머지 JSX는 기존과 완벽하게 동일하므로 그대로 유지 ... */}
             <View style={styles.section}>
               <Text style={styles.title}>오늘 입은 옷</Text>
               {isUsingMockData && <Text style={styles.mockWarningText}>⚠️ 서버 연결 안됨 (더미 데이터 표시 중)</Text>}
@@ -238,8 +262,8 @@ export default function HistoryCreateScreen() {
               )}
             </View>
 
-            <View style={styles.section}><Text style={styles.title}>TPO</Text>{renderChips(tpoOptions, tpo, setTpo)}</View>
-            <View style={styles.section}><Text style={styles.title}>핏</Text>{renderChips(fitOptions, fit, setFit)}</View>
+            <View style={styles.section}><Text style={styles.title}>TPO (상황)</Text>{renderChips(tpoOptions, tpo, setTpo)}</View>
+            <View style={styles.section}><Text style={styles.title}>TPO 적합도</Text>{renderChips(tpoSuitabilityOptions, tpoSuitability, setTpoSuitability)}</View>
             <View style={styles.section}><Text style={styles.title}>체감온도</Text>{renderChips(temperatureOptions, temperature, setTemperature)}</View>
             <View style={styles.section}>
               <Text style={styles.title}>메모</Text>
@@ -247,7 +271,6 @@ export default function HistoryCreateScreen() {
             </View>
 
             <Pressable style={[styles.saveButton, (saving || isUsingMockData) && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving || isUsingMockData}>
-              {/* ✅ 버튼 텍스트 동적 변경 */}
               <Text style={styles.saveText}>{saving ? '저장 중...' : (isEditMode ? '수정 완료' : '저장하기')}</Text>
             </Pressable>
           </ScrollView>
@@ -257,7 +280,6 @@ export default function HistoryCreateScreen() {
   );
 }
 
-// ... styles 부분은 기존과 완벽하게 동일하게 유지
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 16, paddingBottom: 40 },
