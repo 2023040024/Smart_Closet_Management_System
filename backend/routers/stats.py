@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func  
-from typing import List
 from datetime import datetime, timedelta, date 
 from database import get_db
 from models import Clothes, SeasonEnum, User
@@ -13,7 +12,7 @@ router = APIRouter(prefix="/stats", tags=["통계 및 분석"])
 
 
 # 미착용 옷/ 재활용 옷 우선순위 추출 API
-@router.get("/unworn", response_model=List[ClothesResponse])
+@router.get("/unworn", response_model=list[ClothesResponse])
 def get_unworn_clothes(
     current_season: SeasonEnum, 
     days: int = 30, 
@@ -37,7 +36,7 @@ def get_unworn_clothes(
     return unworn_clothes
 
 # 착용 빈도 통계 API
-@router.get("/frequency", response_model=List[ClothesResponse])
+@router.get("/frequency", response_model=list[ClothesResponse])
 def get_top_frequency(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -49,7 +48,7 @@ def get_top_frequency(
     
     return top_clothes
 
-@router.get("/dispose", response_model=List[ClothesResponse])
+@router.get("/dispose", response_model=list[ClothesResponse])
 def get_disposal_recommendation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -73,7 +72,7 @@ def get_disposal_recommendation(
     return disposal_targets
 
 # 가성비 계산 API
-@router.get("/cost-per-wear")
+@router.get("/cost-per-wear", response_model=list[ClothesResponse])
 def get_cost_efficiency(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
