@@ -26,47 +26,47 @@ def create_wear_history(history_data: list[WearHistoryCreate],
 
     created_histories = []
     try:
-        clothes_ids = [data.clothes_id for data in history_data_list]
+        clothes_ids = [data.clothes_id for data in history_data]
         clothes_db = db.query(Clothes).filter(
             Clothes.clothes_id.in_(clothes_ids),
             Clothes.user_id == current_user.id
         ).all()
         clothes_map = {c.clothes_id: c for c in clothes_db}
 
-        worn_dates = [data.worn_date for data in history_data_list]
+        worn_dates = [data.worn_date for data in history_data]
         existing_records_db = db.query(WearHistory).filter(
             WearHistory.clothes_id.in_(clothes_ids),
             WearHistory.worn_date.in_(worn_dates)
         ).all()
         existing_records_set = {(r.clothes_id, r.worn_date) for r in existing_records_db}
 
-        # [Phase 1] 데이터 무결성 사전 검증 (Fail-Fast: 하나라도 에러가 있으면 여기서 즉시 차단)
-        for history_data in history_data_list:
-            cloth = clothes_map.get(history_data.clothes_id)
+        # [Phase 1] 데이터 무결성 사전 검증
+        for hd in history_data:
+            cloth = clothes_map.get(hd.clothes_id)
             if not cloth:
-                raise HTTPException(status_code=404, detail=f"해당 ID({history_data.clothes_id})의 옷을 찾을 수 없습니다.")
+                raise HTTPException(status_code=404, detail=f"해당 ID({hd.clothes_id})의 옷을 찾을 수 없습니다.")
             
-            if (history_data.clothes_id, history_data.worn_date) in existing_records_set:
-                raise HTTPException(status_code=400, detail=f"ID({history_data.clothes_id}) 옷은 오늘 이미 기록되었습니다.")
+            if (hd.clothes_id, hd.worn_date) in existing_records_set:
+                raise HTTPException(status_code=400, detail=f"ID({hd.clothes_id}) 옷은 오늘 이미 기록되었습니다.")
 
-        # [Phase 2] 안전한 비즈니스 로직 연산 및 DB 적재 (검증을 100% 통과한 데이터만 실행됨)
-        for history_data in history_data_list:
-            cloth = clothes_map[history_data.clothes_id]
+        # [Phase 2] 안전한 비즈니스 로직 연산 및 DB 적재
+        for hd in history_data:
+            cloth = clothes_map[hd.clothes_id]
             new_history = WearHistory(
                 user_id=current_user.id,
-                clothes_id=history_data.clothes_id,
-                worn_date=history_data.worn_date,
-                tpo=history_data.tpo,
-                style=history_data.style,
-                mood=history_data.mood,
-                feedback_temperature=history_data.feedback_temperature,
-                feedback_tpo=history_data.feedback_tpo,
-                memo=history_data.memo
+                clothes_id=hd.clothes_id,
+                worn_date=hd.worn_date,
+                tpo=hd.tpo,
+                style=hd.style,
+                mood=hd.mood,
+                feedback_temperature=hd.feedback_temperature,
+                feedback_tpo=hd.feedback_tpo,
+                memo=hd.memo
             )
             
             cloth.wear_count = (cloth.wear_count or 0) + 1
-            if cloth.last_worn_date is None or history_data.worn_date > cloth.last_worn_date:
-                cloth.last_worn_date = history_data.worn_date
+            if cloth.last_worn_date is None or hd.worn_date > cloth.last_worn_date:
+                cloth.last_worn_date = hd.worn_date
             
             db.add(new_history)
             created_histories.append(new_history)
@@ -74,7 +74,9 @@ def create_wear_history(history_data: list[WearHistoryCreate],
         db.commit()
         for h in created_histories:
             db.refresh(h)
-        return created_histories[0] if is_single else created_histories
+            
+        # 단일/다중 상관없이 항상 리스트 형태로만 반환
+        return created_histories
     
     except Exception as e: 
         db.rollback()
