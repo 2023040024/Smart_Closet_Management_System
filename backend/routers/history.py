@@ -29,11 +29,18 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
 
     created_histories = []
     try:
+        # Clothes 일괄 조회 (Bulk Select)
+        clothes_ids = [data.clothes_id for data in history_data_list]
+        clothes_db = db.query(Clothes).filter(
+            Clothes.clothes_id.in_(clothes_ids),
+            Clothes.user_id == current_user.id
+        ).all()
+        clothes_map = {c.clothes_id: c for c in clothes_db}
+
         for history_data in history_data_list:
-            cloth = db.query(Clothes).filter(
-                Clothes.clothes_id == history_data.clothes_id,
-                Clothes.user_id == current_user.id
-            ).first()
+            # 기존 DB 조회를 메모리 맵 조회로 대체
+            cloth = clothes_map.get(history_data.clothes_id)
+
             if not cloth:
                 raise HTTPException(status_code=404, detail=f"해당 ID({history_data.clothes_id})의 옷을 찾을 수 없습니다.")
             existing_record = db.query(WearHistory).filter(
