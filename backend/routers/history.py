@@ -9,8 +9,8 @@ from .auth import get_current_user
 
 router = APIRouter(prefix="/history", tags=["착용 기록"])
 
-@router.post("", response_model=Union[WearHistoryResponse, List[WearHistoryResponse]], status_code=status.HTTP_201_CREATED)
-def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryCreate]],
+@router.post("", response_model=list[WearHistoryResponse], status_code=status.HTTP_201_CREATED)
+def create_wear_history(history_data: list[WearHistoryCreate],
                         db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)
                         ):
