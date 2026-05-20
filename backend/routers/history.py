@@ -29,7 +29,6 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
 
     created_histories = []
     try:
-        # Clothes 일괄 조회 (Bulk Select)
         clothes_ids = [data.clothes_id for data in history_data_list]
         clothes_db = db.query(Clothes).filter(
             Clothes.clothes_id.in_(clothes_ids),
@@ -37,17 +36,20 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
         ).all()
         clothes_map = {c.clothes_id: c for c in clothes_db}
 
-        for history_data in history_data_list:
-            # 기존 DB 조회를 메모리 맵 조회로 대체
-            cloth = clothes_map.get(history_data.clothes_id)
+        worn_dates = [data.worn_date for data in history_data_list]
+        existing_records_db = db.query(WearHistory).filter(
+            WearHistory.clothes_id.in_(clothes_ids),
+            WearHistory.worn_date.in_(worn_dates)
+        ).all()
+        existing_records_set = {(r.clothes_id, r.worn_date) for r in existing_records_db}
 
+        for history_data in history_data_list:
+            # 메모리 맵(clothes_map)에서 옷 정보 꺼내기
+            cloth = clothes_map.get(history_data.clothes_id)
             if not cloth:
                 raise HTTPException(status_code=404, detail=f"해당 ID({history_data.clothes_id})의 옷을 찾을 수 없습니다.")
-            existing_record = db.query(WearHistory).filter(
-                WearHistory.clothes_id == history_data.clothes_id,
-                WearHistory.worn_date == history_data.worn_date
-            ).first()
-            if existing_record:
+            
+            if (history_data.clothes_id, history_data.worn_date) in existing_records_set:
                 raise HTTPException(status_code=400, detail=f"ID({history_data.clothes_id}) 옷은 오늘 이미 기록되었습니다.")
 
             new_history = WearHistory(
