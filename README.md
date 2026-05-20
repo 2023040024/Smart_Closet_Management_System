@@ -32,6 +32,7 @@ pip 24+
 backend 폴더에 .env 파일 생성 후 아래 내용 입력
 ```
 GEMINI_API_KEY=발급받은키입력
+WEATHER_SERVICE_KEY=발급받은키입력
 DATABASE_URL=sqlite:///./closet.db
 SECRET_KEY=mysecretkey123
 ```
