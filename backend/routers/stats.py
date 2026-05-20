@@ -147,8 +147,4 @@ def get_closet_overload(
         for key, items in grouped_data.items()
     ]
 
-    return {
-        "message": f"과다 보유 리포트: {len(detailed_data)}건 발견",
-        "overload_details": detailed_data,
-        "ai_insight": f"사용자는 현재 {len(detailed_data)}개의 스타일에서 중복 구매 패턴을 보입니다."
-    }
+    return detailed_data
