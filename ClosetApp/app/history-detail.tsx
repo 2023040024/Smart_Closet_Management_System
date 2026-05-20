@@ -12,7 +12,7 @@ export default function HistoryDetailScreen() {
   const params = useLocalSearchParams<{
     id?: string;
     date?: string;
-    style?: string;
+    tpoSuitability?: string; // ✅ 파라미터명 변경 적용
     mood?: string;
     tpo?: string;
     memo?: string;
@@ -23,7 +23,8 @@ export default function HistoryDetailScreen() {
     ? JSON.parse(params.clothes)
     : [];
 
-  const feedbackTags = [params.style, params.mood, params.tpo].filter(Boolean);
+  // ✅ 태그 배열에 새로 바뀐 이름(tpoSuitability) 넣기
+  const feedbackTags = [params.tpo, params.tpoSuitability, params.mood].filter(Boolean);
 
   return (
     <>

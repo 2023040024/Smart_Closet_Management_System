@@ -24,7 +24,7 @@ type WearHistoryItem = {
   id: string;
   date: string;
   clothesIds: string[];
-  style?: string;
+  tpoSuitability?: string; // ✅ style -> tpoSuitability 로 명확히 변경
   mood?: string;
   tpo?: string;
   memo?: string;
@@ -59,7 +59,7 @@ type GroupedWearHistoryItem = {
   date: string;
   clothesIds: string[];
   historyIds: string[];
-  style?: string;
+  tpoSuitability?: string; // ✅ 여기도 변경
   mood?: string;
   tpo?: string;
   memo?: string;
@@ -72,7 +72,6 @@ function formatDate(dateString?: string) {
   return dateString.slice(0, 10);
 }
 
-// API 데이터를 UI 데이터 구조로 변환
 function mapApiHistoryToUi(item: HistoryApiItem): WearHistoryItem {
   const clothesId =
     item.clothes?.clothes_id?.toString() ??
@@ -83,8 +82,9 @@ function mapApiHistoryToUi(item: HistoryApiItem): WearHistoryItem {
     id: item.history_id.toString(),
     date: formatDate(item.worn_date),
     clothesIds: clothesId ? [clothesId] : [],
-    style: item.style ?? item.feedback_tpo ?? '',
-    mood: item.mood ?? item.feedback_temperature ?? '',
+    // ✅ 백엔드의 피드백 값이 들어오는 우선순위 설정
+    tpoSuitability: item.feedback_tpo ?? item.style ?? '', 
+    mood: item.feedback_temperature ?? item.mood ?? '',
     tpo: item.tpo ?? '',
     memo: item.memo ?? '',
   };
@@ -106,7 +106,6 @@ export default function HistoryScreen() {
       .filter(Boolean) as ClothingItem[];
   };
 
-  // 기록 목록 불러오기
   const fetchHistoryList = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -164,7 +163,6 @@ export default function HistoryScreen() {
     }, [fetchHistoryList])
   );
 
-  // 같은 날짜끼리 그룹화 처리
   const groupedHistoryData = useMemo(() => {
     const filtered =
       selectedFilter === '전체'
@@ -182,7 +180,7 @@ export default function HistoryScreen() {
           date: item.date,
           clothesIds: [...item.clothesIds],
           historyIds: [item.id],
-          style: item.style || '',
+          tpoSuitability: item.tpoSuitability || '', // ✅ 변수명 교체
           mood: item.mood || '',
           tpo: item.tpo || '',
           memo: item.memo || '',
@@ -193,8 +191,8 @@ export default function HistoryScreen() {
       groupedMap[key].clothesIds.push(...item.clothesIds);
       groupedMap[key].historyIds.push(item.id);
 
-      if (!groupedMap[key].style && item.style) {
-        groupedMap[key].style = item.style;
+      if (!groupedMap[key].tpoSuitability && item.tpoSuitability) {
+        groupedMap[key].tpoSuitability = item.tpoSuitability;
       }
       if (!groupedMap[key].mood && item.mood) {
         groupedMap[key].mood = item.mood;
@@ -212,23 +210,17 @@ export default function HistoryScreen() {
 
   const deleteHistoryByApi = async (id: string) => {
     const numericId = Number(id);
-
-    if (Number.isNaN(numericId)) {
-      throw new Error('유효하지 않은 기록 ID입니다.');
-    }
-
+    if (Number.isNaN(numericId)) throw new Error('유효하지 않은 기록 ID입니다.');
     try {
       const response = await api.delete(`/history/${numericId}`);
       return response.data;
     } catch (error: any) {
-      const message = error.response?.data?.detail || error.message || '삭제 실패';
-      throw new Error(message);
+      throw new Error(error.response?.data?.detail || error.message || '삭제 실패');
     }
   };
 
   const handleDelete = (group: GroupedWearHistoryItem) => {
     if (deletingId) return;
-
     Alert.alert('기록 삭제', '이 날짜의 착용 기록을 모두 삭제할까요?', [
       { text: '취소', style: 'cancel' },
       {
@@ -240,15 +232,9 @@ export default function HistoryScreen() {
             for (const historyId of group.historyIds) {
               await deleteHistoryByApi(historyId);
             }
-            setHistoryList((prev) =>
-              prev.filter((item) => !group.historyIds.includes(item.id))
-            );
+            setHistoryList((prev) => prev.filter((item) => !group.historyIds.includes(item.id)));
           } catch (error) {
-            console.error('삭제 실패:', error);
-            Alert.alert(
-              '삭제 실패',
-              error instanceof Error ? error.message : '서버에서 기록을 삭제하지 못했습니다.'
-            );
+            Alert.alert('삭제 실패', error instanceof Error ? error.message : '서버에서 기록을 삭제하지 못했습니다.');
           } finally {
             setDeletingId(null);
           }
@@ -259,13 +245,12 @@ export default function HistoryScreen() {
 
   const handleDetailPress = (group: GroupedWearHistoryItem) => {
     const clothes = getClothesByIds(group.clothesIds);
-
     router.push({
       pathname: '/history-detail',
       params: {
         id: group.id,
         date: group.date,
-        style: group.style ?? '',
+        tpoSuitability: group.tpoSuitability ?? '', // ✅ 변경된 명칭 넘기기
         mood: group.mood ?? '',
         tpo: group.tpo ?? '',
         memo: group.memo ?? '',
@@ -274,10 +259,8 @@ export default function HistoryScreen() {
     });
   };
 
-  // ✅ 새로 추가: 수정 버튼 눌렀을 때 실행되는 함수 (날짜 기반 데이터 전달)
   const handleEditPress = (group: GroupedWearHistoryItem) => {
     const clothes = getClothesByIds(group.clothesIds);
-
     router.push({
       pathname: '/history-create',
       params: {
@@ -286,7 +269,7 @@ export default function HistoryScreen() {
         editDate: group.date,
         editMemo: group.memo ?? '',
         editTpo: group.tpo ?? '',
-        editFit: group.style ?? '',
+        editTpoSuitability: group.tpoSuitability ?? '', // ✅ 수정 폼에도 변경된 파라미터 전달
         editTemperature: group.mood ?? '',
         editClothes: JSON.stringify(clothes),
       },
@@ -300,8 +283,9 @@ export default function HistoryScreen() {
   const renderItem = ({ item }: { item: GroupedWearHistoryItem }) => {
     const clothes = getClothesByIds(item.clothesIds);
 
+    // ✅ 태그 텍스트 생성 시 명칭 변경점 반영
     const tagText =
-      [item.style, item.mood, item.tpo]
+      [item.tpo, item.tpoSuitability, item.mood]
         .filter((value) => value && value.trim() !== '')
         .join(' · ') || '태그 없음';
 
@@ -328,17 +312,13 @@ export default function HistoryScreen() {
         <Text style={styles.tags}>{tagText}</Text>
         <Text style={styles.memo}>{item.memo || '메모 없음'}</Text>
 
-        {/* ✅ 수정된 버튼 레이아웃 영역 */}
         <View style={styles.actionRow}>
           <Pressable style={styles.actionButton} onPress={() => handleDetailPress(item)} disabled={deletingId === item.id}>
             <Text style={styles.actionButtonText}>상세보기</Text>
           </Pressable>
-
-          {/* ✅ 상세보기와 삭제 사이에 수정 버튼 추가 */}
           <Pressable style={styles.actionButton} onPress={() => handleEditPress(item)} disabled={deletingId === item.id}>
             <Text style={styles.actionButtonText}>수정</Text>
           </Pressable>
-
           <Pressable style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)} disabled={deletingId === item.id}>
             <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
               {deletingId === item.id ? '삭제 중...' : '삭제'}
