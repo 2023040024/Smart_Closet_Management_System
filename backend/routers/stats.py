@@ -103,18 +103,7 @@ def get_cost_efficiency(
         best_items = validated_clothes[:mid_index]
         worst_items = validated_clothes[mid_index:]
 
-    best_item_name = best_items[0].name if best_items else None
-    worst_total_price = sum(c.price for c in worst_items)
-
-    return {
-        "message": "가성비 분석 완료",
-        "best_efficiency": best_items, 
-        "worst_efficiency": worst_items, 
-        "ai_summary": { 
-            "most_efficient_item": best_item_name,
-            "total_investment_on_worst": worst_total_price
-        }
-    }
+    return best_items + worst_items
 
 
 # 옷장 과부하 분석 API
