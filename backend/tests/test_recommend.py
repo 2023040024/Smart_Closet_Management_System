@@ -2,7 +2,8 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from conftest import make_clothes, make_user
 from models import StatusEnum, CategoryEnum, ThicknessEnum, MaterialEnum
-from routers.recommend import filter_clothes, get_unworn_days, get_user_profile_text
+from routers.recommend import filter_clothes, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score
+from unittest.mock import patch
 from datetime import date, timedelta
 
 class TestFilterClothes:
@@ -31,7 +32,7 @@ class TestFilterClothes:
         assert filter_clothes([c], 10.0, "sunny") == []
 
     def test_비오는날_레더_제외(self):
-        c = make_clothes(material=MaterialEnum.레더)
+        c = make_clothes(material=MaterialEnum.leather)
         assert filter_clothes([c], 20.0, "rainy") == []
 
     def test_정상조건_포함(self):
@@ -95,3 +96,60 @@ class TestGetUserProfileText:
         u = make_user(preferred_style="미니멀")
         _, preferred_style, _, _ = get_user_profile_text(u, 20.0)
         assert preferred_style == "미니멀"
+
+class TestGetCurrentSeason:
+    def test_반환값이_4계절중하나(self):
+        assert get_current_season() in ("봄", "여름", "가을", "겨울")
+
+    def test_3월_봄(self):
+        with patch("routers.recommend.date") as mock_date:
+            mock_date.today.return_value = date(2026, 3, 1)
+            assert get_current_season() == "봄"
+
+    def test_7월_여름(self):
+        with patch("routers.recommend.date") as mock_date:
+            mock_date.today.return_value = date(2026, 7, 1)
+            assert get_current_season() == "여름"
+
+    def test_12월_겨울(self):
+        with patch("routers.recommend.date") as mock_date:
+            mock_date.today.return_value = date(2026, 12, 1)
+            assert get_current_season() == "겨울"
+
+
+class TestCalculateConflictScore:
+    def test_사계절_충돌없음(self):
+        c = make_clothes(season="사계절")
+        assert calculate_conflict_score(c, "데일리") == 0
+
+    def test_계절불일치_80반환(self):
+        c = make_clothes(season="겨울")
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            assert calculate_conflict_score(c, "데일리") == 80
+
+    def test_계절일치_0반환(self):
+        c = make_clothes(season="봄")
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            assert calculate_conflict_score(c, "데일리") == 0
+
+    def test_면접_레드_60반환(self):
+        c = make_clothes(season="봄", color="레드")
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            assert calculate_conflict_score(c, "면접") == 60
+
+    def test_면접_안전색상_0반환(self):
+        c = make_clothes(season="봄", color="블랙")
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            assert calculate_conflict_score(c, "면접") == 0
+
+
+class TestFilterClothesF13:
+    def test_계절불일치_제외(self):
+        c = make_clothes(season="겨울")
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            assert filter_clothes([c], 20.0, "sunny") == []
+
+    def test_사계절_포함(self):
+        c = make_clothes(season="사계절", status=StatusEnum.wearable)
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            assert c in filter_clothes([c], 20.0, "sunny")
