@@ -14,14 +14,11 @@ def create_wear_history(history_data: list[WearHistoryCreate],
                         db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)
                         ):
-    is_single = isinstance(history_data, WearHistoryCreate)
-    history_data_list = [history_data] if is_single else history_data
-    
-    if not history_data_list:
+    if not history_data:
         raise HTTPException(status_code=400, detail="기록할 옷 데이터가 비어있습니다.")
     
     seen = set()
-    for data in history_data_list:
+    for data in history_data:
         key = (data.clothes_id, data.worn_date)
         if key in seen:
             raise HTTPException(status_code=400, detail="요청 내에 중복된 기록이 포함되어 있습니다.")
