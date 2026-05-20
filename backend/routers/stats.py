@@ -106,7 +106,7 @@ def get_cost_efficiency(
 
 
 # 옷장 과부하 분석 API
-@router.get("/overload")
+@router.get("/overload", response_model=list[dict])
 def get_closet_overload(
     threshold: int = 3, 
     db: Session = Depends(get_db),
