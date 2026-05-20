@@ -115,3 +115,51 @@ def get_cost_efficiency(
             "total_investment_on_worst": worst_total_price
         }
     }
+
+
+# 옷장 과부하 분석 API
+@router.get("/overload")
+def get_closet_overload(
+    threshold: int = 3, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # [97번 최적화] 서브쿼리로 중복 횟수가 threshold 이상인 카테고리와 색상 조합만 찾기
+    subquery = (
+        db.query(Clothes.category, Clothes.color)
+        .filter(Clothes.user_id == current_user.id)
+        .group_by(Clothes.category, Clothes.color)
+        .having(func.count(Clothes.clothes_id) >= threshold)
+        .subquery()
+    )
+
+    overloaded_items = (
+        db.query(Clothes)
+        .join(subquery, (Clothes.category == subquery.c.category) & (Clothes.color == subquery.c.color))
+        .all()
+    )
+    
+    # [97번 최적화] 메모리 내 그룹화로 DB 부하 감소
+    grouped_data = {}
+    for item in overloaded_items:
+        key = (item.category, item.color)
+        if key not in grouped_data:
+            grouped_data[key] = []
+        grouped_data[key].append(item)
+
+    # 리턴 시 Pydantic 스키마(ClothesResponse) 적용
+    detailed_data = [
+        {
+            "category": key[0],
+            "color": key[1],
+            "count": len(items),
+            "items": [ClothesResponse.model_validate(item).model_dump(by_alias=True) for item in items]
+        }
+        for key, items in grouped_data.items()
+    ]
+
+    return {
+        "message": f"과다 보유 리포트: {len(detailed_data)}건 발견",
+        "overload_details": detailed_data,
+        "ai_insight": f"사용자는 현재 {len(detailed_data)}개의 스타일에서 중복 구매 패턴을 보입니다."
+    }
