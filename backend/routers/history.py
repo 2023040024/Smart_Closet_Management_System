@@ -43,8 +43,8 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
         ).all()
         existing_records_set = {(r.clothes_id, r.worn_date) for r in existing_records_db}
 
+        # [Phase 1] 데이터 무결성 사전 검증 (Fail-Fast: 하나라도 에러가 있으면 여기서 즉시 차단)
         for history_data in history_data_list:
-            # 메모리 맵(clothes_map)에서 옷 정보 꺼내기
             cloth = clothes_map.get(history_data.clothes_id)
             if not cloth:
                 raise HTTPException(status_code=404, detail=f"해당 ID({history_data.clothes_id})의 옷을 찾을 수 없습니다.")
@@ -52,6 +52,9 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
             if (history_data.clothes_id, history_data.worn_date) in existing_records_set:
                 raise HTTPException(status_code=400, detail=f"ID({history_data.clothes_id}) 옷은 오늘 이미 기록되었습니다.")
 
+        # [Phase 2] 안전한 비즈니스 로직 연산 및 DB 적재 (검증을 100% 통과한 데이터만 실행됨)
+        for history_data in history_data_list:
+            cloth = clothes_map[history_data.clothes_id]
             new_history = WearHistory(
                 user_id=current_user.id,
                 clothes_id=history_data.clothes_id,
@@ -63,10 +66,11 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
                 feedback_tpo=history_data.feedback_tpo,
                 memo=history_data.memo
             )
-
+            
             cloth.wear_count = (cloth.wear_count or 0) + 1
             if cloth.last_worn_date is None or history_data.worn_date > cloth.last_worn_date:
                 cloth.last_worn_date = history_data.worn_date
+            
             db.add(new_history)
             created_histories.append(new_history)
     
