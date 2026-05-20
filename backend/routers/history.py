@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
+from datetime import date  
 from typing import List, Union
 
 from database import get_db
@@ -87,15 +88,20 @@ def create_wear_history(history_data: list[WearHistoryCreate],
 @router.get("", response_model=List[WearHistoryResponse])
 def get_wear_histories(
     skip: int = 0, 
-    limit: int = 100, 
+    limit: int = 100,
+    start_date: date = None,
+    end_date: date = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    histories = db.query(WearHistory)\
+    # 1. 기본 쿼리 생성 (실행 안 됨)
+    query = db.query(WearHistory)\
         .options(joinedload(WearHistory.clothes))\
-        .filter(WearHistory.user_id == current_user.id)\
-        .order_by(WearHistory.worn_date.desc()).offset(skip).limit(limit)\
-        .all()
+        .filter(WearHistory.user_id == current_user.id)
+    
+    # 2. 정렬 및 페이징 후 실행
+    histories = query.order_by(WearHistory.worn_date.desc())\
+        .offset(skip).limit(limit).all()
     
     return histories
 
