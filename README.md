@@ -14,15 +14,18 @@
 - AI 설명: 단순히 옷을 골라주는 것이 아니라, 왜 이 코디를 추천하는지 Gemini API가 타당한 근거를 설명합니다.
 
 ## 🛠 기술 스택
-Backend: Python 3.11 + FastAPI
-Frontend: React Native + Expo
+Backend: Python + FastAPI
+Frontend: JavaScript, React Native + Expo
 Database: SQLite
-AI: Google Gemini API
+AI: Google Gemini 1.5 Flash API
 
 의존성
-Python 3.11 이상
-Node.js 18 이상
-pip 24 이상
+```
+Python 3.11+
+Node.js 18+
+pip 24+
+이 외 requrements.txt 명시
+```
 
 ## 💾 설치 방법
 1. 환경 변수 설정
@@ -66,10 +69,10 @@ pytest --cov=. --cov-report=term-missing
 ```
 
 ## 👥 Contributors
-김용민 (2023040028) - Frontend
-이승찬 (2023040025) - Backend
-이준원 (2023040006) - 기록/통계
-박선호 (2023040024) - 추천 로직
+- 김용민 @aepr23 (2023040028) - Frontend
+- 이승찬 @imgoce (2023040025) - Backend
+- 이준원 @junsilva21 (2023040006) - 기록/통계
+- 박선호 @2023040024 (2023040024) - 추천 로직
 
 ## ⚖️ License
 이 프로젝트는 [MIT License](./LICENSE)를 따릅니다.
