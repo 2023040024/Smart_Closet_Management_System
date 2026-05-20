@@ -73,6 +73,9 @@ def get_base_time():
         else:
             break
 
+    if closest_time == 23 and current_hour != 23:
+        base_date = (check_time - timedelta(days=1)).strftime("%Y%m%d")
+
     # 정수형 예보 시간을 기상청 포맷(HH00) 문자열로 가공        
     base_time = f"{closest_time:02d}00"
         
