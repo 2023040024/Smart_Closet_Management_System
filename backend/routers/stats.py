@@ -78,23 +78,30 @@ def get_cost_efficiency(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    clothes = db.query(Clothes).filter(
-        Clothes.user_id == current_user.id,
-        Clothes.price > 0,  # purchase_price 오타 수정
-        Clothes.wear_count > 0
-    ).all()
+    # [97번 최적화] DB 엔진에서 직접 나누기 연산 후 정렬하여 가져옴
+    clothes = (
+        db.query(Clothes)
+        .filter(
+            Clothes.user_id == current_user.id,
+            Clothes.price > 0,
+            Clothes.wear_count > 0
+        )
+        .order_by((Clothes.price / Clothes.wear_count).asc())
+        .all()
+    )
 
+    # 프론트엔드 규격을 위한 Pydantic 검증
     validated_clothes = [ClothesResponse.model_validate(c) for c in clothes]
-    sorted_clothes = sorted(validated_clothes, key=lambda x: x.cost_per_wear)
-
-    total_items = len(sorted_clothes)
+    
+    # 6개 미만 시 발생하는 중복/누락 방지 동적 분할 알고리즘
+    total_items = len(validated_clothes)
     if total_items >= 6:
-        best_items = sorted_clothes[:3]
-        worst_items = sorted_clothes[-3:]
+        best_items = validated_clothes[:3]
+        worst_items = validated_clothes[-3:]
     else:
         mid_index = (total_items + 1) // 2
-        best_items = sorted_clothes[:mid_index]
-        worst_items = sorted_clothes[mid_index:]
+        best_items = validated_clothes[:mid_index]
+        worst_items = validated_clothes[mid_index:]
 
     best_item_name = best_items[0].name if best_items else None
     worst_total_price = sum(c.price for c in worst_items)
@@ -107,44 +114,4 @@ def get_cost_efficiency(
             "most_efficient_item": best_item_name,
             "total_investment_on_worst": worst_total_price
         }
-    }
-
-
-# 옷장 과부하 분석 API
-@router.get("/overload")
-def get_closet_overload(
-    threshold: int = 3, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    overloaded_groups = (
-        db.query(
-            Clothes.category, 
-            Clothes.color, 
-            func.count(Clothes.clothes_id).label("count")
-        )
-        .filter(Clothes.user_id == current_user.id)
-        .group_by(Clothes.category, Clothes.color)
-        .having(func.count(Clothes.clothes_id) >= threshold)
-        .all()
-    )
-
-    detailed_data = []
-    for group in overloaded_groups:
-        items = db.query(Clothes).filter(
-            Clothes.user_id == current_user.id,
-            Clothes.category == group.category,
-            Clothes.color == group.color
-        ).all()
-        detailed_data.append({
-            "category": group.category,
-            "color": group.color,
-            "count": group.count,
-            "items": [ClothesResponse.model_validate(item).model_dump(by_alias=True) for item in items]
-        })
-
-    return {
-        "message": f"과다 보유 리포트: {len(detailed_data)}건 발견",
-        "overload_details": detailed_data,
-        "ai_insight": f"사용자는 현재 {len(detailed_data)}개의 스타일에서 중복 구매 패턴을 보입니다."
     }
