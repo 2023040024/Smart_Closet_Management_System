@@ -151,6 +151,52 @@ def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_cond
         result.append(c)
     return result
 
+def apply_fallback_filter(
+    all_clothes: list[Clothes],
+    temperature: float,
+    weather_condition: str,
+    situation: str = "데일리",
+) -> tuple[list[Clothes], bool]:
+    """strict filter 후 상의/하의가 2벌 미만이면 해당 카테고리의 계절·두께 필터를 해제.
+
+    옷장 규모가 작은 초기 사용자(3~5벌)도 추천을 받을 수 있도록 fallback 적용.
+    반환: (필터 결과, fallback 사용 여부)
+    """
+    MIN_PER_CATEGORY = 2
+
+    strict = filter_clothes(all_clothes, temperature, weather_condition, situation)
+
+    def _cat(c: Clothes) -> str:
+        return c.category.value if hasattr(c.category, "value") else c.category
+
+    def _is_wearable(c: Clothes) -> bool:
+        status = c.status.value if hasattr(c.status, "value") else c.status
+        return (status is None or status == StatusEnum.wearable.value) and _cat(c) != CategoryEnum.acc.value
+
+    tops    = [c for c in strict if _cat(c) == CategoryEnum.top.value]
+    bottoms = [c for c in strict if _cat(c) == CategoryEnum.bottom.value]
+
+    if len(tops) >= MIN_PER_CATEGORY and len(bottoms) >= MIN_PER_CATEGORY:
+        return strict, False
+
+    strict_ids = {c.clothes_id for c in strict}
+    result = list(strict)
+
+    if len(tops) < MIN_PER_CATEGORY:
+        for c in all_clothes:
+            if _cat(c) == CategoryEnum.top.value and c.clothes_id not in strict_ids and _is_wearable(c):
+                result.append(c)
+                strict_ids.add(c.clothes_id)
+
+    if len(bottoms) < MIN_PER_CATEGORY:
+        for c in all_clothes:
+            if _cat(c) == CategoryEnum.bottom.value and c.clothes_id not in strict_ids and _is_wearable(c):
+                result.append(c)
+                strict_ids.add(c.clothes_id)
+
+    return result, True
+
+
 def get_unworn_days(c: Clothes) -> int:
     if c.last_worn_date is None:
         return 999
@@ -291,14 +337,17 @@ def recommend_today(
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered = filter_clothes(all_clothes, temperature, weather_condition, situation or "데일리")
+    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation or "데일리")
     if len(filtered) < 2:
         return {
             "outfits": [],
             "ai_message": "날씨·상태 조건에 맞는 옷이 부족합니다"
         }
     prompt = build_prompt(filtered, situation or "daily", temperature, weather_condition, current_user)
-    return call_gemini(prompt)
+    result = call_gemini(prompt)
+    if used_fallback:
+        result["ai_message"] = "[현재 날씨·계절에 맞는 옷이 부족하여 전체 옷장 기준으로 추천했습니다] " + result.get("ai_message", "")
+    return result
 
 @router.post("/custom", response_model=RecommendResponse)
 def recommend_custom(
@@ -324,14 +373,17 @@ def recommend_custom(
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered = filter_clothes(all_clothes, temperature, weather_condition, body.situation or "데일리")
+    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, body.situation or "데일리")
     if len(filtered) < 2:
         return {
             "outfits": [],
             "ai_message": "날씨·상태 조건에 맞는 옷이 부족합니다"
         }
     prompt = build_prompt(filtered, body.situation or "daily", temperature, weather_condition, current_user)
-    return call_gemini(prompt)
+    result = call_gemini(prompt)
+    if used_fallback:
+        result["ai_message"] = "[현재 날씨·계절에 맞는 옷이 부족하여 전체 옷장 기준으로 추천했습니다] " + result.get("ai_message", "")
+    return result
 
 @router.get("/weekly")
 def recommend_weekly(
