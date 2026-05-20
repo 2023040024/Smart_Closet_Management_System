@@ -61,6 +61,8 @@ def get_base_time():
     
     # 현재 시간에서 10분 정도의 여유를 줌 (발표 직후에는 데이터가 없을 수 있음)
     check_time = now - timedelta(minutes=10)
+
+    base_date = check_time.strftime("%Y%m%d")
     current_hour = check_time.hour
     
     # 현재 시간보다 이전이면서 가장 가까운 발표 시간 찾기
@@ -70,13 +72,8 @@ def get_base_time():
             closest_time = t
         else:
             break
-            
-    # 만약 현재 시간이 02:10 이전이라면 날짜를 전날로 변경해야 함
-    if current_hour < 2:
-        base_date = (now - timedelta(days=1)).strftime("%Y%m%d")
-        base_time = "2300"
-    else:
-        base_date = now.strftime("%Y%m%d")
-        base_time = f"{closest_time:02d}00"
+
+    # 정수형 예보 시간을 기상청 포맷(HH00) 문자열로 가공        
+    base_time = f"{closest_time:02d}00"
         
     return base_date, base_time
