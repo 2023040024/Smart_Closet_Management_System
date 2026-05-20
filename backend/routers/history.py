@@ -99,7 +99,13 @@ def get_wear_histories(
         .options(joinedload(WearHistory.clothes))\
         .filter(WearHistory.user_id == current_user.id)
     
-    # 2. 정렬 및 페이징 후 실행
+    # 2. 동적 날짜 필터링 적용 (조건이 있을 때만 쿼리 추가)
+    if start_date:
+        query = query.filter(WearHistory.worn_date >= start_date)
+    if end_date:
+        query = query.filter(WearHistory.worn_date <= end_date)
+        
+    # 3. 최종 정렬 및 페이징 후 실행
     histories = query.order_by(WearHistory.worn_date.desc())\
         .offset(skip).limit(limit).all()
     
