@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from datetime import date  
-from typing import List, Union
 
 from database import get_db
 from models import Clothes, WearHistory, User
@@ -14,7 +13,7 @@ router = APIRouter(prefix="/history", tags=["착용 기록"])
 def create_wear_history(history_data: list[WearHistoryCreate],
                         db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)
-                        ):
+                        ) -> list[WearHistoryResponse]: # 반환 타입 힌트
     if not history_data:
         raise HTTPException(status_code=400, detail="기록할 옷 데이터가 비어있습니다.")
     
@@ -85,7 +84,7 @@ def create_wear_history(history_data: list[WearHistoryCreate],
             raise e
         raise HTTPException(status_code=500, detail="서버 오류로 인해 기록에 실패했습니다.")
 
-@router.get("", response_model=List[WearHistoryResponse])
+@router.get("", response_model=list[WearHistoryResponse])
 def get_wear_histories(
     skip: int = 0, 
     limit: int = 100,
@@ -93,7 +92,8 @@ def get_wear_histories(
     end_date: date = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
+) -> list[WearHistoryResponse]: # 반환 타입 힌트
+    
     # 1. 기본 쿼리 생성 (실행 안 됨)
     query = db.query(WearHistory)\
         .options(joinedload(WearHistory.clothes))\
@@ -115,7 +115,7 @@ def get_wear_histories(
 def delete_wear_history(history_id: int, 
                         db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)
-                        ):
+                        ) -> None: # 반환값 없음
     # 1. 삭제할 기록 찾기
     history = db.query(WearHistory).filter(
         WearHistory.history_id == history_id,
