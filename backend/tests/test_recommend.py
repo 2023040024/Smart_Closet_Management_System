@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from conftest import make_clothes, make_user
 from models import StatusEnum, CategoryEnum, ThicknessEnum, MaterialEnum
-from routers.recommend import filter_clothes, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score
+from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score
 from unittest.mock import patch
 from datetime import date, timedelta
 
@@ -153,3 +153,39 @@ class TestFilterClothesF13:
         c = make_clothes(season="사계절", status=StatusEnum.wearable)
         with patch("routers.recommend.get_current_season", return_value="봄"):
             assert c in filter_clothes([c], 20.0, "sunny")
+
+
+class TestApplyFallbackFilter:
+    def test_충분한경우_fallback미사용(self):
+        tops    = [make_clothes(category=CategoryEnum.top,    season="봄", clothes_id=i) for i in range(1, 3)]
+        bottoms = [make_clothes(category=CategoryEnum.bottom, season="봄", clothes_id=i) for i in range(3, 5)]
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            result, used = apply_fallback_filter(tops + bottoms, 20.0, "sunny")
+        assert used == False
+        assert len(result) == 4
+
+    def test_상의부족시_fallback적용(self):
+        top_spring = make_clothes(category=CategoryEnum.top,    season="봄",   clothes_id=1)
+        top_winter = make_clothes(category=CategoryEnum.top,    season="겨울", clothes_id=2)
+        bottoms    = [make_clothes(category=CategoryEnum.bottom, season="봄", clothes_id=i) for i in range(3, 5)]
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            result, used = apply_fallback_filter([top_spring, top_winter] + bottoms, 20.0, "sunny")
+        assert used == True
+        assert top_winter in result
+
+    def test_하의부족시_fallback적용(self):
+        tops          = [make_clothes(category=CategoryEnum.top,    season="봄",   clothes_id=i) for i in range(1, 3)]
+        bottom_spring = make_clothes(category=CategoryEnum.bottom, season="봄",   clothes_id=3)
+        bottom_winter = make_clothes(category=CategoryEnum.bottom, season="겨울", clothes_id=4)
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            result, used = apply_fallback_filter(tops + [bottom_spring, bottom_winter], 20.0, "sunny")
+        assert used == True
+        assert bottom_winter in result
+
+    def test_fallback에서도_착용불가_제외(self):
+        top_spring         = make_clothes(category=CategoryEnum.top, season="봄",   clothes_id=1)
+        top_winter_washing = make_clothes(category=CategoryEnum.top, season="겨울", clothes_id=2, status=StatusEnum.washing)
+        bottoms            = [make_clothes(category=CategoryEnum.bottom, season="봄", clothes_id=i) for i in range(3, 5)]
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            result, used = apply_fallback_filter([top_spring, top_winter_washing] + bottoms, 20.0, "sunny")
+        assert top_winter_washing not in result
