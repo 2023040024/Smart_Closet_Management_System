@@ -18,13 +18,14 @@ type ClothingItem = {
   name: string;
   category: string;
   color?: string;
+  imageUrl?: string; // ✅ 상세 화면으로 보낼 이미지 URL 타입 추가
 };
 
 type WearHistoryItem = {
   id: string;
   date: string;
   clothesIds: string[];
-  tpoSuitability?: string; // ✅ style -> tpoSuitability 로 명확히 변경
+  tpoSuitability?: string; 
   mood?: string;
   tpo?: string;
   memo?: string;
@@ -46,6 +47,7 @@ type HistoryApiItem = {
     name?: string;
     category?: string;
     color?: string;
+    image_url?: string; // ✅ 백엔드에서 받아올 이미지 필드 추가
     tags?: {
       category?: string;
       color?: string;
@@ -59,7 +61,7 @@ type GroupedWearHistoryItem = {
   date: string;
   clothesIds: string[];
   historyIds: string[];
-  tpoSuitability?: string; // ✅ 여기도 변경
+  tpoSuitability?: string; 
   mood?: string;
   tpo?: string;
   memo?: string;
@@ -82,7 +84,6 @@ function mapApiHistoryToUi(item: HistoryApiItem): WearHistoryItem {
     id: item.history_id.toString(),
     date: formatDate(item.worn_date),
     clothesIds: clothesId ? [clothesId] : [],
-    // ✅ 백엔드의 피드백 값이 들어오는 우선순위 설정
     tpoSuitability: item.feedback_tpo ?? item.style ?? '', 
     mood: item.feedback_temperature ?? item.mood ?? '',
     tpo: item.tpo ?? '',
@@ -132,11 +133,18 @@ export default function HistoryScreen() {
         const category = item.clothes?.category ?? item.clothes?.tags?.category ?? '미분류';
         const color = item.clothes?.color ?? item.clothes?.tags?.color ?? '색상 정보 없음';
 
+        // ✅ [핵심 변경] 백엔드가 준 상대 경로를 스마트폰이 읽을 수 있는 절대 경로로 변환!
+        const rawImageUrl = item.clothes?.image_url;
+        const fullImageUrl = rawImageUrl 
+          ? (rawImageUrl.startsWith('http') ? rawImageUrl : `http://192.168.1.122:8000${rawImageUrl}`)
+          : undefined;
+
         nextClothesMap[clothesId] = {
           id: clothesId,
           name: item.clothes?.name ?? `옷 ${clothesId}`,
           category: category,
           color: color,
+          imageUrl: fullImageUrl, // ✅ 변환된 절대 경로 저장
         };
       });
 
@@ -180,7 +188,7 @@ export default function HistoryScreen() {
           date: item.date,
           clothesIds: [...item.clothesIds],
           historyIds: [item.id],
-          tpoSuitability: item.tpoSuitability || '', // ✅ 변수명 교체
+          tpoSuitability: item.tpoSuitability || '', 
           mood: item.mood || '',
           tpo: item.tpo || '',
           memo: item.memo || '',
@@ -250,7 +258,7 @@ export default function HistoryScreen() {
       params: {
         id: group.id,
         date: group.date,
-        tpoSuitability: group.tpoSuitability ?? '', // ✅ 변경된 명칭 넘기기
+        tpoSuitability: group.tpoSuitability ?? '', 
         mood: group.mood ?? '',
         tpo: group.tpo ?? '',
         memo: group.memo ?? '',
@@ -269,7 +277,7 @@ export default function HistoryScreen() {
         editDate: group.date,
         editMemo: group.memo ?? '',
         editTpo: group.tpo ?? '',
-        editTpoSuitability: group.tpoSuitability ?? '', // ✅ 수정 폼에도 변경된 파라미터 전달
+        editTpoSuitability: group.tpoSuitability ?? '', 
         editTemperature: group.mood ?? '',
         editClothes: JSON.stringify(clothes),
       },
@@ -283,7 +291,6 @@ export default function HistoryScreen() {
   const renderItem = ({ item }: { item: GroupedWearHistoryItem }) => {
     const clothes = getClothesByIds(item.clothesIds);
 
-    // ✅ 태그 텍스트 생성 시 명칭 변경점 반영
     const tagText =
       [item.tpo, item.tpoSuitability, item.mood]
         .filter((value) => value && value.trim() !== '')
