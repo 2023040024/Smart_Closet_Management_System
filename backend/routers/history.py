@@ -132,6 +132,8 @@ def update_daily_wear_history(
         for record in existing_records:
             db.delete(record)
             
+        db.flush()
+
         # 신규 데이터 삽입
         created_histories = []
         clothes_ids = [data.clothes_id for data in history_data]
