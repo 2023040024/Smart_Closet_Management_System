@@ -1,5 +1,4 @@
-import React from 'react';
-import { Text, StyleSheet } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
 export function TagChip({ text }: { text?: string | null }) {
   if (!text || !text.trim()) return null;

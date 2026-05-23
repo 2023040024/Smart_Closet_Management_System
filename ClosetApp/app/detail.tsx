@@ -12,7 +12,7 @@ import {
 
 import api from './_api';
 
-const API_BASE_URL = 'http://192.168.1.122:8000';
+const API_BASE_URL = 'http://192.168.0.25:8000';
 
 // ✅ 빨간 줄 에러를 해결하기 위해 최상위에 situation, tpo 추가
 type DetailApiItem = {

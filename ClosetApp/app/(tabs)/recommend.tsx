@@ -26,7 +26,6 @@ type OutfitSet = {
 
 // 기기 화면 너비를 가져와서 카드 크기를 비율로 설정합니다.
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-// 섹션 패딩 등을 고려하여 카드가 화면에 꽉 차지 않고 옆 카드가 살짝 보이도록 설정 (약 75% 너비)
 const CARD_WIDTH = SCREEN_WIDTH * 0.75; 
 
 function SkeletonLoader() {
@@ -108,6 +107,32 @@ export default function RecommendScreen() {
     }
   };
 
+  // ✨ 추가된 기능: API 연동 및 데이터 구조화 핸들러
+  const handleWearOutfit = async (outfit: OutfitSet) => {
+    try {
+      // 선택된 코디에서 존재하는 옷들만 필터링하여 백엔드 스펙(list[WearHistoryCreate])에 맞게 변환
+      const payload = [outfit.top, outfit.bottom, outfit.outer, outfit.shoes]
+        .filter(Boolean)
+        .map(cloth => ({
+          clothes_id: Number(cloth!.id)
+        }));
+
+      if (payload.length === 0) {
+        return Alert.alert('알림', '착용할 옷 정보가 없습니다.');
+      }
+
+      await api.post('/history', payload);
+      Alert.alert('성공', '오늘의 착용 기록에 저장되었습니다!');
+    } catch (error: any) {
+      console.error(error);
+      // 백엔드 에러(422 등) 처리
+      const errorMsg = error.response?.status === 422 
+        ? '데이터 포맷이 잘못되었습니다.' 
+        : '착용 기록 저장에 실패했습니다.';
+      Alert.alert('오류', errorMsg);
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>코디 추천</Text>
@@ -135,13 +160,12 @@ export default function RecommendScreen() {
             <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
             {aiMessage && <View style={styles.aiMessageBox}><Text style={styles.aiMessageText}>💬 {aiMessage}</Text></View>}
             
-            {/* ✨ 여기가 좌우 스와이프(Carousel)로 변경된 영역입니다 ✨ */}
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
-              snapToInterval={CARD_WIDTH + 16} // 카드 너비 + 마진값 (스와이프 시 딱딱 걸리게)
+              snapToInterval={CARD_WIDTH + 16}
               decelerationRate="fast"
-              contentContainerStyle={{ paddingRight: 16, paddingBottom: 10 }} // 마지막 카드 우측 여백
+              contentContainerStyle={{ paddingRight: 16, paddingBottom: 10 }}
             >
               {apiRecommendations.map((outfit, index) => (
                 <View key={index} style={[styles.outfitCard, { width: CARD_WIDTH }]}>
@@ -150,12 +174,21 @@ export default function RecommendScreen() {
                   </View>
                   {outfit.reason && <Text style={styles.outfitDescription}>{outfit.reason}</Text>}
                   
-                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                  {/* 카드가 너무 길어지지 않게 ScrollView 안에 옷 목록 배치 */}
+                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={{ flexGrow: 1, marginBottom: 16 }}>
                     {(displayFilter === '전체' || displayFilter === '상의') && outfit.top && <OutfitItemCard label="상의" item={outfit.top} />}
                     {(displayFilter === '전체' || displayFilter === '하의') && outfit.bottom && <OutfitItemCard label="하의" item={outfit.bottom} />}
                     {(displayFilter === '전체' || displayFilter === '아우터') && outfit.outer && <OutfitItemCard label="아우터" item={outfit.outer} />}
                     {(displayFilter === '전체' || displayFilter === '신발') && outfit.shoes && <OutfitItemCard label="신발" item={outfit.shoes} />}
                   </ScrollView>
+
+                  {/* ✨ 추가된 기능: 추천 코디 착용하기 버튼 */}
+                  <TouchableOpacity 
+                    style={styles.wearButton} 
+                    onPress={() => handleWearOutfit(outfit)}
+                  >
+                    <Text style={styles.wearButtonText}>이 코디 착용하기</Text>
+                  </TouchableOpacity>
                 </View>
               ))}
             </ScrollView>
@@ -183,12 +216,15 @@ const styles = StyleSheet.create({
   aiMessageBox: { backgroundColor: '#EEF2FF', padding: 20, borderRadius: 16, marginBottom: 20 },
   aiMessageText: { fontSize: 15, color: '#3730A3', lineHeight: 24, fontWeight: '600' },
   
-  // 아웃핏 카드 스타일 수정 (높이 제한 추가 및 오른쪽 마진 추가)
-  outfitCard: { marginRight: 16, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', maxHeight: 600 }, 
+  outfitCard: { marginRight: 16, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', maxHeight: 600, justifyContent: 'space-between' }, 
   outfitCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   outfitCardTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  outfitDescription: { fontSize: 14, color: '#64748B', marginBottom: 16, lineHeight: 22 },
+  outfitDescription: { fontSize: 14, color: '#64748B', marginBottom: 12, lineHeight: 22 },
   
+  // ✨ 착용하기 버튼 스타일 추가
+  wearButton: { backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 'auto' },
+  wearButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+
   skeletonBase: { backgroundColor: '#E5E7EB', borderRadius: 8 },
   aiMessageBoxSkeleton: { backgroundColor: '#F3F4F6', padding: 20, borderRadius: 16, marginBottom: 20 },
   outfitCardSkeleton: { padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' },

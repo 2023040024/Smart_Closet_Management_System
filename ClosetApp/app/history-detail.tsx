@@ -1,11 +1,12 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type ClothingItem = {
   id: string;
   name: string;
   category: string;
   color: string;
+  imageUrl?: string; // ✅ 이미지 경로가 있을 경우를 위해 타입 추가
 };
 
 export default function HistoryDetailScreen() {
@@ -56,7 +57,17 @@ export default function HistoryDetailScreen() {
                 <View key={cloth.id} style={styles.clothCard}>
                   <Text style={styles.clothCategory}>{cloth.category}</Text>
                   <Text style={styles.clothName}>{cloth.name}</Text>
-                  {/* ✅ Commit 2: history.tsx에서 넘어온 color를 안전하게 바인딩하여 노출 */}
+                  
+                  {/* ✅ Stashed changes: 옷 이름 아래에 이미지 표시 영역 유지 */}
+                  <Image 
+                    source={{ 
+                      uri: cloth.imageUrl || 'https://via.placeholder.com/300x300?text=No+Image' 
+                    }} 
+                    style={styles.clothImage}
+                    resizeMode="contain"
+                  />
+
+                  {/* ✅ Updated upstream: 최신 main의 color 노출 기능도 함께 유지 */}
                   <Text style={styles.clothColor}>색상: {cloth.color || '정보 없음'}</Text>
                 </View>
               ))
@@ -80,5 +91,6 @@ const styles = StyleSheet.create({
   clothCategory: { fontSize: 12, color: '#888', marginBottom: 4 },
   clothName: { fontSize: 15, fontWeight: '600', color: '#222', marginBottom: 4 },
   clothColor: { fontSize: 13, color: '#666' },
+  clothImage: { width: '100%', height: 150, marginTop: 8, marginBottom: 8, borderRadius: 8 }, // ✅ 이미지 스타일 정의 추가
   emptyText: { fontSize: 14, color: '#777' },
 });
