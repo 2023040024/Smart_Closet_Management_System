@@ -111,6 +111,66 @@ def get_wear_histories(
     
     return histories
 
+@router.put("", response_model=list[WearHistoryResponse], status_code=status.HTTP_200_OK)
+def update_daily_wear_history(
+    history_data: list[WearHistoryCreate],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> list[WearHistoryResponse]:
+    if not history_data:
+        raise HTTPException(status_code=400, detail="수정할 옷 데이터가 비어있습니다.")
+
+    target_dates = list({data.worn_date for data in history_data})
+    
+    try:
+        # 기존 기록 삭제 예약
+        existing_records = db.query(WearHistory).filter(
+            WearHistory.user_id == current_user.id,
+            WearHistory.worn_date.in_(target_dates)
+        ).all()
+        
+        for record in existing_records:
+            db.delete(record)
+            
+        # 신규 데이터 삽입
+        created_histories = []
+        clothes_ids = [data.clothes_id for data in history_data]
+        clothes_db = db.query(Clothes).filter(
+            Clothes.clothes_id.in_(clothes_ids),
+            Clothes.user_id == current_user.id
+        ).all()
+        clothes_map = {c.clothes_id: c for c in clothes_db}
+
+        for hd in history_data:
+            if hd.clothes_id not in clothes_map:
+                raise HTTPException(status_code=404, detail=f"해당 ID({hd.clothes_id})의 옷을 찾을 수 없습니다.")
+                
+            new_history = WearHistory(
+                user_id=current_user.id,
+                clothes_id=hd.clothes_id,
+                worn_date=hd.worn_date,
+                tpo=hd.tpo,
+                style=hd.style,
+                mood=hd.mood,
+                feedback_temperature=hd.feedback_temperature,
+                feedback_tpo=hd.feedback_tpo,
+                memo=hd.memo
+            )
+            db.add(new_history)
+            created_histories.append(new_history)
+
+        db.commit()
+        for h in created_histories:
+            db.refresh(h)
+            
+        return created_histories
+
+    except Exception as e:
+        db.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail="서버 오류로 인해 수정에 실패했습니다.")
+
 @router.delete("/{history_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_wear_history(history_id: int, 
                         db: Session = Depends(get_db),
