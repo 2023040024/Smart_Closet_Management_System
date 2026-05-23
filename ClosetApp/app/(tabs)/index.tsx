@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // ✨ 로그아웃을 위해 추가
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -49,12 +50,11 @@ const FILTER_OPTIONS = {
   tpo: [...TAG_OPTIONS.tpo],
 };
 
-// ✅ 에러 해결 핵심: FILTER_SECTIONS에 명시적 타입 할당
 const FILTER_SECTIONS: Array<{
   title: string;
   items: Array<{
     label: string;
-    key: keyof FilterType; // 이 부분이 정확해야 renderSection 호출 시 에러가 나지 않습니다.
+    key: keyof FilterType;
     options: string[];
   }>;
 }> = [
@@ -124,6 +124,26 @@ export default function HomeScreen() {
     }, [fetchClothes])
   );
 
+  // ✨ 로그아웃 처리 함수 추가
+  const handleLogout = () => {
+    Alert.alert('로그아웃', '정말 로그아웃 하시겠습니까?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '로그아웃',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await AsyncStorage.removeItem('userToken');
+            router.replace('/login');
+          } catch (error) {
+            console.error('로그아웃 에러:', error);
+            Alert.alert('오류', '로그아웃 처리 중 문제가 발생했습니다.');
+          }
+        },
+      },
+    ]);
+  };
+
   const filteredClothes = useMemo(() => {
     return clothes.filter((item) => {
       const matchType = selectedType === '전체' || item.tags.category === selectedType;
@@ -179,12 +199,6 @@ export default function HomeScreen() {
     const pageWidthSize = width - 32;
     const offsetX = e.nativeEvent.contentOffset.x;
     setCurrentFilterPage(Math.round(offsetX / pageWidthSize));
-  };
-
-  const moveToFilterPage = (pageIndex: number) => {
-    const pageWidthSize = width - 32;
-    filterScrollRef.current?.scrollTo({ x: pageIndex * pageWidthSize, animated: true });
-    setCurrentFilterPage(pageIndex);
   };
 
   const renderSection = (label: string, key: keyof FilterType, options: string[]) => {
@@ -247,9 +261,16 @@ export default function HomeScreen() {
             <Text style={styles.title}>내 옷장</Text>
             <Text style={styles.subtitle}>등록한 옷을 확인하고 관리해보세요.</Text>
           </View>
-          <TouchableOpacity style={styles.moveRecommendBtn} onPress={() => router.push('/(tabs)/recommend')}>
-            <Text style={styles.moveRecommendText}>추천</Text>
-          </TouchableOpacity>
+          
+          {/* ✨ 로그아웃 버튼과 추천 버튼을 나란히 배치 */}
+          <View style={styles.headerActionBox}>
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <Text style={styles.logoutText}>로그아웃</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.moveRecommendBtn} onPress={() => router.push('/(tabs)/recommend')}>
+              <Text style={styles.moveRecommendText}>추천</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.actionRow}>
@@ -329,7 +350,13 @@ const styles = StyleSheet.create({
   headerTextBox: { flex: 1, paddingRight: 8 },
   title: { fontSize: 28, fontWeight: '800', marginBottom: 6, color: '#111' },
   subtitle: { fontSize: 14, color: '#6b6b6b', lineHeight: 20 },
-  moveRecommendBtn: { backgroundColor: '#f3f3f3', paddingVertical: 9, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e4e4e4', alignSelf: 'flex-start' },
+  
+  /* ✨ 버튼 그룹 스타일 추가 */
+  headerActionBox: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  logoutBtn: { backgroundColor: '#fff', paddingVertical: 9, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: '#ffcccc' },
+  logoutText: { color: '#d11a2a', fontSize: 13, fontWeight: '700' },
+  
+  moveRecommendBtn: { backgroundColor: '#f3f3f3', paddingVertical: 9, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e4e4e4' },
   moveRecommendText: { color: '#222', fontSize: 13, fontWeight: '700' },
   actionRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 },
   primaryActionBtn: { backgroundColor: '#111', paddingVertical: 11, paddingHorizontal: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center' },
