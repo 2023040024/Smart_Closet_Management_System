@@ -18,13 +18,14 @@ type ClothingItem = {
   name: string;
   category: string;
   color?: string;
+  imageUrl?: string; // ✅ 상세 화면으로 보낼 이미지 URL 타입 추가
 };
 
 type WearHistoryItem = {
   id: string;
   date: string;
   clothesIds: string[];
-  style?: string;
+  tpoSuitability?: string; 
   mood?: string;
   tpo?: string;
   memo?: string;
@@ -46,7 +47,7 @@ type HistoryApiItem = {
     name?: string;
     category?: string;
     color?: string;
-    // ✅ Commit 1: 백엔드 태그 계층화 구조에 대응하기 위해 tags 추가
+    image_url?: string; // ✅ 백엔드에서 받아올 이미지 필드 추가
     tags?: {
       category?: string;
       color?: string;
@@ -60,7 +61,7 @@ type GroupedWearHistoryItem = {
   date: string;
   clothesIds: string[];
   historyIds: string[];
-  style?: string;
+  tpoSuitability?: string; 
   mood?: string;
   tpo?: string;
   memo?: string;
@@ -83,9 +84,9 @@ function mapApiHistoryToUi(item: HistoryApiItem): WearHistoryItem {
     id: item.history_id.toString(),
     date: formatDate(item.worn_date),
     clothesIds: clothesId ? [clothesId] : [],
-    style: item.style ?? item.feedback_fit ?? '',
-    mood: item.mood ?? item.feedback_temperature ?? '',
-    tpo: item.tpo ?? item.feedback_tpo ?? '',
+    tpoSuitability: item.feedback_tpo ?? item.style ?? '', 
+    mood: item.feedback_temperature ?? item.mood ?? '',
+    tpo: item.tpo ?? '',
     memo: item.memo ?? '',
   };
 }
@@ -129,15 +130,21 @@ export default function HistoryScreen() {
 
         if (!clothesId) return;
 
-        // ✅ Commit 1: 데이터 바인딩 오류 수정 (tags 내부 값 우선 탐색 후 기본값 매핑)
         const category = item.clothes?.category ?? item.clothes?.tags?.category ?? '미분류';
         const color = item.clothes?.color ?? item.clothes?.tags?.color ?? '색상 정보 없음';
+
+        // ✅ [핵심 변경] 백엔드가 준 상대 경로를 스마트폰이 읽을 수 있는 절대 경로로 변환!
+        const rawImageUrl = item.clothes?.image_url;
+        const fullImageUrl = rawImageUrl 
+          ? (rawImageUrl.startsWith('http') ? rawImageUrl : `http://192.168.1.122:8000${rawImageUrl}`)
+          : undefined;
 
         nextClothesMap[clothesId] = {
           id: clothesId,
           name: item.clothes?.name ?? `옷 ${clothesId}`,
           category: category,
           color: color,
+          imageUrl: fullImageUrl, // ✅ 변환된 절대 경로 저장
         };
       });
 
@@ -181,7 +188,7 @@ export default function HistoryScreen() {
           date: item.date,
           clothesIds: [...item.clothesIds],
           historyIds: [item.id],
-          style: item.style || '',
+          tpoSuitability: item.tpoSuitability || '', 
           mood: item.mood || '',
           tpo: item.tpo || '',
           memo: item.memo || '',
@@ -192,8 +199,8 @@ export default function HistoryScreen() {
       groupedMap[key].clothesIds.push(...item.clothesIds);
       groupedMap[key].historyIds.push(item.id);
 
-      if (!groupedMap[key].style && item.style) {
-        groupedMap[key].style = item.style;
+      if (!groupedMap[key].tpoSuitability && item.tpoSuitability) {
+        groupedMap[key].tpoSuitability = item.tpoSuitability;
       }
       if (!groupedMap[key].mood && item.mood) {
         groupedMap[key].mood = item.mood;
@@ -211,23 +218,17 @@ export default function HistoryScreen() {
 
   const deleteHistoryByApi = async (id: string) => {
     const numericId = Number(id);
-
-    if (Number.isNaN(numericId)) {
-      throw new Error('유효하지 않은 기록 ID입니다.');
-    }
-
+    if (Number.isNaN(numericId)) throw new Error('유효하지 않은 기록 ID입니다.');
     try {
       const response = await api.delete(`/history/${numericId}`);
       return response.data;
     } catch (error: any) {
-      const message = error.response?.data?.detail || error.message || '삭제 실패';
-      throw new Error(message);
+      throw new Error(error.response?.data?.detail || error.message || '삭제 실패');
     }
   };
 
   const handleDelete = (group: GroupedWearHistoryItem) => {
     if (deletingId) return;
-
     Alert.alert('기록 삭제', '이 날짜의 착용 기록을 모두 삭제할까요?', [
       { text: '취소', style: 'cancel' },
       {
@@ -239,15 +240,9 @@ export default function HistoryScreen() {
             for (const historyId of group.historyIds) {
               await deleteHistoryByApi(historyId);
             }
-            setHistoryList((prev) =>
-              prev.filter((item) => !group.historyIds.includes(item.id))
-            );
+            setHistoryList((prev) => prev.filter((item) => !group.historyIds.includes(item.id)));
           } catch (error) {
-            console.error('삭제 실패:', error);
-            Alert.alert(
-              '삭제 실패',
-              error instanceof Error ? error.message : '서버에서 기록을 삭제하지 못했습니다.'
-            );
+            Alert.alert('삭제 실패', error instanceof Error ? error.message : '서버에서 기록을 삭제하지 못했습니다.');
           } finally {
             setDeletingId(null);
           }
@@ -258,17 +253,33 @@ export default function HistoryScreen() {
 
   const handleDetailPress = (group: GroupedWearHistoryItem) => {
     const clothes = getClothesByIds(group.clothesIds);
-
     router.push({
       pathname: '/history-detail',
       params: {
         id: group.id,
         date: group.date,
-        style: group.style ?? '',
+        tpoSuitability: group.tpoSuitability ?? '', 
         mood: group.mood ?? '',
         tpo: group.tpo ?? '',
         memo: group.memo ?? '',
         clothes: JSON.stringify(clothes),
+      },
+    });
+  };
+
+  const handleEditPress = (group: GroupedWearHistoryItem) => {
+    const clothes = getClothesByIds(group.clothesIds);
+    router.push({
+      pathname: '/history-create',
+      params: {
+        editMode: 'true',
+        editId: group.id,
+        editDate: group.date,
+        editMemo: group.memo ?? '',
+        editTpo: group.tpo ?? '',
+        editTpoSuitability: group.tpoSuitability ?? '', 
+        editTemperature: group.mood ?? '',
+        editClothes: JSON.stringify(clothes),
       },
     });
   };
@@ -281,7 +292,7 @@ export default function HistoryScreen() {
     const clothes = getClothesByIds(item.clothesIds);
 
     const tagText =
-      [item.style, item.mood, item.tpo]
+      [item.tpo, item.tpoSuitability, item.mood]
         .filter((value) => value && value.trim() !== '')
         .join(' · ') || '태그 없음';
 
@@ -293,7 +304,6 @@ export default function HistoryScreen() {
           {clothes.length > 0 ? (
             clothes.map((cloth) => (
               <View key={cloth.id} style={styles.clothBox}>
-                {/* 수정한 카테고리가 정상적으로 매핑되어 나옵니다 */}
                 <Text style={styles.clothCategory}>{cloth.category}</Text>
                 <Text style={styles.clothName}>{cloth.name}</Text>
               </View>
@@ -313,7 +323,9 @@ export default function HistoryScreen() {
           <Pressable style={styles.actionButton} onPress={() => handleDetailPress(item)} disabled={deletingId === item.id}>
             <Text style={styles.actionButtonText}>상세보기</Text>
           </Pressable>
-
+          <Pressable style={styles.actionButton} onPress={() => handleEditPress(item)} disabled={deletingId === item.id}>
+            <Text style={styles.actionButtonText}>수정</Text>
+          </Pressable>
           <Pressable style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)} disabled={deletingId === item.id}>
             <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
               {deletingId === item.id ? '삭제 중...' : '삭제'}
