@@ -57,27 +57,25 @@ def create_feedback(
     
     if feedback_data.feedback_tpo is not None:
         history.feedback_tpo = feedback_data.feedback_tpo
+        situation = history.tpo.value if hasattr(history.tpo, 'value') else history.tpo
         
-        if feedback_data.feedback_tpo == FeedbackTpoEnum.bad:
-            situation = history.tpo.value if hasattr(history.tpo, 'value') else history.tpo
-            
-            if situation and cloth:
-                tpo_score_rec = db.query(TpoScore).filter(
-                    TpoScore.clothes_id == cloth.clothes_id,
-                    TpoScore.tpo_name == situation
-                ).first()  
+        if situation and cloth:
+            tpo_score_rec = db.query(TpoScore).filter(
+                TpoScore.clothes_id == cloth.clothes_id,
+                TpoScore.tpo_name == situation
+            ).first()
 
-                # 기존 기록이 없을 경우 신규 생성
+            # [점수 보정 로직]
+            if feedback_data.feedback_tpo == FeedbackTpoEnum.bad:
                 if not tpo_score_rec:
-                    new_score = TpoScore(
-                        clothes_id=cloth.clothes_id,
-                        tpo_name=situation,
-                        score=95
-                    )
-                    db.add(new_score)
+                    db.add(TpoScore(clothes_id=cloth.clothes_id, tpo_name=situation, score=95))
                 else:
-                    current_score = tpo_score_rec.score
-                    tpo_score_rec.score = max(0, current_score - 5)
+                    tpo_score_rec.score = max(0, tpo_score_rec.score - 5)
+            
+            # '적합' 피드백 시 점수 회복 로직 추가 (최대 100점)
+            elif feedback_data.feedback_tpo == FeedbackTpoEnum.good:
+                if tpo_score_rec:
+                    tpo_score_rec.score = min(100, tpo_score_rec.score + 5)
 
 
     if feedback_data.memo is not None:
