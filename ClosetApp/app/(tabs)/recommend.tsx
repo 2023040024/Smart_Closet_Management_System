@@ -72,6 +72,8 @@ export default function RecommendScreen() {
 
     try {
       setApiLoading(true);
+      
+      // 1. 위치 정보는 정상적으로 가져옴 (테스트 환경에서도 중요)
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return Alert.alert('권한 필요', '위치 권한이 필요합니다.');
 
@@ -82,8 +84,9 @@ export default function RecommendScreen() {
       const response = await api.get('/recommend/today', { params: { situation, address } });
 
       setRecommendContext({ situation, address });
-      setAiMessage(response.data.ai_message || '');
+      setAiMessage(response.data.ai_message || '');;
       
+      // 3. 옷 매칭 로직 (기존과 동일)
       const matched = response.data.outfits.map((outfit: any) => {
         const set: OutfitSet = { reason: outfit.reason };
         outfit.items.forEach((item: any) => {
@@ -98,7 +101,9 @@ export default function RecommendScreen() {
         });
         return set;
       });
+
       setApiRecommendations(matched);
+      
     } catch (error) {
       console.error(error);
       Alert.alert('오류', '추천을 불러오지 못했습니다.');
@@ -107,31 +112,35 @@ export default function RecommendScreen() {
     }
   };
 
-  // ✨ 추가된 기능: API 연동 및 데이터 구조화 핸들러
-  const handleWearOutfit = async (outfit: OutfitSet) => {
-    try {
-      // 선택된 코디에서 존재하는 옷들만 필터링하여 백엔드 스펙(list[WearHistoryCreate])에 맞게 변환
-      const payload = [outfit.top, outfit.bottom, outfit.outer, outfit.shoes]
-        .filter(Boolean)
-        .map(cloth => ({
-          clothes_id: Number(cloth!.id)
-        }));
+const handleWearOutfit = async (outfit: OutfitSet) => {
+  try {
+    // 🎯 오늘 날짜를 백엔드 포맷(YYYY-MM-DD)에 맞게 생성
+    const todayStr = new Date().toISOString().slice(0, 10);
 
-      if (payload.length === 0) {
-        return Alert.alert('알림', '착용할 옷 정보가 없습니다.');
-      }
+    // 선택된 코디에서 존재하는 옷들만 필터링하고 worn_date 필드 필수 추가!
+    const payload = [outfit.top, outfit.bottom, outfit.outer, outfit.shoes]
+      .filter(Boolean)
+      .map(cloth => ({
+        clothes_id: Number(cloth!.id),
+        worn_date: todayStr // 👈 이 필드가 누락되어 422 에러가 났던 것입니다.
+      }));
 
-      await api.post('/history', payload);
-      Alert.alert('성공', '오늘의 착용 기록에 저장되었습니다!');
-    } catch (error: any) {
-      console.error(error);
-      // 백엔드 에러(422 등) 처리
-      const errorMsg = error.response?.status === 422 
-        ? '데이터 포맷이 잘못되었습니다.' 
-        : '착용 기록 저장에 실패했습니다.';
-      Alert.alert('오류', errorMsg);
+    if (payload.length === 0) {
+      return Alert.alert('알림', '착용할 옷 정보가 없습니다.');
     }
-  };
+
+    console.log('🚀 백엔드로 보낼 데이터 구조:', payload);
+
+    await api.post('/history', payload);
+    Alert.alert('성공', '오늘의 착용 기록에 저장되었습니다!');
+  } catch (error: any) {
+    console.error(error);
+    const errorMsg = error.response?.status === 422 
+      ? '데이터 포맷이 잘못되었습니다. (422)' 
+      : '착용 기록 저장에 실패했습니다.';
+    Alert.alert('오류', errorMsg);
+  }
+};
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
