@@ -85,7 +85,7 @@ def get_disposal_recommendation(
     return disposal_targets
 
 # 가성비 계산 API
-@router.get("/cost-per-wear", response_model=list[ClothesResponse])
+@router.get("/cost-per-wear", response_model=CostEfficiencyResult) 
 def get_cost_efficiency(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -115,7 +115,10 @@ def get_cost_efficiency(
         best_items = validated_clothes[:mid_index]
         worst_items = validated_clothes[mid_index:]
 
-    return best_items + worst_items
+    return {
+        "best_efficiency": best_items,
+        "worst_efficiency": worst_items
+    }
 
 
 # 옷장 과부하 분석 API
