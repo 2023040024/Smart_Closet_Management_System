@@ -2,16 +2,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 
-// ✨ 우리가 만든 전역 API 모듈 불러오기
 import api from './_api';
 
 export default function LoginScreen() {
@@ -20,7 +24,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    // 1. 입력값 유효성 확인
+    Keyboard.dismiss();
     if (!email.trim() || !password.trim()) {
       Alert.alert('알림', '이메일과 비밀번호를 모두 입력해주세요.');
       return;
@@ -28,34 +32,18 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
-
-      // 2. 실제 백엔드 로그인 API 호출
-      // Swagger에서 확인한 POST /auth/login 경로를 사용합니다.
-      const response = await api.post('/auth/login', {
-        email,
-        password,
-      });
-
-      // 3. 응답에서 진짜 access_token 추출
+      const response = await api.post('/auth/login', { email, password });
       const token = response.data.access_token;
 
       if (token) {
-        // 4. 기기 금고(AsyncStorage)에 진짜 토큰 저장
         await AsyncStorage.setItem('userToken', token);
-        
-        // 5. 로그인 성공 알림 후 홈으로 이동
-        Alert.alert('로그인 성공', '반갑습니다!', [
-          { text: '확인', onPress: () => router.replace('/') }
-        ]);
+        router.replace('/');
       }
     } catch (error: any) {
       console.error('로그인 에러:', error);
-      
-      // 에러 메시지 처리
       const errorMessage = error.response?.status === 401 
-        ? '이메일 또는 비밀번호가 틀렸습니다.' 
-        : '서버와 연결할 수 없습니다. 백엔드 상태를 확인해주세요.';
-        
+        ? '정보가 일치하지 않습니다.' 
+        : '서버 연결에 실패했습니다.';
       Alert.alert('로그인 실패', errorMessage);
     } finally {
       setLoading(false);
@@ -63,121 +51,207 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>로그인</Text>
-        <Text style={styles.subtitle}>스마트 옷장 서비스를 이용해 보세요 👗</Text>
-      </View>
-
-      <View style={styles.form}>
-        <Text style={styles.label}>이메일</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="example@email.com"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-
-        <Text style={styles.label}>비밀번호</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="비밀번호를 입력해주세요"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
-        <TouchableOpacity
-          style={[styles.loginButton, loading && styles.loginButtonDisabled]}
-          onPress={handleLogin}
-          disabled={loading}
+    <SafeAreaView style={styles.safeArea}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView 
+          style={styles.container} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          {loading ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.loginButtonText}>로그인하기</Text>
-          )}
-        </TouchableOpacity>
+          <View style={styles.content}>
+            
+            {/* ✨ 브랜드 히어로 섹션 (PPT 느낌) */}
+            <View style={styles.heroSection}>
+              <Text style={styles.projectType}>Smart Closet Management System</Text>
+              <View style={styles.brandRow}>
+                <Text style={styles.brandName}>Re</Text>
+                <Text style={styles.brandColon}>:</Text>
+                <Text style={styles.brandAccent}>fit</Text>
+              </View>
+              <View style={styles.decoLine} />
+              <Text style={styles.heroSubtitle}>최적의 옷장 활용을 위한 AI 개인화 솔루션</Text>
+            </View>
 
-        {/* ✨ 회원가입 화면으로 이동하는 버튼 */}
-        <TouchableOpacity 
-          style={styles.signupWrap} 
-          onPress={() => router.push('/signup')}
-        >
-          <Text style={styles.signupText}>
-            계정이 없으신가요? <Text style={styles.signupTextBold}>회원가입</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+            {/* 폼 섹션 */}
+            <View style={styles.formCard}>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email Address"
+                  placeholderTextColor="#94a3b8"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  placeholderTextColor="#94a3b8"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+                onPress={handleLogin}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.loginButtonText}>START SYSTEM</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.signupButton} 
+                onPress={() => router.push('/signup')}
+                activeOpacity={0.6}
+              >
+                <Text style={styles.signupText}>
+                  계정이 없으신가요? <Text style={styles.signupTextBold}>회원가입</Text>
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 하단 푸터 느낌의 텍스트 */}
+            <View style={styles.footer}>
+                <Text style={styles.footerText}>Powered by Gemini AI & FastAPI</Text>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#0f172a', // PPT 배경과 같은 딥 네이비
+  },
   container: { 
     flex: 1, 
-    backgroundColor: '#FFFFFF', 
-    padding: 24, 
-    justifyContent: 'center' 
   },
-  header: { 
-    marginBottom: 40 
+  content: {
+    flex: 1,
+    paddingHorizontal: 32,
+    justifyContent: 'center',
   },
-  title: { 
-    fontSize: 32, 
-    fontWeight: '800', 
-    color: '#111827', 
-    marginBottom: 8 
+  heroSection: {
+    marginBottom: 60,
   },
-  subtitle: { 
-    fontSize: 16, 
-    color: '#6B7280' 
+  projectType: {
+    fontSize: 14,
+    color: '#38bdf8', // 사이언 블루 포인트
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
   },
-  form: { 
-    gap: 16 
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
-  label: { 
-    fontSize: 14, 
-    fontWeight: '700', 
-    color: '#374151', 
-    marginBottom: -8 
+  brandName: {
+    fontSize: 64,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -1,
   },
-  input: { 
-    backgroundColor: '#F9FAFB', 
-    borderWidth: 1, 
-    borderColor: '#E5E7EB', 
-    borderRadius: 12, 
-    padding: 16, 
-    fontSize: 16, 
-    color: '#111827' 
+  brandColon: {
+    fontSize: 64,
+    fontWeight: '800',
+    color: '#38bdf8',
   },
-  loginButton: { 
-    backgroundColor: '#111827', 
-    borderRadius: 12, 
-    padding: 16, 
-    alignItems: 'center', 
-    marginTop: 16 
+  brandAccent: {
+    fontSize: 64,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -1,
   },
-  loginButtonDisabled: { 
-    backgroundColor: '#9CA3AF' 
+  decoLine: {
+    width: 60,
+    height: 4,
+    backgroundColor: '#38bdf8',
+    marginTop: 12,
+    borderRadius: 2,
   },
-  loginButtonText: { 
-    color: '#FFFFFF', 
-    fontSize: 16, 
-    fontWeight: '700' 
+  heroSubtitle: {
+    fontSize: 16,
+    color: '#94a3b8',
+    marginTop: 20,
+    fontWeight: '500',
+    lineHeight: 24,
   },
-  signupWrap: {
+  formCard: {
+    gap: 16,
+  },
+  inputContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
+  },
+  input: {
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  loginButton: {
+    backgroundColor: '#38bdf8',
+    borderRadius: 16,
+    paddingVertical: 20,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 12,
+    shadowColor: '#38bdf8',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  loginButtonDisabled: {
+    backgroundColor: '#1e293b',
+    shadowOpacity: 0,
+  },
+  loginButtonText: {
+    color: '#0f172a',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  signupButton: {
+    marginTop: 24,
+    alignItems: 'center',
   },
   signupText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#64748b',
   },
   signupTextBold: {
+    color: '#38bdf8',
     fontWeight: '700',
-    color: '#111827',
+    textDecorationLine: 'underline',
   },
+  footer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '600',
+    letterSpacing: 1,
+  }
 });

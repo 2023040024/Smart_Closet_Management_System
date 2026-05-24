@@ -1,4 +1,4 @@
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,34 +12,17 @@ import {
   View,
 } from 'react-native';
 
-// ✅ 1. 인터셉터 가져오기 (파일 위치가 app 폴더 안이라면 ./_api)
 import api from './_api';
 
-type ClothingItem = {
-  id: string;
-  name: string;
-  category: string;
-  color?: string;
-};
+type ClothingItem = { id: string; name: string; category: string; color?: string; };
+type ClothesApiItem = { clothes_id?: number; id?: number; name?: string; category?: string; color?: string; tags?: { category?: string; color?: string; [key: string]: any; }; };
 
-type ClothesApiItem = {
-  clothes_id?: number;
-  id?: number;
-  name?: string;
-  category?: string;
-  color?: string;
-};
+const tpoOptions = ['데일리', '비즈니스', '면접', '결혼식', '장례식', '운동', '데이트', '모임', '여행'];
+const tpoSuitabilityOptions = ['잘 어울림', '보통', '안 어울림']; 
+// ✅ 백엔드 Enum 스펙에 맞춰 '적당' -> '적당함'으로 수정
+const temperatureOptions = ['추움', '적당함', '더움']; 
 
-const tpoOptions = [
-  '데일리', '비즈니스', '면접', '결혼식', '장례식', '운동', '데이트', '모임', '여행',
-];
-
-const fitOptions = ['잘맞음', '보통', '안맞음'];
-const temperatureOptions = ['추움', '적당함', '더움'];
-
-function formatToday() {
-  return new Date().toISOString().slice(0, 10);
-}
+function formatToday() { return new Date().toISOString().slice(0, 10); }
 
 function normalizeCategory(category?: string) {
   const value = (category || '').trim().toLowerCase();
@@ -52,12 +35,24 @@ function normalizeCategory(category?: string) {
 }
 
 export default function HistoryCreateScreen() {
-  const today = formatToday();
+  const params = useLocalSearchParams<{
+    editMode?: string;
+    editId?: string;
+    editDate?: string;
+    editMemo?: string;
+    editTpo?: string;
+    editTpoSuitability?: string; 
+    editTemperature?: string;
+    editClothes?: string;
+  }>();
+
+  const isEditMode = params.editMode === 'true';
+  const displayDate = isEditMode && params.editDate ? params.editDate : formatToday();
 
   const [clothesList, setClothesList] = useState<ClothingItem[]>([]);
   const [selectedClothes, setSelectedClothes] = useState<string[]>([]);
   const [tpo, setTpo] = useState('');
-  const [fit, setFit] = useState('');
+  const [tpoSuitability, setTpoSuitability] = useState(''); 
   const [temperature, setTemperature] = useState('');
   const [memo, setMemo] = useState('');
 
@@ -65,28 +60,41 @@ export default function HistoryCreateScreen() {
   const [saving, setSaving] = useState(false);
   const [isUsingMockData, setIsUsingMockData] = useState(false);
 
-  // ✅ 옷 목록 불러오기 (인터셉터 적용)
+  useEffect(() => {
+    if (isEditMode) {
+      if (params.editMemo) setMemo(params.editMemo);
+      if (params.editTpo) setTpo(params.editTpo);
+      if (params.editTpoSuitability) setTpoSuitability(params.editTpoSuitability); 
+      
+      // ✅ 기존 데이터가 '적당'일 경우 '적당함'으로 보정해서 칩 맵칭 보장
+      if (params.editTemperature) {
+        setTemperature(params.editTemperature === '적당' ? '적당함' : params.editTemperature);
+      }
+      
+      if (params.editClothes) {
+        try {
+          const parsedClothes: ClothingItem[] = JSON.parse(params.editClothes);
+          setSelectedClothes(parsedClothes.map((cloth) => String(cloth.id)));
+        } catch (e) {
+          console.error('옷 데이터 파싱 에러:', e);
+        }
+      }
+    }
+  }, [isEditMode, params.editMemo, params.editTpo, params.editTpoSuitability, params.editTemperature, params.editClothes]);
+
   useEffect(() => {
     const fetchClothes = async () => {
       try {
         setLoadingClothes(true);
-        // api.get을 사용하면 자동으로 헤더에 토큰이 들어갑니다.
         const response = await api.get('/clothes');
         const data: ClothesApiItem[] = response.data;
-
-        const mapped: ClothingItem[] = data
-          .map((item, index) => {
-            const rawId = item.clothes_id ?? item.id;
-            if (rawId === undefined || rawId === null) return null;
-
-            return {
-              id: String(rawId),
-              name: item.name?.trim() || `옷 ${index + 1}`,
-              category: normalizeCategory(item.category),
-              color: item.color ?? '',
-            };
-          })
-          .filter(Boolean) as ClothingItem[];
+        const mapped: ClothingItem[] = data.map((item, index) => {
+          const rawId = item.clothes_id ?? item.id;
+          if (rawId === undefined || rawId === null) return null;
+          const rawCategory = item.category ?? item.tags?.category;
+          const rawColor = item.color ?? item.tags?.color ?? '';
+          return { id: String(rawId), name: item.name?.trim() || `옷 ${index + 1}`, category: normalizeCategory(rawCategory), color: rawColor };
+        }).filter(Boolean) as ClothingItem[];
 
         if (mapped.length === 0) {
           setIsUsingMockData(true);
@@ -100,8 +108,6 @@ export default function HistoryCreateScreen() {
         }
       } catch (error: any) {
         console.error('옷 목록 불러오기 실패:', error);
-        
-        // 401 에러 시 더미 데이터로 전환하며 안내
         setIsUsingMockData(true);
         if (error.response?.status === 401) {
           Alert.alert('인증 오류', '세션이 만료되었습니다. 다시 로그인해주세요.');
@@ -110,18 +116,20 @@ export default function HistoryCreateScreen() {
         setLoadingClothes(false);
       }
     };
-
     fetchClothes();
   }, []);
 
-  const groupedClothes = useMemo(() => ({
-    상의: clothesList.filter((item) => item.category === '상의'),
-    하의: clothesList.filter((item) => item.category === '하의'),
-    아우터: clothesList.filter((item) => item.category === '아우터'),
-    신발: clothesList.filter((item) => item.category === '신발'),
-    악세사리: clothesList.filter((item) => item.category === '악세사리'),
-    기타: clothesList.filter((item) => item.category === '기타'),
-  }), [clothesList]);
+  const groupedClothes = useMemo(() => {
+    const groups = [
+      { title: '아우터', items: clothesList.filter((item) => item.category === '아우터') },
+      { title: '상의', items: clothesList.filter((item) => item.category === '상의') },
+      { title: '하의', items: clothesList.filter((item) => item.category === '하의') },
+      { title: '신발', items: clothesList.filter((item) => item.category === '신발') },
+      { title: '악세사리', items: clothesList.filter((item) => item.category === '악세사리') },
+      { title: '기타', items: clothesList.filter((item) => item.category === '기타') },
+    ];
+    return groups.filter((g) => g.items.length > 0);
+  }, [clothesList]);
 
   const toggleCloth = (id: string) => {
     setSelectedClothes((prev) =>
@@ -137,21 +145,17 @@ export default function HistoryCreateScreen() {
           style={[styles.chip, selected === option && styles.chipSelected]}
           onPress={() => setValue(option)}
         >
-          <Text style={[styles.chipText, selected === option && styles.chipTextSelected]}>
-            {option}
-          </Text>
+          <Text style={[styles.chipText, selected === option && styles.chipTextSelected]}>{option}</Text>
         </Pressable>
       ))}
     </View>
   );
 
-  // ✅ 기록 저장 (인터셉터 적용)
   const handleSave = async () => {
     if (isUsingMockData) {
       Alert.alert('안내', '현재는 더미 데이터 상태라 저장이 불가능합니다. 다시 로그인해주세요.');
       return;
     }
-
     if (selectedClothes.length === 0) {
       Alert.alert('안내', '옷을 선택해주세요.');
       return;
@@ -159,26 +163,58 @@ export default function HistoryCreateScreen() {
 
     try {
       setSaving(true);
-      const payload = selectedClothes.map((clothesId) => ({
-        clothes_id: Number(clothesId),
-        worn_date: today,
-        tpo: tpo || null,
-        style: null,
-        mood: null,
-        feedback_temperature: temperature || null,
-        feedback_tpo: fit || null,
-        memo: memo.trim() || null,
-      }));
 
-      // ✅ fetch 대신 api.post 사용
-      await api.post('/history', payload);
+      let targetDate = typeof displayDate === 'string' ? displayDate.trim() : String(displayDate);
+      if (targetDate.includes('T')) {
+        targetDate = targetDate.split('T')[0];
+      }
+      targetDate = targetDate.slice(0, 10);
 
-      Alert.alert('저장 완료', '착용 기록이 저장되었습니다.', [
-        { text: '확인', onPress: () => router.replace('/(tabs)/history') },
-      ]);
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(targetDate)) {
+        Alert.alert('오류', `날짜 형식이 유효하지 않습니다: ${targetDate}`);
+        setSaving(false);
+        return;
+      }
+
+      const payload = selectedClothes.map((clothesId) => {
+        const numericId = Number(clothesId);
+        if (isNaN(numericId)) {
+          throw new Error(`유효하지 않은 옷 ID가 포함되어 있습니다: ${clothesId}`);
+        }
+
+        return {
+          clothes_id: numericId,
+          worn_date: targetDate, 
+          tpo: tpo && tpo.trim() !== "" ? tpo.trim() : null,
+          style: null,
+          mood: null,
+          feedback_temperature: temperature && temperature.trim() !== "" ? temperature.trim() : null,
+          feedback_tpo: tpoSuitability && tpoSuitability.trim() !== "" ? tpoSuitability.trim() : null,
+          memo: memo && memo.trim() !== "" ? memo.trim() : null,
+        };
+      });
+
+      if (isEditMode) {
+        // PUT 요청은 명세서 및 라우터 구조상 리스트 형태 고정 전송
+        await api.put(`/history/date/${targetDate}`, payload); 
+        Alert.alert('수정 완료', '착용 기록이 수정되었습니다.', [
+          { text: '확인', onPress: () => router.replace('/(tabs)/history') },
+        ]);
+      } else {
+        // ✅ POST /history 전송 시 Union 검증기 우회를 위해 리스트 래핑 규격 안정화 보장
+        await api.post('/history', payload);
+        Alert.alert('저장 완료', '착용 기록이 저장되었습니다.', [
+          { text: '확인', onPress: () => router.replace('/(tabs)/history') },
+        ]);
+      }
     } catch (error: any) {
       console.error('착용 기록 저장 실패:', error);
-      Alert.alert('저장 실패', error.response?.data?.detail || '서버 오류가 발생했습니다.');
+      if (error.response && error.response.data) {
+        Alert.alert('저장 실패 (422)', JSON.stringify(error.response.data.detail));
+      } else {
+        Alert.alert('저장 실패', error.message || '서버 오류가 발생했습니다.');
+      }
     } finally {
       setSaving(false);
     }
@@ -186,79 +222,56 @@ export default function HistoryCreateScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: '착용 기록 추가' }} />
+      <Stack.Screen options={{ title: isEditMode ? '착용 기록 수정' : '착용 기록 추가' }} />
       <SafeAreaView style={styles.container}>
         {loadingClothes ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" />
+            <ActivityIndicator size="large" color="#111" />
             <Text style={styles.loadingText}>옷 목록 불러오는 중...</Text>
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.content}>
             <View style={styles.section}>
               <Text style={styles.title}>날짜</Text>
-              <Text style={styles.value}>{today}</Text>
+              <Text style={styles.value}>{displayDate}</Text>
             </View>
 
             <View style={styles.section}>
               <Text style={styles.title}>오늘 입은 옷</Text>
-              {isUsingMockData && (
-                <Text style={styles.mockWarningText}>⚠️ 서버 연결 안됨 (더미 데이터 표시 중)</Text>
-              )}
-              {Object.entries(groupedClothes).map(([category, items]) => (
-                items.length > 0 && (
-                  <View key={category} style={styles.categoryBlock}>
-                    <Text style={styles.subTitle}>{category}</Text>
+              {isUsingMockData && <Text style={styles.mockWarningText}>⚠️ 서버 연결 안됨 (더미 데이터 표시 중)</Text>}
+              
+              {groupedClothes.length > 0 ? (
+                groupedClothes.map((group) => (
+                  <View key={group.title} style={styles.categoryBlock}>
+                    <Text style={styles.subTitle}>{group.title}</Text>
                     <View style={styles.clothRow}>
-                      {items.map((item) => (
+                      {group.items.map((item) => (
                         <Pressable
                           key={item.id}
                           style={[styles.clothBox, selectedClothes.includes(item.id) && styles.clothBoxSelected]}
                           onPress={() => toggleCloth(item.id)}
                         >
-                          <Text style={[styles.clothName, selectedClothes.includes(item.id) && styles.clothNameSelected]}>
-                            {item.name}
-                          </Text>
+                          <Text style={[styles.clothName, selectedClothes.includes(item.id) && styles.clothNameSelected]}>{item.name}</Text>
                         </Pressable>
                       ))}
                     </View>
                   </View>
-                )
-              ))}
+                ))
+              ) : (
+                !isUsingMockData && <Text style={styles.emptyText}>선택할 수 있는 옷이 없습니다.</Text>
+              )}
             </View>
 
-            <View style={styles.section}>
-              <Text style={styles.title}>TPO</Text>
-              {renderChips(tpoOptions, tpo, setTpo)}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.title}>핏</Text>
-              {renderChips(fitOptions, fit, setFit)}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.title}>체감온도</Text>
-              {renderChips(temperatureOptions, temperature, setTemperature)}
-            </View>
-
+            <View style={styles.section}><Text style={styles.title}>TPO (상황)</Text>{renderChips(tpoOptions, tpo, setTpo)}</View>
+            <View style={styles.section}><Text style={styles.title}>TPO 적합도</Text>{renderChips(tpoSuitabilityOptions, tpoSuitability, setTpoSuitability)}</View>
+            <View style={styles.section}><Text style={styles.title}>체감온도</Text>{renderChips(temperatureOptions, temperature, setTemperature)}</View>
             <View style={styles.section}>
               <Text style={styles.title}>메모</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="오늘 착장에 대한 메모를 입력하세요"
-                value={memo}
-                onChangeText={setMemo}
-                multiline
-              />
+              <TextInput style={styles.input} placeholder="오늘 착장에 대한 메모를 입력하세요" value={memo} onChangeText={setMemo} multiline />
             </View>
 
-            <Pressable
-              style={[styles.saveButton, (saving || isUsingMockData) && styles.saveButtonDisabled]}
-              onPress={handleSave}
-              disabled={saving || isUsingMockData}
-            >
-              <Text style={styles.saveText}>{saving ? '저장 중...' : '저장하기'}</Text>
+            <Pressable style={[styles.saveButton, (saving || isUsingMockData) && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving || isUsingMockData}>
+              <Text style={styles.saveText}>{saving ? '저장 중...' : (isEditMode ? '수정 완료' : '저장하기')}</Text>
             </Pressable>
           </ScrollView>
         )}
@@ -267,25 +280,24 @@ export default function HistoryCreateScreen() {
   );
 }
 
-// 스타일 시트는 기존 것 유지
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 16, paddingBottom: 40 },
   section: { marginBottom: 20 },
-  categoryBlock: { marginTop: 10 },
+  categoryBlock: { marginTop: 12 },
   title: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  subTitle: { fontSize: 13, color: '#666', marginBottom: 6 },
+  subTitle: { fontSize: 14, fontWeight: '600', color: '#555', marginBottom: 8 },
   value: { fontSize: 15, color: '#111' },
   clothRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   clothBox: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#f1f1f1' },
   clothBoxSelected: { backgroundColor: '#111' },
   clothName: { color: '#333', fontSize: 13 },
-  clothNameSelected: { color: '#fff' },
+  clothNameSelected: { color: '#fff', fontWeight: '600' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f1f1f1' },
   chipSelected: { backgroundColor: '#111' },
   chipText: { fontSize: 13, color: '#333' },
-  chipTextSelected: { color: '#fff' },
+  chipTextSelected: { color: '#fff', fontWeight: '600' },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, minHeight: 80, textAlignVertical: 'top' },
   saveButton: { marginTop: 10, backgroundColor: '#111', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.6 },
@@ -293,4 +305,5 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   loadingText: { marginTop: 12, fontSize: 14, color: '#777' },
   mockWarningText: { fontSize: 13, color: '#c0392b', marginBottom: 8, lineHeight: 18 },
+  emptyText: { fontSize: 14, color: '#888', marginTop: 4 },
 });
