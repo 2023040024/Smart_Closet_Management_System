@@ -44,10 +44,13 @@ def create_feedback(
         # current_user를 직접 사용하여 로직 간소화
         current_sensitivity = current_user.temp_sensitivity or 0.0
         
+        # 보정 가중치를 0.5로 최적화하고, 범위를 -2.0 ~ 2.0 사이로 제한(Clamp)
         if feedback_data.feedback_temperature == FeedbackTempEnum.cold:
-            current_user.temp_sensitivity = current_sensitivity + 1
+            new_val = current_sensitivity + 0.5
+            current_user.temp_sensitivity = max(-2.0, min(2.0, new_val))
         elif feedback_data.feedback_temperature == FeedbackTempEnum.hot:
-            current_user.temp_sensitivity = current_sensitivity - 1
+            new_val = current_sensitivity - 0.5
+            current_user.temp_sensitivity = max(-2.0, min(2.0, new_val))
         elif feedback_data.feedback_temperature == FeedbackTempEnum.good:
             current_user.temp_sensitivity = current_sensitivity
 
