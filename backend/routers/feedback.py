@@ -81,13 +81,20 @@ def create_feedback(
     if feedback_data.memo is not None:
         history.memo = feedback_data.memo
         
-    # 4. DB에 변경사항 저장
-    db.commit()
-    db.refresh(history)
-    db.refresh(current_user) # current_user 테이블 변경사항 확정
-    
-    return {
-        "message": "피드백 저장 및 사용자 온도 민감도 보정이 완료되었습니다.",
-        "history_id": history.history_id,
-        "new_temp_sensitivity": current_user.temp_sensitivity # 단순화된 반환 로직
-    }
+    # 4. DB에 변경사항 저장 (트랜잭션 안전성 확보)
+    try:
+        db.commit()
+        db.refresh(history)
+        db.refresh(current_user)
+        
+        return {
+            "message": "피드백 저장 및 사용자 온도 민감도 보정이 완료되었습니다.",
+            "history_id": history.history_id,
+            "new_temp_sensitivity": current_user.temp_sensitivity
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="피드백 저장 중 서버 오류가 발생했습니다."
+        )
