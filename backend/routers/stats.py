@@ -122,7 +122,7 @@ def get_cost_efficiency(
 
 
 # 옷장 과부하 분석 API
-@router.get("/overload", response_model=list[dict])
+@router.get("/overload", response_model=list[OverloadResult]) 
 def get_closet_overload(
     threshold: int = 3, 
     db: Session = Depends(get_db),
@@ -151,13 +151,12 @@ def get_closet_overload(
             grouped_data[key] = []
         grouped_data[key].append(item)
 
-    # 리턴 시 Pydantic 스키마(ClothesResponse) 적용
     detailed_data = [
         {
             "category": key[0],
             "color": key[1],
             "count": len(items),
-            "items": [ClothesResponse.model_validate(item).model_dump(by_alias=True) for item in items]
+            "items": items 
         }
         for key, items in grouped_data.items()
     ]
