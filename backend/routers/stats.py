@@ -7,6 +7,19 @@ from models import Clothes, SeasonEnum, User
 from routers.auth import get_current_user
 from schemas import ClothesResponse
 
+from pydantic import BaseModel
+
+# --- 통계 전용 응답 스키마 ---
+class CostEfficiencyResult(BaseModel):
+    best_efficiency: list[ClothesResponse]
+    worst_efficiency: list[ClothesResponse]
+
+class OverloadResult(BaseModel):
+    category: str
+    color: str
+    count: int
+    items: list[ClothesResponse]
+# ------------------------------
 
 router = APIRouter(prefix="/stats", tags=["통계 및 분석"])
 
