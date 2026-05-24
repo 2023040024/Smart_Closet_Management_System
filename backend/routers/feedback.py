@@ -87,11 +87,11 @@ def create_feedback(
         db.refresh(history)
         db.refresh(current_user)
         
-        return {
+        return [{
             "message": "피드백 저장 및 사용자 온도 민감도 보정이 완료되었습니다.",
             "history_id": history.history_id,
             "new_temp_sensitivity": current_user.temp_sensitivity
-        }
+        }]
     except Exception as e:
         db.rollback()
         raise HTTPException(
