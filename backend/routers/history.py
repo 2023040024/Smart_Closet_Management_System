@@ -34,10 +34,11 @@ def create_wear_history(history_data: list[WearHistoryCreate],
         clothes_map = {c.clothes_id: c for c in clothes_db}
 
         worn_dates = [data.worn_date for data in history_data]
-        existing_records_db = db.query(WearHistory).filter(
-            WearHistory.clothes_id.in_(clothes_ids),
-            WearHistory.worn_date.in_(worn_dates)
-        ).all()
+        existing_records_db = db.query(WearHistory)\
+            .filter(WearHistory.user_id == current_user.id)\
+            .filter(WearHistory.clothes_id.in_(clothes_ids))\
+            .filter(WearHistory.worn_date.in_(worn_dates))\
+            .all()
         existing_records_set = {(r.clothes_id, r.worn_date) for r in existing_records_db}
 
         # [Phase 1] 데이터 무결성 사전 검증
@@ -130,6 +131,10 @@ def update_daily_wear_history(
         ).all()
         
         for record in existing_records:
+            # 삭제되는 기록에 연결된 옷 객체를 찾아 착용 횟수 1 감소 (4줄 추가)
+            cloth_to_reduce = db.query(Clothes).filter(Clothes.clothes_id == record.clothes_id).first()
+            if cloth_to_reduce and cloth_to_reduce.wear_count > 0:
+                cloth_to_reduce.wear_count -= 1
             db.delete(record)
             
         db.flush()
@@ -147,6 +152,11 @@ def update_daily_wear_history(
             if hd.clothes_id not in clothes_map:
                 raise HTTPException(status_code=404, detail=f"해당 ID({hd.clothes_id})의 옷을 찾을 수 없습니다.")
                 
+            cloth = clothes_map[hd.clothes_id]
+            cloth.wear_count = (cloth.wear_count or 0) + 1
+            if not cloth.last_worn_date or hd.worn_date > cloth.last_worn_date:
+                cloth.last_worn_date = hd.worn_date
+
             new_history = WearHistory(
                 user_id=current_user.id,
                 clothes_id=hd.clothes_id,
