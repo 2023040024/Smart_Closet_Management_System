@@ -152,6 +152,11 @@ def update_daily_wear_history(
             if hd.clothes_id not in clothes_map:
                 raise HTTPException(status_code=404, detail=f"해당 ID({hd.clothes_id})의 옷을 찾을 수 없습니다.")
                 
+            cloth = clothes_map[hd.clothes_id]
+            cloth.wear_count = (cloth.wear_count or 0) + 1
+            if not cloth.last_worn_date or hd.worn_date > cloth.last_worn_date:
+                cloth.last_worn_date = hd.worn_date
+
             new_history = WearHistory(
                 user_id=current_user.id,
                 clothes_id=hd.clothes_id,
