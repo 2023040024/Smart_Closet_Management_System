@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session, joinedload
 from datetime import date  
 
@@ -114,7 +114,10 @@ def get_wear_histories(
 
 @router.put("", response_model=list[WearHistoryResponse], status_code=status.HTTP_200_OK)
 def update_daily_wear_history(
-    history_data: list[WearHistoryCreate],
+    history_data: list[WearHistoryCreate] = Body(
+        description="수정할 착용 기록 리스트입니다. JSON Root에 배열([ ]) 형태로 전달해야 합니다.",
+        example=[{"clothes_id": 1, "worn_date": "2026-05-25", "tpo": "데일리"}]
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> list[WearHistoryResponse]:
