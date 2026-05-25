@@ -131,6 +131,10 @@ def update_daily_wear_history(
         ).all()
         
         for record in existing_records:
+            # 삭제되는 기록에 연결된 옷 객체를 찾아 착용 횟수 1 감소 (4줄 추가)
+            cloth_to_reduce = db.query(Clothes).filter(Clothes.clothes_id == record.clothes_id).first()
+            if cloth_to_reduce and cloth_to_reduce.wear_count > 0:
+                cloth_to_reduce.wear_count -= 1
             db.delete(record)
             
         db.flush()
