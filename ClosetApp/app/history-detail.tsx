@@ -65,7 +65,7 @@ export default function HistoryDetailScreen() {
                       uri: cloth.imageUrl || 'https://via.placeholder.com/300x300?text=No+Image' 
                     }} 
                     style={styles.clothImage}
-                    resizeMode="cover"
+                    resizeMode="contain"
                   />
 
                   <Text style={styles.clothColor}>색상: {cloth.color || '정보 없음'}</Text>
@@ -101,10 +101,10 @@ const styles = StyleSheet.create({
   /* ✅ 새로 추가된 이미지 스타일 */
   clothImage: {
     width: '100%',
-    height: 180, // 이미지가 시원하게 보이도록 높이 설정
+    height: 200, // 이미지가 시원하게 보이도록 높이 설정
     borderRadius: 8,
-    backgroundColor: '#f1f1f1',
-    marginBottom: 12, // 이미지 아래 색상 텍스트와의 간격
+    backgroundColor: '#f9f9f9',
+    marginTop: 8, // 이미지 아래 색상 텍스트와의 간격
   },
   
   clothColor: { fontSize: 13, color: '#666' },
