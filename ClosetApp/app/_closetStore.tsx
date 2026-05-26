@@ -65,7 +65,7 @@ type ClosetContextType = {
 const STORAGE_KEY = 'clothes-v3'; 
 const ClosetContext = createContext<ClosetContextType | null>(null);
 
-const API_BASE_URL = 'http://192.168.0.25:8000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
 // ✅ 하얗게 뜨는 이미지 문제 해결을 위한 URL 변환 함수
 function resolveImageUri(image?: string | null) {

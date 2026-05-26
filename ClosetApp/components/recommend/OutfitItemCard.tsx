@@ -3,7 +3,7 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ClothesItem } from '../../app/_closetStore';
 import { TagChip } from './TagChip';
 
-const API_BASE_URL = 'http://192.168.0.25:8000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
 function resolveImageUri(image?: string | null) {
   if (!image) return '';
