@@ -197,7 +197,7 @@ export default function HistoryCreateScreen() {
 
       if (isEditMode) {
         // PUT 요청은 명세서 및 라우터 구조상 리스트 형태 고정 전송
-        await api.put(`/history/date/${targetDate}`, payload); 
+        await api.put(`/history`, payload); 
         Alert.alert('수정 완료', '착용 기록이 수정되었습니다.', [
           { text: '확인', onPress: () => router.replace('/(tabs)/history') },
         ]);
