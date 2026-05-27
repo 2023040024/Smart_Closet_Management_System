@@ -251,3 +251,11 @@ class FeedbackCreate(BaseModel):
     @classmethod
     def validate_enums(cls, v: Any, info: Any) -> Any:
         return map_korean_to_enum_logic(v, info)
+
+class OverloadItem(BaseModel):
+    category: str
+    color: str
+    count: int
+    warning_message: str
+    items: list[ClothesResponse]
+
