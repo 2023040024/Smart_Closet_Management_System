@@ -139,10 +139,18 @@ def update_daily_wear_history(
         ).all()
         
         for record in existing_records:
-            # 삭제되는 기록에 연결된 옷 객체를 찾아 착용 횟수 1 감소 (4줄 추가)
             cloth_to_reduce = db.query(Clothes).filter(Clothes.clothes_id == record.clothes_id).first()
-            if cloth_to_reduce and cloth_to_reduce.wear_count > 0:
-                cloth_to_reduce.wear_count -= 1
+            if cloth_to_reduce:
+                if cloth_to_reduce.wear_count > 0:
+                    cloth_to_reduce.wear_count -= 1
+                
+                # 삭제될 기록을 제외하고 가장 최신 기록을 다시 조회 (버그 수정)
+                rem_h = db.query(WearHistory).filter(
+                    WearHistory.clothes_id == record.clothes_id,
+                    WearHistory.history_id != record.history_id
+                ).order_by(WearHistory.worn_date.desc()).first()
+                cloth_to_reduce.last_worn_date = rem_h.worn_date if rem_h else None
+            
             db.delete(record)
             
         db.flush()
