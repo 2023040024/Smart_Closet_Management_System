@@ -1,19 +1,31 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func  
-from typing import List
 from datetime import datetime, timedelta, date 
 from database import get_db
 from models import Clothes, SeasonEnum, User
 from routers.auth import get_current_user
 from schemas import ClothesResponse
 
+from pydantic import BaseModel
+
+# --- 통계 전용 응답 스키마 ---
+class CostEfficiencyResult(BaseModel):
+    best_efficiency: list[ClothesResponse]
+    worst_efficiency: list[ClothesResponse]
+
+class OverloadResult(BaseModel):
+    category: str
+    color: str
+    count: int
+    items: list[ClothesResponse]
+# ------------------------------
 
 router = APIRouter(prefix="/stats", tags=["통계 및 분석"])
 
 
 # 미착용 옷/ 재활용 옷 우선순위 추출 API
-@router.get("/unworn", response_model=List[ClothesResponse])
+@router.get("/unworn", response_model=list[ClothesResponse])
 def get_unworn_clothes(
     current_season: SeasonEnum, 
     days: int = 30, 
@@ -37,7 +49,7 @@ def get_unworn_clothes(
     return unworn_clothes
 
 # 착용 빈도 통계 API
-@router.get("/frequency", response_model=List[ClothesResponse])
+@router.get("/frequency", response_model=list[ClothesResponse])
 def get_top_frequency(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -49,7 +61,7 @@ def get_top_frequency(
     
     return top_clothes
 
-@router.get("/dispose", response_model=List[ClothesResponse])
+@router.get("/dispose", response_model=list[ClothesResponse])
 def get_disposal_recommendation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -73,7 +85,7 @@ def get_disposal_recommendation(
     return disposal_targets
 
 # 가성비 계산 API
-@router.get("/cost-per-wear")
+@router.get("/cost-per-wear", response_model=CostEfficiencyResult) 
 def get_cost_efficiency(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -103,22 +115,14 @@ def get_cost_efficiency(
         best_items = validated_clothes[:mid_index]
         worst_items = validated_clothes[mid_index:]
 
-    best_item_name = best_items[0].name if best_items else None
-    worst_total_price = sum(c.price for c in worst_items)
-
     return {
-        "message": "가성비 분석 완료",
-        "best_efficiency": best_items, 
-        "worst_efficiency": worst_items, 
-        "ai_summary": { 
-            "most_efficient_item": best_item_name,
-            "total_investment_on_worst": worst_total_price
-        }
+        "best_efficiency": best_items,
+        "worst_efficiency": worst_items
     }
 
 
 # 옷장 과부하 분석 API
-@router.get("/overload")
+@router.get("/overload", response_model=list[OverloadResult]) 
 def get_closet_overload(
     threshold: int = 3, 
     db: Session = Depends(get_db),
@@ -147,19 +151,14 @@ def get_closet_overload(
             grouped_data[key] = []
         grouped_data[key].append(item)
 
-    # 리턴 시 Pydantic 스키마(ClothesResponse) 적용
     detailed_data = [
         {
             "category": key[0],
             "color": key[1],
             "count": len(items),
-            "items": [ClothesResponse.model_validate(item).model_dump(by_alias=True) for item in items]
+            "items": items 
         }
         for key, items in grouped_data.items()
     ]
 
-    return {
-        "message": f"과다 보유 리포트: {len(detailed_data)}건 발견",
-        "overload_details": detailed_data,
-        "ai_insight": f"사용자는 현재 {len(detailed_data)}개의 스타일에서 중복 구매 패턴을 보입니다."
-    }
+    return detailed_data
