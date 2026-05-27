@@ -221,6 +221,16 @@ def update_status(clothes_id: int, body: ClothesStatusUpdate, db: Session = Depe
 def delete_clothes(clothes_id: int, db: Session = Depends(get_db)
                    , current_user: User = Depends(get_current_user)):
     clothes = _get_clothes_or_404(db, clothes_id, current_user.id)
+
+    # 실제 이미지 파일 삭제 (경로가 존재할 경우)
+    if clothes.image_url:
+        # /images/파일명 -> uploaded_images/파일명 으로 변환하여 삭제
+        file_name = clothes.image_url.split("/")[-1]
+        file_path = os.path.join(IMAGE_DIR, file_name)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            
+    # db 기록 삭제
     db.delete(clothes)
     db.commit()
 
