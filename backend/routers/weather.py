@@ -71,7 +71,8 @@ async def get_weather_by_location(
             res_data = response.json()
         
         if res_data.get('response', {}).get('header', {}).get('resultCode') != '00':
-            return {"status": "error", "message": "기상청 API 응답 오류"}
+            error_msg = res_data.get('response', {}).get('header', {}).get('resultMsg', '알 수 없는 오류')
+            raise HTTPException(status_code=502, detail=f"기상청 API 응답 오류: {error_msg}")
 
         items = res_data['response']['body']['items']['item']
 
@@ -95,7 +96,7 @@ async def get_weather_by_location(
             value = item['fcstValue']
 
             # 1. 현재 기온 (가장 빠른 예보 시간의 TMP)
-            if category == 'TMP' and weather_info["현재 기온"] is None:
+            if category == 'TMP' and weather_info["현재_기온"] is None:
                 weather_info["현재_기온"] = f"{value}°C"
             
             # 2. 최고 기온
@@ -107,15 +108,15 @@ async def get_weather_by_location(
                 weather_info["최저_기온"] = f"{value}°C"
             
             # 4. 하늘 상태
-            elif category == 'SKY' and weather_info["하늘 상태"] is None:
+            elif category == 'SKY' and weather_info["하늘_상태"] is None:
                 weather_info["하늘_상태"] = sky_status.get(value, "알 수 없음")
             
             # 5. 강수 형태
-            elif category == 'PTY' and weather_info["강수 형태"] is None:
+            elif category == 'PTY' and weather_info["강수_형태"] is None:
                 weather_info["강수_형태"] = pty_status.get(value, "알 수 없음")
             
             # 6. 강수 확률
-            elif category == 'POP' and weather_info["강수 확률"] is None:
+            elif category == 'POP' and weather_info["강수_확률"] is None:
                 weather_info["강수_확률"] = f"{value}%"
 
         return {
@@ -127,5 +128,7 @@ async def get_weather_by_location(
             "weather": weather_info
         }
 
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail=f"기상청 서버와 통신할 수 없습니다: {exc}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"날씨 정보 처리 중 내부 서버 에러: {str(e)}")
