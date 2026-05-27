@@ -10,8 +10,7 @@ from database import Base
 
 
 # ──────────────────────────────────────────────
-# Enum 유효값 정의 (팀 전체 공유 기준)
-# B 담당자가 확정 후 팀원에게 공유할 것
+# Enum 유효값 정의
 # ──────────────────────────────────────────────
 
 class CategoryEnum(str, enum.Enum):
@@ -129,9 +128,9 @@ class FeedbackTempEnum(str, enum.Enum):
     cold     = "추움"
 
 class FeedbackTpoEnum(str, enum.Enum):
-    good     = "잘맞음"
+    good     = "잘 어울림"
     normal   = "보통"
-    bad      = "안맞음"
+    bad      = "안 어울림"
 
 
 # ──────────────────────────────────────────────
@@ -248,5 +247,5 @@ class TpoScore(Base):
     id         = Column(Integer, primary_key=True, index=True)
     clothes_id = Column(Integer, ForeignKey("clothes.clothes_id", ondelete="CASCADE"), nullable=False)
     tpo_name   = Column(String, nullable=False)
-    scor       = Column(Integer, default=100, nullable=False)
+    score       = Column(Integer, default=100, nullable=False)
     clothes    = relationship("Clothes", back_populates="tpo_scores")

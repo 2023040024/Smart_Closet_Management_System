@@ -1,9 +1,15 @@
 from fastapi import APIRouter, Query, HTTPException
 from utils import convert_grid, get_base_time, get_coords_from_address # 유틸리티 함수 로드
-import requests
+import requests, os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 router = APIRouter(prefix="/weather", tags=["날씨"])
-SERVICE_KEY = "0b1a641aa90d0faf85b954ff4400466397b5737a27a3f95d1997150ba7f28f01"
+SERVICE_KEY = os.getenv("WEATHER_SERVICE_KEY")
+
+if not SERVICE_KEY:
+    print("WEATHER_SERVICE_KEY 환경 변수가 로드되지 않았습니다. .env 파일을 확인하세요.")
 
 @router.get("/address")
 def get_weather_by_location(
