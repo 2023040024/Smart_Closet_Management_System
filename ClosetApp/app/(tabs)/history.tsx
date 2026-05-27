@@ -67,7 +67,7 @@ type GroupedWearHistoryItem = {
   memo?: string;
 };
 
-const filterOptions = ['전체', '데일리', '비즈니스', '데이트', '여행', '운동', '모임'];
+const filterOptions = ['전체', '데일리', '비즈니스', '면접', '결혼식', '장례식', '운동', '데이트', '모임', '여행'];
 
 function formatDate(dateString?: string) {
   if (!dateString) return '날짜 없음';
