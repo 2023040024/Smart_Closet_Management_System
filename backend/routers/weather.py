@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel, Field, ConfigDict
 from utils import convert_grid, get_base_time, get_coords_from_address # 유틸리티 함수 로드
-import requests, os
+import os, httpx
 from dotenv import load_dotenv
 from typing import Optional, Dict
 
@@ -34,9 +34,9 @@ class WeatherResponse(BaseModel):
     status: str
     base_info: BaseInfo
     weather: WeatherInfo
-    
-@router.get("/address")
-def get_weather_by_location(
+
+@router.get("/address", response_model=WeatherResponse)
+async def get_weather_by_location(
     address: str = Query(..., description="주소명 (예: 서울시, 부산광역시 해운대구)")
 ):
     # 1. 주소를 위경도로 변환
@@ -64,8 +64,11 @@ def get_weather_by_location(
     }
 
     try:
-        response = requests.get(url, params=params, timeout=5)
-        res_data = response.json()
+        # httpx 비동기 클라이언트 사용 및 타임아웃, 상태 검증
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, timeout=5.0)
+            response.raise_for_status()
+            res_data = response.json()
         
         if res_data.get('response', {}).get('header', {}).get('resultCode') != '00':
             return {"status": "error", "message": "기상청 API 응답 오류"}
