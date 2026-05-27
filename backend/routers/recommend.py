@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from database import get_db
-from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum
+from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum, TpoScore
 from routers.auth import get_current_user
 from tpo_rules import get_tpo_prompt_text, check_color_conflict
 
@@ -324,6 +324,27 @@ def call_gemini(prompt: str, retries: int = 2) -> dict:
             if attempt == retries:
                 raise HTTPException(status_code=500, detail=f"AI 추천 생성 실패: {str(e)}")
 
+SITUATION_MAP = {
+    "daily": "데일리", "business": "비즈니스", "interview": "면접",
+    "wedding": "결혼식", "funeral": "장례식", "exercise": "운동",
+    "date": "데이트", "meeting": "모임", "travel": "여행",
+    "school": "데일리", "cafe": "데일리",
+}
+
+def to_situation_kr(situation: str | None) -> str:
+    if not situation:
+        return "데일리"
+    return SITUATION_MAP.get(situation, situation)
+
+def load_tpo_scores(db: Session, user_id: int, situation_kr: str) -> dict[int, int]:
+    rows = (
+        db.query(TpoScore)
+        .join(Clothes, TpoScore.clothes_id == Clothes.clothes_id)
+        .filter(Clothes.user_id == user_id, TpoScore.tpo_name == situation_kr)
+        .all()
+    )
+    return {row.clothes_id: row.score for row in rows}
+
 @router.get("/today", response_model=RecommendResponse)
 def recommend_today(
     situation: Optional[str] = None,
@@ -351,7 +372,9 @@ def recommend_today(
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation or "데일리")
+    situation_kr = to_situation_kr(situation)
+    tpo_scores = load_tpo_scores(db, user_id, situation_kr)
+    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation_kr, tpo_scores)
     if len(filtered) < 2:
         return {
             "outfits": [],
@@ -387,7 +410,9 @@ def recommend_custom(
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, body.situation or "데일리")
+    situation_kr = to_situation_kr(body.situation)
+    tpo_scores = load_tpo_scores(db, user_id, situation_kr)
+    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation_kr, tpo_scores)
     if len(filtered) < 2:
         return {
             "outfits": [],
@@ -421,7 +446,9 @@ def recommend_weekly(
         all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     except LookupError as e:
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
-    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation or "데일리")
+    situation_kr = to_situation_kr(situation)
+    tpo_scores = load_tpo_scores(db, user_id, situation_kr)
+    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation_kr, tpo_scores)
     if len(filtered) < 4:
         return {
             "weekly_outfits": [],
