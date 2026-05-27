@@ -155,6 +155,24 @@ class TestFilterClothesF13:
         with patch("routers.recommend.get_current_season", return_value="봄"):
             assert c in filter_clothes([c], 20.0, "sunny")
 
+    def test_세탁필요_제외(self):
+        c = make_clothes(status=StatusEnum.need_wash)
+        assert filter_clothes([c], 20.0, "sunny") == []
+
+
+class TestGetCurrentSeasonExtra:
+    def test_9월_가을(self):
+        with patch("routers.recommend.date") as mock_date:
+            mock_date.today.return_value = date(2026, 9, 1)
+            assert get_current_season() == "가을"
+
+
+class TestCalculateConflictScoreExtra:
+    def test_면접_영어상황도_60반환(self):
+        c = make_clothes(season="봄", color="레드")
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            assert calculate_conflict_score(c, "interview") == 60
+
 
 class TestApplyFallbackFilter:
     def test_충분한경우_fallback미사용(self):
