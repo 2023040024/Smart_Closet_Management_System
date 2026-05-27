@@ -143,14 +143,24 @@ def get_closet_overload(
             grouped_data[key] = []
         grouped_data[key].append(item)
 
-    detailed_data = [
-        {
-            "category": key[0],
-            "color": key[1],
-            "count": len(items),
-            "items": items 
-        }
-        for key, items in grouped_data.items()
-    ]
+    detailed_data = []
+    for key, items in grouped_data.items():
+        # Enum 객체일 경우 문자열 값(value)만 추출
+        cat_val = key[0].value if hasattr(key[0], 'value') else key[0]
+        col_val = key[1].value if hasattr(key[1], 'value') else key[1]
+        count = len(items)
+        
+        # 경고 메시지 동적 생성
+        message = f"경고! 옷장에 {col_val} {cat_val}만 {count}벌이 있어요. 유사한 옷의 충동 소비를 주의하세요!"
+        
+        detailed_data.append(
+            OverloadItem(
+                category=cat_val,
+                color=col_val,
+                count=count,
+                warning_message=message,
+                items=items
+            )
+        )
 
     return detailed_data
