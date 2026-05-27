@@ -18,6 +18,7 @@ def make_clothes(**kwargs):
     c.mood           = None
     c.point          = None
     c.wear_count     = kwargs.get("wear_count",     0)
+    c.situation      = kwargs.get("situation",      None)
     return c
 
 def make_user(**kwargs):
