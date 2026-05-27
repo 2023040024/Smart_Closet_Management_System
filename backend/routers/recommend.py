@@ -455,7 +455,6 @@ def recommend_weekly(
             "tip": "주간 추천을 위해 최소 4벌 이상의 옷을 등록해주세요."
         }
     clothes_text = "\n".join([clothes_to_text(c) for c in filtered])
-    situation_kr = situation or "데일리"
 
     prompt = f"""
 당신은 패션 코디 전문가입니다.
