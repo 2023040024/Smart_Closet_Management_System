@@ -40,7 +40,7 @@ async def get_weather_by_location(
     address: str = Query(..., description="주소명 (예: 서울시, 부산광역시 해운대구)")
 ):
     # 1. 주소를 위경도로 변환
-    lat, lon = get_coords_from_address(address)
+    lat, lon = await get_coords_from_address(address)
     
     if lat is None:
         raise HTTPException(status_code=400, detail="유효하지 않은 주소입니다.")

@@ -11,11 +11,19 @@ async def get_coords_from_address(address: str):
         # 5초 타임아웃 지정 및 비동기 클라이언트 사용
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(url, headers=headers)
-        data = response.json()
-        if data:
-            return float(data[0]['lat']), float(data[0]['lon'])
-        return None, None
-    except:
+
+            # HTTP 상태 코드가 정상(200)일 때만 데이터 파싱
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    return float(data[0]['lat']), float(data[0]['lon'])
+            
+            # 검색 결과가 없거나 200이 아닌 경우
+            return None, None
+            
+    except Exception as e:
+        # 디버깅을 위해 에러 로그 출력, 시스템 종료 예외는 잡지 않음
+        print(f"[Warning] 주소 변환 API 오류 발생: {e}")
         return None, None
     
 def convert_grid(lat, lon):
