@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Query, HTTPException
+from pydantic import BaseModel, Field, ConfigDict
 from utils import convert_grid, get_base_time, get_coords_from_address # 유틸리티 함수 로드
 import requests, os
 from dotenv import load_dotenv
+from typing import Optional, Dict
 
 load_dotenv()
 
@@ -10,6 +12,19 @@ SERVICE_KEY = os.getenv("WEATHER_SERVICE_KEY")
 
 if not SERVICE_KEY:
     print("WEATHER_SERVICE_KEY 환경 변수가 로드되지 않았습니다. .env 파일을 확인하세요.")
+
+class WeatherInfo(BaseModel):
+    주소: str
+    좌표: Dict[str, float]
+    # FE로는 "현재 기온"으로 응답하고, 백엔드 내부에서는 "현재_기온"으로 다룹니다.
+    현재_기온: Optional[str] = Field(None, alias="현재 기온")
+    최고_기온: Optional[str] = Field(None, alias="최고 기온")
+    최저_기온: Optional[str] = Field(None, alias="최저 기온")
+    하늘_상태: Optional[str] = Field(None, alias="하늘 상태")
+    강수_형태: Optional[str] = Field(None, alias="강수 형태")
+    강수_확률: Optional[str] = Field(None, alias="강수 확률")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 @router.get("/address")
 def get_weather_by_location(
@@ -55,12 +70,12 @@ def get_weather_by_location(
         weather_info = {
             "주소": address,
             "좌표": {"위도": lat, "경도": lon},
-            "현재 기온": None,  # TMP
-            "최고 기온": None,      # TMX
-            "최저 기온": None,      # TMN
-            "하늘 상태": None, # SKY
-            "강수 형태": None, # PTY
-            "강수 확률": None # POP
+            "현재_기온": None,  # TMP
+            "최고_기온": None,      # TMX
+            "최저_기온": None,      # TMN
+            "하늘_상태": None, # SKY
+            "강수_형태": None, # PTY
+            "강수_확률": None # POP
         }
 
         for item in items:
@@ -69,27 +84,27 @@ def get_weather_by_location(
 
             # 1. 현재 기온 (가장 빠른 예보 시간의 TMP)
             if category == 'TMP' and weather_info["현재 기온"] is None:
-                weather_info["현재 기온"] = f"{value}°C"
+                weather_info["현재_기온"] = f"{value}°C"
             
             # 2. 최고 기온
             elif category == 'TMX':
-                weather_info["최고 기온"] = f"{value}°C"
+                weather_info["최고_기온"] = f"{value}°C"
             
             # 3. 최저 기온
             elif category == 'TMN':
-                weather_info["최저 기온"] = f"{value}°C"
+                weather_info["최저_기온"] = f"{value}°C"
             
             # 4. 하늘 상태
             elif category == 'SKY' and weather_info["하늘 상태"] is None:
-                weather_info["하늘 상태"] = sky_status.get(value, "알 수 없음")
+                weather_info["하늘_상태"] = sky_status.get(value, "알 수 없음")
             
             # 5. 강수 형태
             elif category == 'PTY' and weather_info["강수 형태"] is None:
-                weather_info["강수 형태"] = pty_status.get(value, "알 수 없음")
+                weather_info["강수_형태"] = pty_status.get(value, "알 수 없음")
             
             # 6. 강수 확률
             elif category == 'POP' and weather_info["강수 확률"] is None:
-                weather_info["강수 확률"] = f"{value}%"
+                weather_info["강수_확률"] = f"{value}%"
 
         return {
             "status": "success",
