@@ -26,6 +26,15 @@ class WeatherInfo(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+class BaseInfo(BaseModel):
+    date: str
+    time: str
+
+class WeatherResponse(BaseModel):
+    status: str
+    base_info: BaseInfo
+    weather: WeatherInfo
+    
 @router.get("/address")
 def get_weather_by_location(
     address: str = Query(..., description="주소명 (예: 서울시, 부산광역시 해운대구)")
