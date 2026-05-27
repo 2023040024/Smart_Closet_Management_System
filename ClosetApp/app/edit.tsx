@@ -15,7 +15,7 @@ import {
 import api from './_api';
 import { ClothesTags, EMPTY_TAGS, TAG_OPTIONS, useCloset } from './_closetStore';
 
-const API_BASE_URL = 'http://192.168.1.122:8000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
 function resolveImageUri(image?: string | null) {
   if (!image) return '';

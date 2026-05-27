@@ -133,10 +133,11 @@ export default function HistoryScreen() {
         const category = item.clothes?.category ?? item.clothes?.tags?.category ?? '미분류';
         const color = item.clothes?.color ?? item.clothes?.tags?.color ?? '색상 정보 없음';
 
-        // ✅ [핵심 변경] 백엔드가 준 상대 경로를 스마트폰이 읽을 수 있는 절대 경로로 변환!
+        const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+        
         const rawImageUrl = item.clothes?.image_url;
         const fullImageUrl = rawImageUrl 
-          ? (rawImageUrl.startsWith('http') ? rawImageUrl : `http://192.168.1.122:8000${rawImageUrl}`)
+          ? (rawImageUrl.startsWith('http') ? rawImageUrl : `${API_BASE_URL}${rawImageUrl}`)
           : undefined;
 
         nextClothesMap[clothesId] = {
