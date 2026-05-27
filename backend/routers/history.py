@@ -10,10 +10,15 @@ from .auth import get_current_user
 router = APIRouter(prefix="/history", tags=["착용 기록"])
 
 @router.post("", response_model=list[WearHistoryResponse], status_code=status.HTTP_201_CREATED)
-def create_wear_history(history_data: list[WearHistoryCreate],
-                        db: Session = Depends(get_db),
-                        current_user: User = Depends(get_current_user)
-                        ) -> list[WearHistoryResponse]: # 반환 타입 힌트
+def create_wear_history(
+    history_data: list[WearHistoryCreate] = Body(
+        ..., 
+        description="등록할 착용 기록 데이터 리스트입니다. 반드시 배열([ ]) 형태로 전달해야 합니다."
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> list[WearHistoryResponse]:
+    
     if not history_data:
         raise HTTPException(status_code=400, detail="기록할 옷 데이터가 비어있습니다.")
     
