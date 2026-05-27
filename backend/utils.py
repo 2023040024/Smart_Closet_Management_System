@@ -1,14 +1,16 @@
 from datetime import datetime, timedelta
 import math
-import requests
+import httpx
 
 # 1. 주소 -> 위경도 변환 (OpenStreetMap Nominatim 사용)
-def get_coords_from_address(address: str):
+async def get_coords_from_address(address: str):
     url = f"https://nominatim.openstreetmap.org/search?q={address}&format=json"
     headers = {"User-Agent": "SmartClosetApp"} # 필수 헤더
     
     try:
-        response = requests.get(url, headers=headers)
+        # 5초 타임아웃 지정 및 비동기 클라이언트 사용
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url, headers=headers)
         data = response.json()
         if data:
             return float(data[0]['lat']), float(data[0]['lon'])
