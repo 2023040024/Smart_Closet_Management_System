@@ -130,7 +130,15 @@ def calculate_conflict_score(c: Clothes, situation: str) -> int:
     return 0
 
 
-def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_condition: str, situation: str = "데일리") -> list[Clothes]:
+def filter_clothes(
+    clothes_list: list[Clothes],
+    temperature: float,
+    weather_condition: str,
+    situation: str = "데일리",
+    tpo_scores: dict[int, int] | None = None,
+) -> list[Clothes]:
+    if tpo_scores is None:
+        tpo_scores = {}
     result = []
     for c in clothes_list:
         if c.status is not None and c.status != StatusEnum.wearable.value:
@@ -148,6 +156,9 @@ def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_cond
         # F-13: 계절 불일치(C=80) 제외
         if calculate_conflict_score(c, situation) >= 80:
             continue
+        # 피드백 누적 TpoScore 60 미만 옷 제외 (8회 이상 부정 피드백)
+        if tpo_scores.get(c.clothes_id, 100) < 60:
+            continue
         result.append(c)
     return result
 
@@ -156,15 +167,18 @@ def apply_fallback_filter(
     temperature: float,
     weather_condition: str,
     situation: str = "데일리",
+    tpo_scores: dict[int, int] | None = None,
 ) -> tuple[list[Clothes], bool]:
     """strict filter 후 상의/하의가 2벌 미만이면 해당 카테고리의 계절·두께 필터를 해제.
 
     옷장 규모가 작은 초기 사용자(3~5벌)도 추천을 받을 수 있도록 fallback 적용.
     반환: (필터 결과, fallback 사용 여부)
     """
+    if tpo_scores is None:
+        tpo_scores = {}
     MIN_PER_CATEGORY = 2
 
-    strict = filter_clothes(all_clothes, temperature, weather_condition, situation)
+    strict = filter_clothes(all_clothes, temperature, weather_condition, situation, tpo_scores)
 
     def _cat(c: Clothes) -> str:
         return c.category.value if hasattr(c.category, "value") else c.category
