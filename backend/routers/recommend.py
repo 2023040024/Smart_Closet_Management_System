@@ -407,11 +407,11 @@ def recommend_weekly(
         all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     except LookupError as e:
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
-    filtered = [c for c in all_clothes if c.status in (StatusEnum.wearable, None)]
+    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation or "데일리")
     if len(filtered) < 4:
         return {
-            "outfits": [], 
-            "ai_message": "주간 추천을 위해 최소 4벌 이상의 옷을 등록해주세요."
+            "weekly_outfits": [],
+            "tip": "주간 추천을 위해 최소 4벌 이상의 옷을 등록해주세요."
         }
     clothes_text = "\n".join([clothes_to_text(c) for c in filtered])
     situation_kr = situation or "데일리"
@@ -446,4 +446,7 @@ def recommend_weekly(
   "tip": "이번 주 코디 팁 한 줄"
 }}
 """
-    return call_gemini(prompt)
+    result = call_gemini(prompt)
+    if used_fallback:
+        result["tip"] = "[현재 날씨·계절에 맞는 옷이 부족하여 전체 옷장 기준으로 추천했습니다] " + result.get("tip", "")
+    return result
