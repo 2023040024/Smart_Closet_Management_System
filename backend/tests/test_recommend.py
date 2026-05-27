@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from conftest import make_clothes, make_user
 from models import StatusEnum, CategoryEnum, ThicknessEnum, MaterialEnum
-from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score
+from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score, to_situation_kr
 from unittest.mock import patch
 from datetime import date, timedelta
 
@@ -189,3 +189,35 @@ class TestApplyFallbackFilter:
         with patch("routers.recommend.get_current_season", return_value="봄"):
             result, used = apply_fallback_filter([top_spring, top_winter_washing] + bottoms, 20.0, "sunny")
         assert top_winter_washing not in result
+
+
+class TestFilterClothesTpoScore:
+    def test_tpo_score_60미만_제외(self):
+        c = make_clothes(clothes_id=1)
+        assert filter_clothes([c], 20.0, "sunny", tpo_scores={1: 59}) == []
+
+    def test_tpo_score_60이상_포함(self):
+        c = make_clothes(clothes_id=1)
+        assert c in filter_clothes([c], 20.0, "sunny", tpo_scores={1: 60})
+
+    def test_tpo_score_없으면_기본값100_포함(self):
+        c = make_clothes(clothes_id=1)
+        assert c in filter_clothes([c], 20.0, "sunny", tpo_scores={})
+
+    def test_tpo_scores_None이면_모두포함(self):
+        c = make_clothes(clothes_id=1)
+        assert c in filter_clothes([c], 20.0, "sunny", tpo_scores=None)
+
+
+class TestToSituationKr:
+    def test_영문_daily_데일리(self):
+        assert to_situation_kr("daily") == "데일리"
+
+    def test_영문_interview_면접(self):
+        assert to_situation_kr("interview") == "면접"
+
+    def test_한글_그대로반환(self):
+        assert to_situation_kr("데일리") == "데일리"
+
+    def test_None이면_데일리(self):
+        assert to_situation_kr(None) == "데일리"
