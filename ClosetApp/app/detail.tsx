@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -14,7 +14,18 @@ import api from './_api';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
-// ✅ 빨간 줄 에러를 해결하기 위해 최상위에 situation, tpo 추가
+// ✅ 1. 관리 팁 데이터를 위한 타입 정의 추가
+interface CareTip {
+  "세탁 및 관리": string;
+  "보관 방법": string;
+}
+
+interface TipResponse {
+  clothes_name: string;
+  material: string;
+  tip: CareTip | string;
+}
+
 type DetailApiItem = {
   id?: number;
   clothes_id?: number;
@@ -47,6 +58,7 @@ type DetailApiItem = {
   color?: string;
   season?: string;
   style?: string;
+  material?: string; // 소재 정보 추가 매핑용
 };
 
 function resolveImageUri(image?: string | null) {
@@ -63,6 +75,10 @@ export default function DetailScreen() {
   const [item, setItem] = useState<DetailApiItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // ✅ 2. 관리 팁 상태 변수 추가
+  const [tipData, setTipData] = useState<TipResponse | null>(null);
+  const [tipLoading, setTipLoading] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     if (!id) {
@@ -109,13 +125,33 @@ export default function DetailScreen() {
     }, [fetchDetail])
   );
 
+  // ✅ 3. 옷 상세 정보(item)를 성공적으로 가져오면 관리 팁 API 호출
+  useEffect(() => {
+    const fetchCareTips = async () => {
+      const actualId = item?.id ?? item?.clothes_id;
+      if (!actualId) return;
+
+      try {
+        setTipLoading(true);
+        const response = await api.get<TipResponse>(`/clothes/${actualId}/tips`);
+        setTipData(response.data);
+      } catch (error) {
+        console.error("소재별 관리 팁 로드 실패:", error);
+        setTipData(null);
+      } finally {
+        setTipLoading(false);
+      }
+    };
+
+    fetchCareTips();
+  }, [item?.id, item?.clothes_id]); // ID가 확보될 때만 실행
+
   const visibleTags = useMemo(() => {
     if (!item) return [];
 
     const s = item.tags || {};
     const fitValue = s.top_fit ?? s.topFit ?? s.bottom_fit ?? s.bottomFit ?? '';
     
-    // ✅ 에러 없이 안전하게 호출 가능
     const tpoValue = s.situation ?? s.tpo ?? item.situation ?? item.tpo ?? '';
     
     const rawPrice = item.price ?? item.purchase_price;
@@ -132,7 +168,7 @@ export default function DetailScreen() {
       { label: '스타일', value: s.style ?? item.style },
       { label: '분위기', value: s.mood },
       { label: '핏', value: fitValue },
-      { label: '소재', value: s.material },
+      { label: '소재', value: s.material ?? item.material },
       { label: '두께', value: s.thickness },
       { label: '포인트', value: s.point },
       { label: 'TPO', value: tpoValue },
@@ -149,7 +185,7 @@ export default function DetailScreen() {
   if (loading && !item) {
     return (
       <View style={styles.emptyContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#111827" />
         <Text style={styles.emptyText}>상세 정보를 불러오는 중...</Text>
       </View>
     );
@@ -192,6 +228,30 @@ export default function DetailScreen() {
         </View>
       )}
 
+      {/* ✅ 4. 관리 팁 UI 섹션 추가 (태그 리스트와 수정 버튼 사이) */}
+      {tipLoading ? (
+        <ActivityIndicator size="small" color="#111827" style={{ marginBottom: 20 }} />
+      ) : tipData ? (
+        <View style={styles.tipContainer}>
+          <Text style={styles.tipTitle}>💡 {tipData.material} 소재 관리 팁</Text>
+          
+          {typeof tipData.tip === 'object' ? (
+            <>
+              <View style={styles.tipBox}>
+                <Text style={styles.tipLabel}>🧼 세탁 및 관리</Text>
+                <Text style={styles.tipValueText}>{tipData.tip["세탁 및 관리"]}</Text>
+              </View>
+              <View style={styles.tipBox}>
+                <Text style={styles.tipLabel}>📦 보관 방법</Text>
+                <Text style={styles.tipValueText}>{tipData.tip["보관 방법"]}</Text>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.errorTipText}>{tipData.tip}</Text>
+          )}
+        </View>
+      ) : null}
+
       <TouchableOpacity
         style={styles.button}
         onPress={() => router.push({ 
@@ -220,6 +280,15 @@ const styles = StyleSheet.create({
   tagLabel: { width: 88, fontSize: 14, color: '#6b7280' },
   tagPill: { flexShrink: 1, backgroundColor: '#111827', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12 },
   tagText: { color: '#fff', fontSize: 14 },
+  
+  // ✅ 5. 관리 팁 관련 스타일
+  tipContainer: { backgroundColor: '#f9fafb', padding: 16, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: '#e5e7eb' },
+  tipTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, color: '#111827' },
+  tipBox: { marginBottom: 12 },
+  tipLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 4 },
+  tipValueText: { fontSize: 14, color: '#4b5563', lineHeight: 20 },
+  errorTipText: { fontSize: 14, color: '#6b7280', fontStyle: 'italic', lineHeight: 20 },
+
   button: { marginTop: 8, backgroundColor: '#111827', paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });
