@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime
 from unittest.mock import patch
-from utils import get_base_time 
+from utils import get_base_time, get_weather_data
 
 def test_get_base_time_midnight_edge_case():
     """
@@ -50,3 +50,49 @@ def test_get_base_time_normal_daytime():
         assert base_date == "20260520"  # 당일 날짜 유지
         # 시스템에 정의된 base_times 규칙(예: 0200, 0500 등) 중 06시 직전 최적 타임라인 검증
         assert base_time == "0500"
+
+
+class TestGetWeatherData:
+    def _make_api_response(self, temp, sky, pty):
+        return {
+            "response": {
+                "header": {"resultCode": "00"},
+                "body": {"items": {"item": [
+                    {"category": "TMP", "fcstValue": str(temp)},
+                    {"category": "SKY", "fcstValue": str(sky)},
+                    {"category": "PTY", "fcstValue": str(pty)},
+                ]}}
+            }
+        }
+
+    def test_맑은날_sunny반환(self):
+        with patch("utils.get_coords_from_address", return_value=(37.5, 127.0)), \
+             patch("utils.convert_grid", return_value=(60, 127)), \
+             patch("utils.get_base_time", return_value=("20260527", "0800")), \
+             patch("utils.requests.get") as mock_get:
+            mock_get.return_value.json.return_value = self._make_api_response(18, 1, 0)
+            result = get_weather_data("서울시 강남구")
+        assert result["temperature"] == 18.0
+        assert result["condition"] == "sunny"
+
+    def test_비오는날_rainy반환(self):
+        with patch("utils.get_coords_from_address", return_value=(37.5, 127.0)), \
+             patch("utils.convert_grid", return_value=(60, 127)), \
+             patch("utils.get_base_time", return_value=("20260527", "0800")), \
+             patch("utils.requests.get") as mock_get:
+            mock_get.return_value.json.return_value = self._make_api_response(15, 4, 1)
+            result = get_weather_data("서울시 강남구")
+        assert result["condition"] == "rainy"
+
+    def test_유효하지않은주소_기본값반환(self):
+        with patch("utils.get_coords_from_address", return_value=(None, None)):
+            result = get_weather_data("존재하지않는주소xxxxxx")
+        assert result == {"temperature": 20.0, "condition": "sunny"}
+
+    def test_API호출실패_기본값반환(self):
+        with patch("utils.get_coords_from_address", return_value=(37.5, 127.0)), \
+             patch("utils.convert_grid", return_value=(60, 127)), \
+             patch("utils.get_base_time", return_value=("20260527", "0800")), \
+             patch("utils.requests.get", side_effect=Exception("network error")):
+            result = get_weather_data("서울시 강남구")
+        assert result == {"temperature": 20.0, "condition": "sunny"}
