@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session, joinedload
 from datetime import date  
 
@@ -10,10 +10,15 @@ from .auth import get_current_user
 router = APIRouter(prefix="/history", tags=["착용 기록"])
 
 @router.post("", response_model=list[WearHistoryResponse], status_code=status.HTTP_201_CREATED)
-def create_wear_history(history_data: list[WearHistoryCreate],
-                        db: Session = Depends(get_db),
-                        current_user: User = Depends(get_current_user)
-                        ) -> list[WearHistoryResponse]: # 반환 타입 힌트
+def create_wear_history(
+    history_data: list[WearHistoryCreate] = Body(
+        ..., 
+        description="등록할 착용 기록 데이터 리스트입니다. 반드시 배열([ ]) 형태로 전달해야 합니다."
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> list[WearHistoryResponse]:
+    
     if not history_data:
         raise HTTPException(status_code=400, detail="기록할 옷 데이터가 비어있습니다.")
     
@@ -114,7 +119,10 @@ def get_wear_histories(
 
 @router.put("", response_model=list[WearHistoryResponse], status_code=status.HTTP_200_OK)
 def update_daily_wear_history(
-    history_data: list[WearHistoryCreate],
+    history_data: list[WearHistoryCreate] = Body(
+        description="수정할 착용 기록 리스트입니다. JSON Root에 배열([ ]) 형태로 전달해야 합니다.",
+        example=[{"clothes_id": 1, "worn_date": "2026-05-25", "tpo": "데일리"}]
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> list[WearHistoryResponse]:
@@ -131,10 +139,18 @@ def update_daily_wear_history(
         ).all()
         
         for record in existing_records:
-            # 삭제되는 기록에 연결된 옷 객체를 찾아 착용 횟수 1 감소 (4줄 추가)
             cloth_to_reduce = db.query(Clothes).filter(Clothes.clothes_id == record.clothes_id).first()
-            if cloth_to_reduce and cloth_to_reduce.wear_count > 0:
-                cloth_to_reduce.wear_count -= 1
+            if cloth_to_reduce:
+                if cloth_to_reduce.wear_count > 0:
+                    cloth_to_reduce.wear_count -= 1
+                
+                # 삭제될 기록을 제외하고 가장 최신 기록을 다시 조회 (버그 수정)
+                rem_h = db.query(WearHistory).filter(
+                    WearHistory.clothes_id == record.clothes_id,
+                    WearHistory.history_id != record.history_id
+                ).order_by(WearHistory.worn_date.desc()).first()
+                cloth_to_reduce.last_worn_date = rem_h.worn_date if rem_h else None
+            
             db.delete(record)
             
         db.flush()
