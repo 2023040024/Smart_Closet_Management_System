@@ -103,7 +103,8 @@ async def create_clothes(
     # 이미지 저장
     image_url = None
     if image and image.filename:
-        ext = image.filename.rsplit(".", 1)[-1].lower()
+        _, ext = os.path.splitext(image.filename)
+        ext = ext.lstrip(".").lower()
         if ext not in ("jpg", "jpeg", "png", "webp"):
             raise HTTPException(status_code=400, detail="jpg, png, webp만 가능합니다")
         filename  = f"{uuid.uuid4()}.{ext}"
@@ -186,7 +187,7 @@ def get_clothes_detail(clothes_id: int, db: Session = Depends(get_db)
 # ──────────────────────────────────────────────
 
 @router.put("/{clothes_id}", response_model=ClothesResponse)
-def update_clothes(clothes_id: int, body: ClothesUpdate, db: Session = Depends(get_db)
+async def update_clothes(clothes_id: int, body: ClothesUpdate, db: Session = Depends(get_db)
                    , current_user: User = Depends(get_current_user)):
     clothes = _get_clothes_or_404(db, clothes_id, current_user.id)
 
