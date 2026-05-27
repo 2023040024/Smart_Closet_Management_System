@@ -169,7 +169,7 @@ def get_closet_overload(
     elif total_warnings <= 2:
         advice = "몇 가지 비슷한 아이템이 눈에 띄네요. 다음번엔 새로운 스타일이나 색상에 도전해 보세요."
     else:
-        advice = "옷장 다이어트가 시급합니다! 취향이 확고하시지만, 안 입는 중복 옷을 비워낼 타이밍입니다."
+        advice = "옷장 다이어트가 시급합니다! 안 입는 중복 옷을 비워낼 타이밍입니다."
 
     return OverloadResponse(
         total_warnings=total_warnings,
