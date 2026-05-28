@@ -37,3 +37,29 @@ class TestUpdateTpoScoreBad:
         rec = db.query.return_value.filter.return_value.first.return_value
         update_tpo_score(db, clothes_id=1, situation="면접", feedback_tpo=FeedbackTpoEnum.bad)
         assert rec.score == 0
+
+
+class TestUpdateTpoScoreGood:
+    def test_good_기존_점수_5회복(self):
+        db = make_db(existing_score=70)
+        rec = db.query.return_value.filter.return_value.first.return_value
+        update_tpo_score(db, clothes_id=1, situation="데일리", feedback_tpo=FeedbackTpoEnum.good)
+        assert rec.score == 75
+
+    def test_good_100_초과_클램프(self):
+        db = make_db(existing_score=98)
+        rec = db.query.return_value.filter.return_value.first.return_value
+        update_tpo_score(db, clothes_id=1, situation="데일리", feedback_tpo=FeedbackTpoEnum.good)
+        assert rec.score == 100
+
+    def test_good_레코드_없으면_추가_안함(self):
+        db = make_db(existing_score=None)
+        update_tpo_score(db, clothes_id=1, situation="데일리", feedback_tpo=FeedbackTpoEnum.good)
+        db.add.assert_not_called()
+
+    def test_normal_점수_변화_없음(self):
+        db = make_db(existing_score=80)
+        rec = db.query.return_value.filter.return_value.first.return_value
+        update_tpo_score(db, clothes_id=1, situation="데일리", feedback_tpo=FeedbackTpoEnum.normal)
+        assert rec.score == 80
+        db.add.assert_not_called()
