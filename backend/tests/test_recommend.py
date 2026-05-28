@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from conftest import make_clothes, make_user
 from models import StatusEnum, CategoryEnum, ThicknessEnum, MaterialEnum
-from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score, to_situation_kr
+from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score, to_situation_kr, clothes_to_text
 from unittest.mock import patch
 from datetime import date, timedelta
 
@@ -225,3 +225,27 @@ class TestToSituationKr:
 
     def test_None이면_데일리(self):
         assert to_situation_kr(None) == "데일리"
+
+
+class TestClothesToText:
+    def test_착용기록_없으면_착용기록없음_표시(self):
+        c = make_clothes(last_worn_date=None)
+        result = clothes_to_text(c)
+        assert "착용 기록 없음" in result
+
+    def test_옷_ID와_이름_포함(self):
+        c = make_clothes(clothes_id=42, name="청바지")
+        result = clothes_to_text(c)
+        assert "[ID:42]" in result
+        assert "청바지" in result
+
+    def test_situation_None이면_미입력_표시(self):
+        c = make_clothes(situation=None)
+        result = clothes_to_text(c)
+        assert "미입력" in result
+
+    def test_material_None이면_미입력_표시(self):
+        c = make_clothes()
+        c.material = None
+        result = clothes_to_text(c)
+        assert "미입력" in result
