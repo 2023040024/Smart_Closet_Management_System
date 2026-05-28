@@ -454,8 +454,45 @@ class TestRecommendEndpoints:
 
     def test_weekly_정상_추천(self, client, auth_headers, sample_clothes):
         client.post("/clothes", headers=auth_headers,
-                    json={"name": "후드티", "category": "상의", "season": "사계절", "status": "착용가능"})
+                    data={"name": "후드티", "category": "상의", "color": "그레이", "season": "사계절", "style": "캐주얼"})
         with patch("routers.recommend.call_gemini", return_value=self.GEMINI_WEEKLY_OK):
             res = client.get("/recommend/weekly", headers=auth_headers,
                              params={"temperature": 20.0, "weather_condition": "sunny"})
         assert res.status_code == 200
+
+    def test_today_address_날씨조회(self, client, auth_headers, sample_clothes):
+        with patch("routers.recommend.fetch_weather", return_value={"temperature": 18.0, "condition": "cloudy"}):
+            with patch("routers.recommend.call_gemini", return_value=self.GEMINI_OK):
+                res = client.get("/recommend/today", headers=auth_headers,
+                                 params={"address": "서울"})
+        assert res.status_code == 200
+
+    def test_custom_address_날씨조회(self, client, auth_headers, sample_clothes):
+        with patch("routers.recommend.fetch_weather", return_value={"temperature": 18.0, "condition": "cloudy"}):
+            with patch("routers.recommend.call_gemini", return_value=self.GEMINI_OK):
+                res = client.post("/recommend/custom", headers=auth_headers,
+                                  json={"situation": "daily", "address": "서울"})
+        assert res.status_code == 200
+
+    def test_weekly_address_날씨조회(self, client, auth_headers, sample_clothes):
+        client.post("/clothes", headers=auth_headers,
+                    data={"name": "후드티", "category": "상의", "color": "그레이", "season": "사계절", "style": "캐주얼"})
+        with patch("routers.recommend.fetch_weather", return_value={"temperature": 18.0, "condition": "cloudy"}):
+            with patch("routers.recommend.call_gemini", return_value=self.GEMINI_WEEKLY_OK):
+                res = client.get("/recommend/weekly", headers=auth_headers,
+                                 params={"address": "서울"})
+        assert res.status_code == 200
+
+    def test_today_filtered_부족_empty반환(self, client, auth_headers, sample_clothes):
+        with patch("routers.recommend.apply_fallback_filter", return_value=([], False)):
+            res = client.get("/recommend/today", headers=auth_headers,
+                             params={"temperature": 20.0, "weather_condition": "sunny"})
+        assert res.status_code == 200
+        assert res.json()["outfits"] == []
+
+    def test_custom_filtered_부족_empty반환(self, client, auth_headers, sample_clothes):
+        with patch("routers.recommend.apply_fallback_filter", return_value=([], False)):
+            res = client.post("/recommend/custom", headers=auth_headers,
+                              json={"situation": "daily", "temperature": 20.0, "weather_condition": "sunny"})
+        assert res.status_code == 200
+        assert res.json()["outfits"] == []
