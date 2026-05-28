@@ -3,9 +3,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.dirname(__file__))
 from conftest import make_clothes, make_user
 from models import StatusEnum, CategoryEnum, ThicknessEnum, MaterialEnum
-from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score, to_situation_kr, clothes_to_text, build_prompt, load_tpo_scores
+from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score, to_situation_kr, clothes_to_text, build_prompt, load_tpo_scores, fetch_weather, call_gemini
 from unittest.mock import patch, MagicMock
 from datetime import date, timedelta
+import pytest
+from fastapi import HTTPException
 
 class TestFilterClothes:
     def test_세탁중_제외(self):
@@ -306,3 +308,154 @@ class TestLoadTpoScores:
         db = self._make_db([row])
         result = load_tpo_scores(db, user_id=1, situation_kr="미팅")
         assert result[5] == 95
+
+
+class TestFetchWeather:
+    def _mock_httpx(self, mock_client, return_value):
+        mock_client.return_value.__enter__.return_value.get.return_value = return_value
+
+    def test_비오는날_rainy(self):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "status": "success",
+            "weather": {"현재 기온": "15°C", "하늘 상태": "흐림", "강수 형태": "비"}
+        }
+        with patch("routers.recommend.httpx.Client") as mc:
+            self._mock_httpx(mc, mock_resp)
+            result = fetch_weather("서울")
+        assert result["condition"] == "rainy"
+        assert result["temperature"] == 15.0
+
+    def test_눈오는날_snowy(self):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "status": "success",
+            "weather": {"현재 기온": "0°C", "하늘 상태": "흐림", "강수 형태": "눈"}
+        }
+        with patch("routers.recommend.httpx.Client") as mc:
+            self._mock_httpx(mc, mock_resp)
+            result = fetch_weather("서울")
+        assert result["condition"] == "snowy"
+
+    def test_맑은날_sunny(self):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "status": "success",
+            "weather": {"현재 기온": "25°C", "하늘 상태": "맑음", "강수 형태": "없음"}
+        }
+        with patch("routers.recommend.httpx.Client") as mc:
+            self._mock_httpx(mc, mock_resp)
+            result = fetch_weather("서울")
+        assert result["condition"] == "sunny"
+
+    def test_흐린날_cloudy(self):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "status": "success",
+            "weather": {"현재 기온": "18°C", "하늘 상태": "구름많음", "강수 형태": "없음"}
+        }
+        with patch("routers.recommend.httpx.Client") as mc:
+            self._mock_httpx(mc, mock_resp)
+            result = fetch_weather("서울")
+        assert result["condition"] == "cloudy"
+
+    def test_status_실패시_기본값반환(self):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"status": "error"}
+        with patch("routers.recommend.httpx.Client") as mc:
+            self._mock_httpx(mc, mock_resp)
+            result = fetch_weather("서울")
+        assert result == {"temperature": 20.0, "condition": "sunny"}
+
+    def test_예외발생시_기본값반환(self):
+        with patch("routers.recommend.httpx.Client") as mc:
+            mc.return_value.__enter__.return_value.get.side_effect = Exception("연결 실패")
+            result = fetch_weather("서울")
+        assert result == {"temperature": 20.0, "condition": "sunny"}
+
+
+class TestCallGemini:
+    def test_정상_JSON_반환(self):
+        mock_resp = MagicMock()
+        mock_resp.text = '{"outfits": [{"outfit_number": 1, "items": [{"clothes_id": 1, "name": "티", "category": "상의", "color": "블랙"}], "reason": "좋아"}], "ai_message": "추천"}'
+        with patch("routers.recommend.model.generate_content", return_value=mock_resp):
+            result = call_gemini("test prompt")
+        assert "outfits" in result
+        assert len(result["outfits"]) == 1
+
+    def test_백틱_JSON_파싱(self):
+        mock_resp = MagicMock()
+        mock_resp.text = '```json\n{"outfits": [{"outfit_number": 1, "items": [], "reason": "좋아"}], "ai_message": "추천"}\n```'
+        with patch("routers.recommend.model.generate_content", return_value=mock_resp):
+            result = call_gemini("test prompt")
+        assert "outfits" in result
+
+    def test_outfits_없으면_HTTPException(self):
+        mock_resp = MagicMock()
+        mock_resp.text = '{"outfits": [], "ai_message": "없음"}'
+        with patch("routers.recommend.model.generate_content", return_value=mock_resp):
+            with pytest.raises(HTTPException) as exc:
+                call_gemini("test prompt", retries=0)
+        assert exc.value.status_code == 500
+
+
+class TestRecommendEndpoints:
+    GEMINI_OK = {
+        "outfits": [{
+            "outfit_number": 1,
+            "items": [{"clothes_id": 1, "name": "티셔츠", "category": "상의", "color": "블랙"}],
+            "reason": "좋은 코디입니다"
+        }],
+        "ai_message": "오늘의 추천 완료"
+    }
+    GEMINI_WEEKLY_OK = {
+        "weekly_outfits": [
+            {"day": "월요일", "items": [{"clothes_id": 1, "name": "티셔츠", "category": "상의", "color": "블랙"}], "reason": "좋아"},
+            {"day": "화요일", "items": [], "reason": "좋아"},
+            {"day": "수요일", "items": [], "reason": "좋아"},
+            {"day": "목요일", "items": [], "reason": "좋아"},
+            {"day": "금요일", "items": [], "reason": "좋아"},
+        ],
+        "tip": "이번 주 팁"
+    }
+
+    def test_today_인증없이_거부(self, client):
+        res = client.get("/recommend/today")
+        assert res.status_code in (401, 403)
+
+    def test_today_옷부족_400(self, client, auth_headers):
+        res = client.get("/recommend/today", headers=auth_headers,
+                         params={"temperature": 20.0, "weather_condition": "sunny"})
+        assert res.status_code == 400
+
+    def test_today_정상_추천(self, client, auth_headers, sample_clothes):
+        with patch("routers.recommend.call_gemini", return_value=self.GEMINI_OK):
+            res = client.get("/recommend/today", headers=auth_headers,
+                             params={"temperature": 20.0, "weather_condition": "sunny"})
+        assert res.status_code == 200
+        assert "outfits" in res.json()
+
+    def test_custom_옷부족_400(self, client, auth_headers):
+        res = client.post("/recommend/custom", headers=auth_headers,
+                          json={"situation": "daily", "temperature": 20.0, "weather_condition": "sunny"})
+        assert res.status_code == 400
+
+    def test_custom_정상_추천(self, client, auth_headers, sample_clothes):
+        with patch("routers.recommend.call_gemini", return_value=self.GEMINI_OK):
+            res = client.post("/recommend/custom", headers=auth_headers,
+                              json={"situation": "daily", "temperature": 20.0, "weather_condition": "sunny"})
+        assert res.status_code == 200
+
+    def test_weekly_옷부족_empty반환(self, client, auth_headers, sample_clothes):
+        res = client.get("/recommend/weekly", headers=auth_headers,
+                         params={"temperature": 20.0, "weather_condition": "sunny"})
+        assert res.status_code == 200
+        assert res.json()["weekly_outfits"] == []
+
+    def test_weekly_정상_추천(self, client, auth_headers, sample_clothes):
+        client.post("/clothes", headers=auth_headers,
+                    json={"name": "후드티", "category": "상의", "season": "사계절", "status": "착용가능"})
+        with patch("routers.recommend.call_gemini", return_value=self.GEMINI_WEEKLY_OK):
+            res = client.get("/recommend/weekly", headers=auth_headers,
+                             params={"temperature": 20.0, "weather_condition": "sunny"})
+        assert res.status_code == 200
