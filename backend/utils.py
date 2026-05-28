@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import math
+import os
 import requests
 
 # 1. 주소 -> 위경도 변환 (OpenStreetMap Nominatim 사용)
@@ -76,7 +77,75 @@ def get_base_time():
     if closest_time == 23 and current_hour != 23:
         base_date = (check_time - timedelta(days=1)).strftime("%Y%m%d")
 
-    # 정수형 예보 시간을 기상청 포맷(HH00) 문자열로 가공        
+    # 정수형 예보 시간을 기상청 포맷(HH00) 문자열로 가공
     base_time = f"{closest_time:02d}00"
-        
+
     return base_date, base_time
+
+
+def get_weather_data(address: str) -> dict:
+    """주소로 기상청 단기예보 API를 직접 호출해 기온·날씨 조건을 반환.
+    실패 또는 유효하지 않은 주소면 기본값 {'temperature': 20.0, 'condition': 'sunny'}을 반환한다.
+    recommend.py의 fetch_weather()가 자기 서버 HTTP를 호출하는 구조를 제거하기 위해 추가됨.
+    """
+    service_key = os.getenv("WEATHER_SERVICE_KEY")
+
+    lat, lon = get_coords_from_address(address)
+    if lat is None:
+        return {"temperature": 20.0, "condition": "sunny"}
+
+    nx, ny = convert_grid(lat, lon)
+    base_date, base_time = get_base_time()
+
+    url = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
+    params = {
+        "serviceKey": service_key,
+        "pageNo": "1",
+        "numOfRows": "200",
+        "dataType": "JSON",
+        "base_date": base_date,
+        "base_time": base_time,
+        "nx": nx,
+        "ny": ny,
+    }
+
+    try:
+        response = requests.get(url, params=params, timeout=5)
+        res_data = response.json()
+
+        if res_data.get("response", {}).get("header", {}).get("resultCode") != "00":
+            return {"temperature": 20.0, "condition": "sunny"}
+
+        items = res_data["response"]["body"]["items"]["item"]
+        sky_map = {"1": "맑음", "3": "구름많음", "4": "흐림"}
+        pty_map = {"0": "없음", "1": "비", "2": "비/눈", "3": "눈", "4": "소나기"}
+
+        current_temp, sky, rain = None, None, None
+        for item in items:
+            cat, val = item["category"], item["fcstValue"]
+            if cat == "TMP" and current_temp is None:
+                current_temp = float(val)
+            elif cat == "SKY" and sky is None:
+                sky = sky_map.get(val, "맑음")
+            elif cat == "PTY" and rain is None:
+                rain = pty_map.get(val, "없음")
+            if current_temp is not None and sky is not None and rain is not None:
+                break
+
+        temperature = current_temp if current_temp is not None else 20.0
+        sky = sky or "맑음"
+        rain = rain or "없음"
+
+        if rain in ("비", "소나기", "비/눈"):
+            condition = "rainy"
+        elif rain == "눈":
+            condition = "snowy"
+        elif sky == "맑음":
+            condition = "sunny"
+        else:
+            condition = "cloudy"
+
+        return {"temperature": temperature, "condition": condition}
+
+    except Exception:
+        return {"temperature": 20.0, "condition": "sunny"}
