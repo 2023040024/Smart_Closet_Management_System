@@ -223,6 +223,33 @@ class TestToSituationKr:
     def test_영문_interview_면접(self):
         assert to_situation_kr("interview") == "면접"
 
+    def test_영문_meeting_미팅(self):
+        assert to_situation_kr("meeting") == "미팅"
+
+    def test_영문_business_비즈니스(self):
+        assert to_situation_kr("business") == "비즈니스"
+
+    def test_영문_wedding_결혼식(self):
+        assert to_situation_kr("wedding") == "결혼식"
+
+    def test_영문_funeral_장례식(self):
+        assert to_situation_kr("funeral") == "장례식"
+
+    def test_영문_exercise_운동(self):
+        assert to_situation_kr("exercise") == "운동"
+
+    def test_영문_date_데이트(self):
+        assert to_situation_kr("date") == "데이트"
+
+    def test_영문_travel_여행(self):
+        assert to_situation_kr("travel") == "여행"
+
+    def test_영문_school_데일리폴백(self):
+        assert to_situation_kr("school") == "데일리"
+
+    def test_영문_cafe_데일리폴백(self):
+        assert to_situation_kr("cafe") == "데일리"
+
     def test_한글_그대로반환(self):
         assert to_situation_kr("데일리") == "데일리"
 

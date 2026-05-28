@@ -244,7 +244,7 @@ def build_prompt(clothes_list: list[Clothes], situation: str, temperature: float
     situation_map = {
         "daily": "데일리", "business": "비즈니스", "interview": "면접",
         "wedding": "결혼식", "funeral": "장례식", "exercise": "운동",
-        "date": "데이트", "meeting": "모임", "travel": "여행",
+        "date": "데이트", "meeting": "미팅", "travel": "여행",
         "school": "데일리", "cafe": "데일리",
     }
     situation_kr = situation_map.get(situation or "daily", situation or "데일리")
@@ -327,7 +327,7 @@ def call_gemini(prompt: str, retries: int = 2) -> dict:
 SITUATION_MAP = {
     "daily": "데일리", "business": "비즈니스", "interview": "면접",
     "wedding": "결혼식", "funeral": "장례식", "exercise": "운동",
-    "date": "데이트", "meeting": "모임", "travel": "여행",
+    "date": "데이트", "meeting": "미팅", "travel": "여행",
     "school": "데일리", "cafe": "데일리",
 }
 
