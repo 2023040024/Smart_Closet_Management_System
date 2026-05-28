@@ -5,21 +5,13 @@ from datetime import datetime, timedelta, date
 from database import get_db
 from models import Clothes, SeasonEnum, User
 from routers.auth import get_current_user
-from schemas import ClothesResponse
-
+# schemas.py에서 새로운 OverloadItem, OverloadResponse를 추가로 불러오기.
+from schemas import ClothesResponse, OverloadItem, OverloadResponse, DisposalResponse
 from pydantic import BaseModel
 
-# --- 통계 전용 응답 스키마 ---
 class CostEfficiencyResult(BaseModel):
     best_efficiency: list[ClothesResponse]
     worst_efficiency: list[ClothesResponse]
-
-class OverloadResult(BaseModel):
-    category: str
-    color: str
-    count: int
-    items: list[ClothesResponse]
-# ------------------------------
 
 router = APIRouter(prefix="/stats", tags=["통계 및 분석"])
 
@@ -61,8 +53,9 @@ def get_top_frequency(
     
     return top_clothes
 
-@router.get("/dispose", response_model=list[ClothesResponse])
+@router.get("/dispose", response_model=DisposalResponse) 
 def get_disposal_recommendation(
+    current_season: SeasonEnum,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -122,43 +115,74 @@ def get_cost_efficiency(
 
 
 # 옷장 과부하 분석 API
-@router.get("/overload", response_model=list[OverloadResult]) 
+@router.get("/overload", response_model=OverloadResponse) 
 def get_closet_overload(
-    threshold: int = 3, 
+    threshold: int = 4, # 1. 임계값 4로 상향
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # [97번 최적화] 서브쿼리로 중복 횟수가 threshold 이상인 카테고리와 색상 조합만 찾기
+    # 2. 계절(season)과 소재(material)를 group_by 조건에 추가
     subquery = (
-        db.query(Clothes.category, Clothes.color)
+        db.query(Clothes.category, Clothes.color, Clothes.season, Clothes.material)
         .filter(Clothes.user_id == current_user.id)
-        .group_by(Clothes.category, Clothes.color)
+        .group_by(Clothes.category, Clothes.color, Clothes.season, Clothes.material)
         .having(func.count(Clothes.clothes_id) >= threshold)
         .subquery()
     )
 
+    # 3. 조인 조건에도 4가지 속성이 모두 완벽히 일치해야 함을 명시
     overloaded_items = (
         db.query(Clothes)
-        .join(subquery, (Clothes.category == subquery.c.category) & (Clothes.color == subquery.c.color))
+        .join(subquery, (
+            (Clothes.category == subquery.c.category) & 
+            (Clothes.color == subquery.c.color) &
+            (Clothes.season == subquery.c.season) &
+            (Clothes.material == subquery.c.material)
+        ))
         .all()
     )
     
     # [97번 최적화] 메모리 내 그룹화로 DB 부하 감소
     grouped_data = {}
     for item in overloaded_items:
-        key = (item.category, item.color)
+        # 그룹 묶음 단위를 4가지 속성으로 확장
+        key = (item.category, item.color, item.season, item.material)
         if key not in grouped_data:
             grouped_data[key] = []
         grouped_data[key].append(item)
 
-    detailed_data = [
-        {
-            "category": key[0],
-            "color": key[1],
-            "count": len(items),
-            "items": items 
-        }
-        for key, items in grouped_data.items()
-    ]
+    detailed_data = []
+    for key, items in grouped_data.items():
+        # 4가지 Key에서 Enum 객체 처리 및 결측치 기본값 할당
+        cat_val = key[0].value if hasattr(key[0], 'value') else key[0]
+        col_val = key[1].value if hasattr(key[1], 'value') else key[1]
+        sea_val = key[2].value if hasattr(key[2], 'value') else (key[2] or '계절무관')
+        mat_val = key[3].value if hasattr(key[3], 'value') else (key[3] or '기본')
+        count = len(items)
+        
+        # 더 엄격해진 기준을 반영한 상세 경고 메시지
+        message = f"경고! 옷장에 [{sea_val}]에 입는 [{mat_val}] 소재의 [{col_val} {cat_val}]만 {count}벌이 있어요. 유사한 옷의 충동 소비를 주의하세요!"
+        
+        detailed_data.append(
+            OverloadItem(
+                category=cat_val,
+                color=col_val,
+                count=count,
+                warning_message=message,
+                items=items
+            )
+        )
 
-    return detailed_data
+    total_warnings = len(detailed_data)
+    if total_warnings == 0:
+        advice = "옷장에 중복되는 아이템이 없네요! 스마트한 소비를 하고 계십니다."
+    elif total_warnings <= 2:
+        advice = "몇 가지 비슷한 아이템이 눈에 띄네요. 다음번엔 새로운 스타일이나 색상에 도전해 보세요."
+    else:
+        advice = "옷장 다이어트가 시급합니다! 안 입는 중복 옷을 비워낼 타이밍입니다."
+
+    return OverloadResponse(
+        total_warnings=total_warnings,
+        items=detailed_data,
+        ai_advice=advice
+    )
