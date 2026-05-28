@@ -63,3 +63,35 @@ class TestUpdateTpoScoreGood:
         update_tpo_score(db, clothes_id=1, situation="데일리", feedback_tpo=FeedbackTpoEnum.normal)
         assert rec.score == 80
         db.add.assert_not_called()
+
+
+class TestUpdateTempSensitivity:
+    def test_hot_민감도_감소(self):
+        user = MagicMock()
+        user.temp_sensitivity = 0.5
+        update_temp_sensitivity(user, FeedbackTempEnum.hot)
+        assert user.temp_sensitivity == 0.0
+
+    def test_cold_민감도_증가(self):
+        user = MagicMock()
+        user.temp_sensitivity = 0.5
+        update_temp_sensitivity(user, FeedbackTempEnum.cold)
+        assert user.temp_sensitivity == 1.0
+
+    def test_good_민감도_변화_없음(self):
+        user = MagicMock()
+        user.temp_sensitivity = 0.5
+        update_temp_sensitivity(user, FeedbackTempEnum.good)
+        assert user.temp_sensitivity == 0.5
+
+    def test_hot_하한_클램프(self):
+        user = MagicMock()
+        user.temp_sensitivity = -1.8
+        update_temp_sensitivity(user, FeedbackTempEnum.hot)
+        assert user.temp_sensitivity == -2.0
+
+    def test_cold_상한_클램프(self):
+        user = MagicMock()
+        user.temp_sensitivity = 1.8
+        update_temp_sensitivity(user, FeedbackTempEnum.cold)
+        assert user.temp_sensitivity == 2.0
