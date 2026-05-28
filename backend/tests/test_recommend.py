@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from conftest import make_clothes, make_user
 from models import StatusEnum, CategoryEnum, ThicknessEnum, MaterialEnum
-from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score, to_situation_kr, clothes_to_text
+from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score, to_situation_kr, clothes_to_text, build_prompt
 from unittest.mock import patch
 from datetime import date, timedelta
 
@@ -249,3 +249,34 @@ class TestClothesToText:
         c.material = None
         result = clothes_to_text(c)
         assert "미입력" in result
+
+
+class TestBuildPrompt:
+    def _make_top(self, clothes_id=1):
+        c = make_clothes(clothes_id=clothes_id, category=CategoryEnum.top)
+        c.category = CategoryEnum.top
+        return c
+
+    def _make_bottom(self, clothes_id=2):
+        c = make_clothes(clothes_id=clothes_id, category=CategoryEnum.bottom)
+        c.category = CategoryEnum.bottom
+        return c
+
+    def test_영문_상황이_한국어로_변환됨(self):
+        user = make_user()
+        prompt = build_prompt([], "interview", 20.0, "sunny", user)
+        assert "면접" in prompt
+
+    def test_옷_ID가_프롬프트에_포함됨(self):
+        user = make_user()
+        top = self._make_top(clothes_id=99)
+        bottom = self._make_bottom(clothes_id=88)
+        prompt = build_prompt([top, bottom], "daily", 20.0, "sunny", user)
+        assert "ID:99" in prompt
+        assert "ID:88" in prompt
+
+    def test_JSON_응답형식_포함됨(self):
+        user = make_user()
+        prompt = build_prompt([], "daily", 20.0, "sunny", user)
+        assert "outfits" in prompt
+        assert "items" in prompt
