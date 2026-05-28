@@ -66,6 +66,7 @@ def get_disposal_recommendation(
         db.query(Clothes)
         .filter(
             Clothes.user_id == current_user.id,
+            (Clothes.season == current_season) | (Clothes.season == SeasonEnum.all_year), # 필터링 조건 추가
             (Clothes.last_worn_date <= ninety_days_ago_date) | 
             (
                 ((Clothes.wear_count == 0) | Clothes.wear_count.is_(None)) & 
@@ -74,8 +75,18 @@ def get_disposal_recommendation(
         )
         .all()
     )
+
+    if not disposal_targets:
+        advice = "90일 이상 미착용된 옷이 없습니다."
+    else:
+        advice_list = [f"옷 ID {c.clothes_id}번은 90일 이상 미착용된 옷입니다. 처분을 고려해보세요." for c in disposal_targets]
+        advice = "\n".join(advice_list)
+        
+    return DisposalResponse(
+        items=disposal_targets,
+        ai_advice=advice
+    )
     
-    return disposal_targets
 
 # 가성비 계산 API
 @router.get("/cost-per-wear", response_model=CostEfficiencyResult) 
