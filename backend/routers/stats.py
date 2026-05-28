@@ -116,22 +116,28 @@ def get_cost_efficiency(
 # 옷장 과부하 분석 API
 @router.get("/overload", response_model=OverloadResponse) 
 def get_closet_overload(
-    threshold: int = 3, 
+    threshold: int = 4, # 1. 임계값 4로 상향
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # [97번 최적화] 서브쿼리로 중복 횟수가 threshold 이상인 카테고리와 색상 조합만 찾기
+    # 2. 계절(season)과 소재(material)를 group_by 조건에 추가
     subquery = (
-        db.query(Clothes.category, Clothes.color)
+        db.query(Clothes.category, Clothes.color, Clothes.season, Clothes.material)
         .filter(Clothes.user_id == current_user.id)
-        .group_by(Clothes.category, Clothes.color)
+        .group_by(Clothes.category, Clothes.color, Clothes.season, Clothes.material)
         .having(func.count(Clothes.clothes_id) >= threshold)
         .subquery()
     )
 
+    # 3. 조인 조건에도 4가지 속성이 모두 완벽히 일치해야 함을 명시
     overloaded_items = (
         db.query(Clothes)
-        .join(subquery, (Clothes.category == subquery.c.category) & (Clothes.color == subquery.c.color))
+        .join(subquery, (
+            (Clothes.category == subquery.c.category) & 
+            (Clothes.color == subquery.c.color) &
+            (Clothes.season == subquery.c.season) &
+            (Clothes.material == subquery.c.material)
+        ))
         .all()
     )
     
