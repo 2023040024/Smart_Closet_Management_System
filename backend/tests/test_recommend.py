@@ -325,6 +325,12 @@ class TestBuildPrompt:
         assert "outfits" in prompt
         assert "items" in prompt
 
+    def test_영문_meeting이_미팅으로_변환됨(self):
+        user = make_user()
+        prompt = build_prompt([], "meeting", 20.0, "sunny", user)
+        assert "미팅" in prompt
+        assert "모임" not in prompt
+
 
 class TestLoadTpoScores:
     def _make_db(self, rows):
@@ -537,3 +543,14 @@ class TestRecommendEndpoints:
                               json={"situation": "daily", "temperature": 20.0, "weather_condition": "sunny"})
         assert res.status_code == 200
         assert res.json()["outfits"] == []
+
+    def test_weekly_인증없이_거부(self, client):
+        res = client.get("/recommend/weekly")
+        assert res.status_code in (401, 403)
+
+    def test_weekly_filtered_부족_empty반환(self, client, auth_headers, sample_clothes):
+        with patch("routers.recommend.apply_fallback_filter", return_value=([], False)):
+            res = client.get("/recommend/weekly", headers=auth_headers,
+                             params={"temperature": 20.0, "weather_condition": "sunny"})
+        assert res.status_code == 200
+        assert res.json()["weekly_outfits"] == []
