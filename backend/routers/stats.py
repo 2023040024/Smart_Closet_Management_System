@@ -144,7 +144,8 @@ def get_closet_overload(
     # [97번 최적화] 메모리 내 그룹화로 DB 부하 감소
     grouped_data = {}
     for item in overloaded_items:
-        key = (item.category, item.color)
+        # 그룹 묶음 단위를 4가지 속성으로 확장
+        key = (item.category, item.color, item.season, item.material)
         if key not in grouped_data:
             grouped_data[key] = []
         grouped_data[key].append(item)
