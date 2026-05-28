@@ -156,8 +156,8 @@ def filter_clothes(
         # F-13: 계절 불일치(C=80) 제외
         if calculate_conflict_score(c, situation) >= 80:
             continue
-        # 피드백 누적 TpoScore 60 미만 옷 제외 (8회 이상 부정 피드백)
-        if tpo_scores.get(c.clothes_id, 100) < 60:
+        # 피드백 누적 TpoScore 60 이하 옷 제외 (8회 이상 부정 피드백)
+        if tpo_scores.get(c.clothes_id, 100) <= 60:
             continue
         result.append(c)
     return result

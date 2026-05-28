@@ -196,9 +196,13 @@ class TestFilterClothesTpoScore:
         c = make_clothes(clothes_id=1)
         assert filter_clothes([c], 20.0, "sunny", tpo_scores={1: 59}) == []
 
-    def test_tpo_score_60이상_포함(self):
+    def test_tpo_score_정확히60_제외(self):
         c = make_clothes(clothes_id=1)
-        assert c in filter_clothes([c], 20.0, "sunny", tpo_scores={1: 60})
+        assert filter_clothes([c], 20.0, "sunny", tpo_scores={1: 60}) == []
+
+    def test_tpo_score_61이상_포함(self):
+        c = make_clothes(clothes_id=1)
+        assert c in filter_clothes([c], 20.0, "sunny", tpo_scores={1: 61})
 
     def test_tpo_score_없으면_기본값100_포함(self):
         c = make_clothes(clothes_id=1)
