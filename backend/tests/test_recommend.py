@@ -2,8 +2,8 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from conftest import make_clothes, make_user
 from models import StatusEnum, CategoryEnum, ThicknessEnum, MaterialEnum
-from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score, to_situation_kr, clothes_to_text, build_prompt
-from unittest.mock import patch
+from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score, to_situation_kr, clothes_to_text, build_prompt, load_tpo_scores
+from unittest.mock import patch, MagicMock
 from datetime import date, timedelta
 
 class TestFilterClothes:
@@ -280,3 +280,28 @@ class TestBuildPrompt:
         prompt = build_prompt([], "daily", 20.0, "sunny", user)
         assert "outfits" in prompt
         assert "items" in prompt
+
+
+class TestLoadTpoScores:
+    def _make_db(self, rows):
+        db = MagicMock()
+        db.query.return_value.join.return_value.filter.return_value.all.return_value = rows
+        return db
+
+    def test_점수_딕셔너리로_반환(self):
+        row1 = MagicMock(clothes_id=1, score=80)
+        row2 = MagicMock(clothes_id=2, score=65)
+        db = self._make_db([row1, row2])
+        result = load_tpo_scores(db, user_id=1, situation_kr="면접")
+        assert result == {1: 80, 2: 65}
+
+    def test_결과_없으면_빈_딕셔너리(self):
+        db = self._make_db([])
+        result = load_tpo_scores(db, user_id=1, situation_kr="데일리")
+        assert result == {}
+
+    def test_단일_레코드_반환(self):
+        row = MagicMock(clothes_id=5, score=95)
+        db = self._make_db([row])
+        result = load_tpo_scores(db, user_id=1, situation_kr="미팅")
+        assert result[5] == 95
