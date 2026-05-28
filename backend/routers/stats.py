@@ -152,13 +152,15 @@ def get_closet_overload(
 
     detailed_data = []
     for key, items in grouped_data.items():
-        # Enum 객체일 경우 문자열 값(value)만 추출
+        # 4가지 Key에서 Enum 객체 처리 및 결측치 기본값 할당
         cat_val = key[0].value if hasattr(key[0], 'value') else key[0]
         col_val = key[1].value if hasattr(key[1], 'value') else key[1]
+        sea_val = key[2].value if hasattr(key[2], 'value') else (key[2] or '계절무관')
+        mat_val = key[3].value if hasattr(key[3], 'value') else (key[3] or '기본')
         count = len(items)
         
-        # 경고 메시지 동적 생성
-        message = f"경고! 옷장에 {col_val} {cat_val}만 {count}벌이 있어요. 유사한 옷의 충동 소비를 주의하세요!"
+        # 더 엄격해진 기준을 반영한 상세 경고 메시지
+        message = f"경고! 옷장에 [{sea_val}]에 입는 [{mat_val}] 소재의 [{col_val} {cat_val}]만 {count}벌이 있어요. 유사한 옷의 충동 소비를 주의하세요!"
         
         detailed_data.append(
             OverloadItem(
