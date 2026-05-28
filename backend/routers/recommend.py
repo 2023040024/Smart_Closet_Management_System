@@ -1,7 +1,6 @@
 import os
 import json
 import re
-import httpx
 import google.generativeai as genai
 from dotenv import load_dotenv
 from datetime import date
@@ -14,6 +13,7 @@ from database import get_db
 from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum
 from routers.auth import get_current_user
 from tpo_rules import get_tpo_prompt_text, check_color_conflict
+from utils import get_weather_data
 
 # .env 파일 로드
 load_dotenv()
@@ -24,8 +24,6 @@ router = APIRouter(prefix="/recommend", tags=["코디 추천"])
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("models/gemini-flash-latest")
-
-WEATHER_BASE_URL = os.getenv("WEATHER_BASE_URL", "http://localhost:8000")
 
 # --- 데이터 모델 정의 ---
 class RecommendRequest(BaseModel):
@@ -52,35 +50,7 @@ class RecommendResponse(BaseModel):
 # --- 유틸리티 함수 ---
 def fetch_weather(address: str) -> dict:
     try:
-        with httpx.Client(timeout=5.0) as client:
-            resp = client.get(
-                f"{WEATHER_BASE_URL}/weather/address",
-                params={"address": address}
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-        if data.get("status") != "success":
-            return {"temperature": 20.0, "condition": "sunny"}
-
-        weather = data["weather"]
-        temp_str = weather.get("현재 기온", "20°C").replace("°C", "").strip()
-        temperature = float(temp_str)
-
-        sky  = weather.get("하늘 상태", "맑음")
-        rain = weather.get("강수 형태", "없음")
-
-        if rain in ("비", "소나기", "비/눈"):
-            condition = "rainy"
-        elif rain == "눈":
-            condition = "snowy"
-        elif sky == "맑음":
-            condition = "sunny"
-        else:
-            condition = "cloudy"
-
-        return {"temperature": temperature, "condition": condition}
-
+        return get_weather_data(address)
     except Exception as e:
         print(f"[날씨 연동 실패, 기본값 사용] {e}")
         return {"temperature": 20.0, "condition": "sunny"}
@@ -407,11 +377,11 @@ def recommend_weekly(
         all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     except LookupError as e:
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
-    filtered = [c for c in all_clothes if c.status in (StatusEnum.wearable, None)]
+    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation or "데일리")
     if len(filtered) < 4:
         return {
-            "outfits": [], 
-            "ai_message": "주간 추천을 위해 최소 4벌 이상의 옷을 등록해주세요."
+            "weekly_outfits": [],
+            "tip": "주간 추천을 위해 최소 4벌 이상의 옷을 등록해주세요."
         }
     clothes_text = "\n".join([clothes_to_text(c) for c in filtered])
     situation_kr = situation or "데일리"
@@ -446,4 +416,7 @@ def recommend_weekly(
   "tip": "이번 주 코디 팁 한 줄"
 }}
 """
-    return call_gemini(prompt)
+    result = call_gemini(prompt)
+    if used_fallback:
+        result["tip"] = "[현재 날씨·계절에 맞는 옷이 부족하여 전체 옷장 기준으로 추천했습니다] " + result.get("tip", "")
+    return result
