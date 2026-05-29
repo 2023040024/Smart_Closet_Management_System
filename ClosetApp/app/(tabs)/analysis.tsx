@@ -68,7 +68,7 @@ export default function AnalysisScreen() {
         try {
           const [overloadRes, disposalRes] = await Promise.all([
             api.get('/stats/overload'),
-            api.get('/stats/unworn', { params: { current_season: '여름' } }),
+            api.get('/stats/dispose', { params: { current_season: getCurrentSeason() } }),
           ]);
 
           if (isMounted) {
@@ -93,6 +93,15 @@ export default function AnalysisScreen() {
       };
     }, [])
   );
+
+  // 현재 월(Month)을 가져와서 한국어 계절로 반환해 주는 함수
+  const getCurrentSeason = (): string => {
+  const month = new Date().getMonth() + 1;
+  if (month >= 3 && month <= 5) return '봄';
+  if (month >= 6 && month <= 8) return '여름';
+  if (month >= 9 && month <= 11) return '가을';
+  return '겨울';
+}
 
   // 공통 의류 카드 컴포넌트 렌더러 (백엔드 플랫 데이터 매핑)
   const renderClothesCard = (item: any, badgeType?: 'overload' | 'dispose') => {
