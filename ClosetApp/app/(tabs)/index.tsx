@@ -137,9 +137,9 @@ useFocusEffect(
           // 기존 과부하 API 호출
           const statsRes = await api.get('/stats/overload');
           
-          // 🚨 [추가] 처분 추천 API 호출 (테스트를 위해 '여름'으로 하드코딩 혹은 로직 추가)
+          // 처분 추천 API 호출
           const disposalRes = await api.get('/stats/dispose', {
-            params: { current_season: '여름' } 
+            params: { current_season: getCurrentSeason() } 
           });
 
           if (isMounted) {
@@ -175,6 +175,14 @@ useFocusEffect(
       },
     ]);
   };
+
+  function getCurrentSeason(): string {
+  const month = new Date().getMonth() + 1;
+  if (month >= 3 && month <= 5) return '봄';
+  if (month >= 6 && month <= 8) return '여름';
+  if (month >= 9 && month <= 11) return '가을';
+  return '겨울';
+  }
 
   const filteredClothes = useMemo(() => {
     return clothes.filter((item) => {
