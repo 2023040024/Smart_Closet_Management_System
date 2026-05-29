@@ -377,7 +377,7 @@ useFocusEffect(
             )}
 
             {/* 🚨 [추가] 처분 추천 배너 (아이템이 있을 때만 표시) */}
-            {disposalBanner && disposalBanner.items.length > 0 && (
+            {disposalBanner && disposalBanner.items?.length > 0 && (
               <View style={styles.disposalBannerBox}>
                 <View style={styles.disposalBannerHeader}>
                   <Ionicons name="trash-outline" size={16} color="#d97706" />
