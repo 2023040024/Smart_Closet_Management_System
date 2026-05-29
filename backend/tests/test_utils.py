@@ -1,10 +1,11 @@
 import pytest
 from datetime import datetime
 from unittest.mock import patch
-from utils import get_base_time, get_coords_from_address, convert_grid
+from utils import get_base_time, get_coords_from_address, get_weather_data, convert_grid
 
-@patch('utils.requests.get')
-def test_get_coords_from_address_success(mock_get):
+@patch('utils.httpx.AsyncClient.get')
+@pytest.mark.asyncio
+async def test_get_coords_from_address_success(mock_get):
     """정상적으로 위경도 데이터를 받아오는 경우"""
     mock_get.return_value.json.return_value = [{'lat': '37.5665', 'lon': '126.9780'}]
     lat, lon = get_coords_from_address("서울")

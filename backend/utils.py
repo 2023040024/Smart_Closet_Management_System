@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 import math
-import httpx
+import httpx, os, requests
 
 # 1. 주소 -> 위경도 변환 (OpenStreetMap Nominatim 사용)
 async def get_coords_from_address(address: str):

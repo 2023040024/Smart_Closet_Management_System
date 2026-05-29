@@ -1,6 +1,4 @@
-import os
-import json
-import re
+import os, json, re, httpx
 import google.generativeai as genai
 from dotenv import load_dotenv
 from datetime import date

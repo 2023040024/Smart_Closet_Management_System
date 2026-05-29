@@ -1,10 +1,7 @@
-import pytest
+import pytest, sys, os, importlib, httpx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
-import importlib
-import sys
-import os
+from unittest.mock import patch, MagicMock, AsyncMock
 from io import StringIO
 
 from routers import weather
@@ -15,11 +12,11 @@ app.include_router(router)
 client = TestClient(app)
 
 class TestWeatherAPI:
-    @patch("routers.weather.requests.get")
+    @patch("routers.weather.httpx.AsyncClient.get", new_callable=AsyncMock)
     @patch("routers.weather.get_base_time")
     @patch("routers.weather.convert_grid")
-    @patch("routers.weather.get_coords_from_address")
-    def test_날씨_조회_성공_모든_조건_통과(self, mock_coords, mock_grid, mock_time, mock_requests):
+    @patch("routers.weather.get_coords_from_address", new_callable=AsyncMock)
+    def test_날씨_조회_성공_모든_조건_통과(self, mock_coords, mock_grid, mock_time, mock_get):
         """정상적인 API 응답 및 모든 if/elif 카테고리(TMP, TMX, TMN, SKY, PTY, POP) 파싱 검증"""
         mock_coords.return_value = (37.5665, 126.9780)
         mock_grid.return_value = (60, 127)
@@ -44,7 +41,8 @@ class TestWeatherAPI:
                 }
             }
         }
-        mock_requests.return_value = mock_response
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
 
         response = client.get("/weather/address?address=서울시")
 
@@ -62,7 +60,7 @@ class TestWeatherAPI:
         assert weather_data["강수 형태"] == "비"
         assert weather_data["강수 확률"] == "80%"
 
-    @patch("routers.weather.get_coords_from_address")
+    @patch("routers.weather.get_coords_from_address", new_callable=AsyncMock)
     def test_유효하지_않은_주소(self, mock_coords):
         """주소 변환 실패(lat is None) 시 400 에러 검증"""
         mock_coords.return_value = (None, None)
@@ -72,11 +70,11 @@ class TestWeatherAPI:
         assert response.status_code == 400
         assert response.json()["detail"] == "유효하지 않은 주소입니다."
 
-    @patch("routers.weather.requests.get")
+    @patch("routers.weather.httpx.AsyncClient.get", new_callable=AsyncMock)
     @patch("routers.weather.get_base_time")
     @patch("routers.weather.convert_grid")
-    @patch("routers.weather.get_coords_from_address")
-    def test_기상청_API_응답_오류(self, mock_coords, mock_grid, mock_time, mock_requests):
+    @patch("routers.weather.get_coords_from_address", new_callable=AsyncMock)
+    def test_기상청_API_응답_오류(self, mock_coords, mock_grid, mock_time, mock_get):
         """기상청 서버에서 resultCode가 '00'이 아닌 에러 코드를 내려줄 때 검증"""
         mock_coords.return_value = (37.5665, 126.9780)
         mock_grid.return_value = (60, 127)
@@ -88,27 +86,39 @@ class TestWeatherAPI:
                 "header": {"resultCode": "10", "resultMsg": "오류 발생"}
             }
         }
-        mock_requests.return_value = mock_response
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
 
         response = client.get("/weather/address?address=서울시")
         
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "error"
-        assert data["message"] == "기상청 API 응답 오류"
+        assert response.status_code == 502
+        assert "기상청 API 응답 오류: 오류 발생" in response.json()["detail"]
 
-    @patch("routers.weather.requests.get")
-    @patch("routers.weather.get_coords_from_address")
-    def test_통신_예외_발생(self, mock_coords, mock_requests):
+    @patch("routers.weather.httpx.AsyncClient.get", new_callable=AsyncMock)
+    @patch("routers.weather.get_coords_from_address", new_callable=AsyncMock)
+    def test_통신_예외_발생_503(self, mock_coords, mock_get):
         """requests.get에서 타임아웃 등 Exception이 터졌을 때 500 에러 검증"""
         mock_coords.return_value = (37.5665, 126.9780)
         
-        mock_requests.side_effect = Exception("Timeout Error")
+        mock_get.side_effect = httpx.RequestError("Timeout Error", request=MagicMock())
+
+        response = client.get("/weather/address?address=서울시")
+        
+        assert response.status_code == 503
+        assert "기상청 서버와 통신할 수 없습니다" in response.json()["detail"]
+
+    @patch("routers.weather.httpx.AsyncClient.get", new_callable=AsyncMock)
+    @patch("routers.weather.get_coords_from_address", new_callable=AsyncMock)
+    def test_내부_서버_예외_발생_500(self, mock_coords, mock_get):
+        """그 외의 일반적인 Exception 발생 시 500 에러 검증"""
+        mock_coords.return_value = (37.5665, 126.9780)
+        
+        mock_get.side_effect = Exception("Unknown Server Error")
 
         response = client.get("/weather/address?address=서울시")
         
         assert response.status_code == 500
-        assert "Timeout Error" in response.json()["detail"]
+        assert "내부 서버 에러" in response.json()["detail"]
 
     def test_환경변수_누락_프린트문_커버리지(self):
         """
