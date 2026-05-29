@@ -74,10 +74,10 @@ export default function AnalysisScreen() {
           if (isMounted) {
             setOverloadData(overloadRes.data);
 
-            const disposalArray = disposalRes.data || [];
+            const disposalResponse = disposalRes.data;
             setDisposalData({
-              items: disposalArray,
-              ai_advice: '최근 90일 이상 입지 않은 옷들입니다. 처분이나 나눔을 고민해 보세요!',
+              items: disposalResponse.items || [],
+              ai_advice: disposalResponse.ai_advice || '최근 90일 이상 입지 않은 옷들입니다. 처분이나 나눔을 고민해 보세요!',
             });
           }
         } catch (error) {
