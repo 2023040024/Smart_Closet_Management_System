@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Clothes, User, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum, SituationEnum, ColorEnum
+from models import Clothes, User, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum, SituationEnum, ColorEnum, TopFitEnum, BottomFitEnum
 from schemas import ClothesUpdate, ClothesStatusUpdate, ClothesResponse, ClothesCreate
 from .auth import get_current_user
 
@@ -95,6 +95,8 @@ async def create_clothes(
     situation:      Optional[SituationEnum] = Form(None),
     thickness:      Optional[ThicknessEnum] = Form(None),
     price:          Optional[int]     = Form(None),
+    top_fit:        Optional[TopFitEnum] = Form(None),
+    bottom_fit:     Optional[BottomFitEnum] = Form(None),
     image:          Optional[UploadFile] = File(None),
     db:             Session           = Depends(get_db),
     current_user:   User = Depends(get_current_user)
@@ -126,6 +128,8 @@ async def create_clothes(
         material       = material.strip() if material else None,
         thickness      = thickness,
         price          = price,
+        top_fit        = top_fit,
+        bottom_fit     = bottom_fit,
         image_url      = image_url,
         status         = StatusEnum.wearable
     )
