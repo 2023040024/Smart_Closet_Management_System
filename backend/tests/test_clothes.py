@@ -1,5 +1,6 @@
 import sys, os, io
-from unittest.mock import patch
+from unittest.mock import patch, mock_open
+from routers.clothes import get_material_tip, MATERIAL_TIPS
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 class TestClothes:
@@ -23,16 +24,35 @@ class TestClothes:
         assert res.json()["detail"] == "옷을 찾을 수 없습니다"
 
     def test_옷_등록_잘못된_이미지_확장자(self, client, auth_headers):
-        fake_file = io.BytesIO(b"fake image data")
+        data = {
+            "name": "바지", 
+            "category": "하의", 
+            "color": "블랙", 
+            "season": "사계절", 
+            "style": "캐주얼", 
+            "situation": "데일리"
+        }
+        
+        fake_file = io.BytesIO(b"fake pdf content")
         fake_file.name = "test.pdf"
         
         res = client.post(
             "/clothes",
             headers=auth_headers,
-            data={"name": "바지", "category": "하의", "color": "블랙"},
+            data=data,
             files={"image": ("test.pdf", fake_file, "application/pdf")}
         )
-        assert res.status_code in (400, 422)
+        
+        assert res.status_code == 400
+        assert res.json()["detail"] == "jpg, png, webp만 가능합니다"
+
+    @patch("builtins.open", new_callable=mock_open)
+    def test_옷_등록_이미지_업로드_성공(self, mock_file, client, auth_headers):
+        data = {"name": "이미지옷", "category": "상의", "color": "화이트", "season": "여름", "style": "캐주얼", "situation": "데일리"} 
+        files = {"image": ("test.png", b"fake image content", "image/png")}
+    
+        res = client.post("/clothes", headers=auth_headers, data=data, files=files)
+        assert res.status_code in (200, 201)
 
     def test_옷_상세_조회_성공(self, client, auth_headers, sample_clothes):
         clothes = sample_clothes[0]
@@ -45,9 +65,10 @@ class TestClothes:
         res = client.put(
             f"/clothes/{clothes['clothes_id']}",
             headers=auth_headers,
-            data={"name": "수정된 티셔츠", "category": "상의"} 
+            json={"name": "수정된 티셔츠", "category": "상의"} 
         )
-        assert res.status_code in (200, 422)
+        assert res.status_code == 200
+        assert res.json()["name"] == "수정된 티셔츠"
 
     def test_옷_상태_변경_성공(self, client, auth_headers, sample_clothes):
         clothes = sample_clothes[0]
@@ -67,30 +88,26 @@ class TestClothes:
         res_check = client.get(f"/clothes/{clothes['clothes_id']}", headers=auth_headers)
         assert res_check.status_code == 404
 
-    def test_소재_팁_조회_소재없음(self, client, auth_headers, sample_clothes):
-        clothes = sample_clothes[0]
-        client.put(f"/clothes/{clothes['clothes_id']}", headers=auth_headers, data={"material": ""})
+    def test_소재_팁_조회_소재없음(self):
+        assert get_material_tip(None) == "소재 정보가 없습니다. 옷 정보를 수정해서 소재를 입력해주세요."
+        assert get_material_tip("") == "소재 정보가 없습니다. 옷 정보를 수정해서 소재를 입력해주세요."
 
+    def test_소재_팁_조회_유사단어(self):
+        expected_tip = MATERIAL_TIPS["면"]
+        assert get_material_tip("면 100%") == expected_tip
+
+    def test_소재_팁_조회_알수없는소재(self):
+        result = get_material_tip("우주소재")
+        assert "'우주소재' 소재에 대한 팁이 아직 없습니다." in result
+
+    def test_소재_팁_조회_정확한매칭(self):
+        expected_tip = MATERIAL_TIPS["면"]
+        assert get_material_tip("면") == expected_tip
+
+    def test_소재_정보_미입력시_응답(self, client, auth_headers, sample_clothes):
+        clothes = sample_clothes[0]
         res = client.get(f"/clothes/{clothes['clothes_id']}/tips", headers=auth_headers)
         assert res.status_code == 200
-        assert "소재 정보가 없습니다" in res.json()["tip"]
-
-    def test_소재_팁_조회_유사단어(self, client, auth_headers, sample_clothes):
-        clothes = sample_clothes[0]
-        client.put(f"/clothes/{clothes['clothes_id']}", headers=auth_headers, data={"material": "면 100%"})
-        
-        res = client.get(f"/clothes/{clothes['clothes_id']}/tips", headers=auth_headers)
-        assert res.status_code == 200
-        assert "소재에 대한 팁이 아직 없습니다" not in res.json()["tip"]
-
-    def test_소재_팁_조회_알수없는소재(self, client, auth_headers, sample_clothes):
-        clothes = sample_clothes[0]
-        cid = clothes.get('clothes_id') or clothes.get('id')
-        client.put(f"/clothes/{clothes['clothes_id']}", headers=auth_headers, data={"material": "우주소재"})
-        
-        res = client.get(f"/clothes/{clothes['clothes_id']}/tips", headers=auth_headers)
-        assert res.status_code == 200
-        assert "소재 정보가 없습니다. 옷 정보를 수정해서 소재를 입력해주세요." in res.json()["tip"]
 
     # 불량 데이터 예외 처리
     @patch("routers.clothes.ClothesResponse.model_validate")
