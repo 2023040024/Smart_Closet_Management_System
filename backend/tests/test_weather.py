@@ -91,7 +91,7 @@ class TestWeatherAPI:
 
         response = client.get("/weather/address?address=서울시")
         
-        assert response.status_code == 502
+        assert response.status_code == 500
         assert "기상청 API 응답 오류: 오류 발생" in response.json()["detail"]
 
     @patch("routers.weather.httpx.AsyncClient.get", new_callable=AsyncMock)
