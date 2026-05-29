@@ -45,6 +45,7 @@ type OverloadGroup = {
 export default function AnalysisScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // 🚨 옷장 분석 데이터 저장용 상태 관리 스태이트
   const [overloadData, setOverloadData] = useState<{
@@ -66,6 +67,7 @@ export default function AnalysisScreen() {
         if (!isMounted) return;
         setLoading(true);
         try {
+          setError(null);
           const [overloadRes, disposalRes] = await Promise.all([
             api.get('/stats/overload'),
             api.get('/stats/dispose', { params: { current_season: getCurrentSeason() } }),
@@ -151,6 +153,14 @@ export default function AnalysisScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#111" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={{ color: '#dc2626', fontSize: 16, fontWeight: 'bold' }}>⚠️ {error}</Text>
       </View>
     );
   }
