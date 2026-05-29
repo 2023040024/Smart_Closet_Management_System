@@ -82,10 +82,10 @@ def get_disposal_recommendation(
         advice_list = [f"옷 ID {c.clothes_id}번은 90일 이상 미착용된 옷입니다. 처분을 고려해보세요." for c in disposal_targets]
         advice = "\n".join(advice_list)
         
-    return DisposalResponse(
-        items=disposal_targets,
-        ai_advice=advice
-    )
+    return {
+        "items": disposal_targets,
+        "ai_advice": advice
+    }
     
 
 # 가성비 계산 API
@@ -192,8 +192,8 @@ def get_closet_overload(
     else:
         advice = "옷장 다이어트가 시급합니다! 안 입는 중복 옷을 비워낼 타이밍입니다."
 
-    return OverloadResponse(
-        total_warnings=total_warnings,
-        items=detailed_data,
-        ai_advice=advice
-    )
+    return {
+        "total_warnings": total_warnings,
+        "items": detailed_data,
+        "ai_advice": advice
+    }
