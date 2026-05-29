@@ -109,6 +109,31 @@ class TestClothes:
         res = client.get(f"/clothes/{clothes['clothes_id']}/tips", headers=auth_headers)
         assert res.status_code == 200
 
+    def test_소재_팁_API_정상_반환(self, client, auth_headers, sample_clothes):
+        clothes = sample_clothes[0]
+        
+        target_id = clothes.get("clothes_id", clothes.get("clothes_id"))
+        
+        client.put(
+            f"/clothes/{target_id}",
+            headers=auth_headers,
+            json={
+                "name": clothes["name"],
+                "category": clothes["tags"]["category"],
+                "season": clothes["tags"]["season"],
+                "style": clothes["tags"]["style"],
+                "material": "면"
+            }
+        )
+        
+        res = client.get(f"/clothes/{target_id}/tips", headers=auth_headers)
+
+        assert res.status_code == 200
+        json_data = res.json()
+        assert json_data["material"] == "면"
+        assert "clothes_name" in json_data
+        assert "tip" in json_data
+
     # 불량 데이터 예외 처리
     @patch("routers.clothes.ClothesResponse.model_validate")
     def test_옷_목록_조회_불량데이터_무시(self, mock_validate, client, auth_headers, sample_clothes):
