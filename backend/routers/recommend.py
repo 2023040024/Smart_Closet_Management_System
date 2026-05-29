@@ -1,7 +1,6 @@
 import os
 import json
 import re
-import httpx
 import google.generativeai as genai
 from dotenv import load_dotenv
 from datetime import date
@@ -14,6 +13,7 @@ from database import get_db
 from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum, TpoScore
 from routers.auth import get_current_user
 from tpo_rules import get_tpo_prompt_text, check_color_conflict
+from utils import get_weather_data
 
 # .env 파일 로드
 load_dotenv()
@@ -24,8 +24,6 @@ router = APIRouter(prefix="/recommend", tags=["코디 추천"])
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("models/gemini-flash-latest")
-
-WEATHER_BASE_URL = os.getenv("WEATHER_BASE_URL", "http://localhost:8000")
 
 # --- 데이터 모델 정의 ---
 class RecommendRequest(BaseModel):
@@ -52,35 +50,7 @@ class RecommendResponse(BaseModel):
 # --- 유틸리티 함수 ---
 def fetch_weather(address: str) -> dict:
     try:
-        with httpx.Client(timeout=5.0) as client:
-            resp = client.get(
-                f"{WEATHER_BASE_URL}/weather/address",
-                params={"address": address}
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-        if data.get("status") != "success":
-            return {"temperature": 20.0, "condition": "sunny"}
-
-        weather = data["weather"]
-        temp_str = weather.get("현재 기온", "20°C").replace("°C", "").strip()
-        temperature = float(temp_str)
-
-        sky  = weather.get("하늘 상태", "맑음")
-        rain = weather.get("강수 형태", "없음")
-
-        if rain in ("비", "소나기", "비/눈"):
-            condition = "rainy"
-        elif rain == "눈":
-            condition = "snowy"
-        elif sky == "맑음":
-            condition = "sunny"
-        else:
-            condition = "cloudy"
-
-        return {"temperature": temperature, "condition": condition}
-
+        return get_weather_data(address)
     except Exception as e:
         print(f"[날씨 연동 실패, 기본값 사용] {e}")
         return {"temperature": 20.0, "condition": "sunny"}

@@ -202,7 +202,8 @@ export default function RegisterScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>옷 등록</Text>
       <TouchableOpacity style={styles.imageBox} onPress={pickImage}>
-        {image ? <Image source={{ uri: image }} style={styles.image} resizeMode="cover" /> : <Text style={styles.imagePlaceholder}>+ 사진 추가</Text>}
+        {/* ✅ 수정 포인트: resizeMode를 contain으로 수정하여 이미지 상/하단 짤림 해결 */}
+        {image ? <Image source={{ uri: image }} style={styles.image} resizeMode="contain" /> : <Text style={styles.imagePlaceholder}>+ 사진 추가</Text>}
       </TouchableOpacity>
       <Text style={styles.sectionTitle}>카테고리</Text>
       {renderChips(TAG_OPTIONS.category, 'category')}
@@ -245,6 +246,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 32 },
   title: { fontSize: 26, fontWeight: '700', marginBottom: 16 },
   imageBox: { height: 220, borderRadius: 16, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginBottom: 20 },
+  // ✅ 배경색을 한 번 더 선언하여 원본 비율 매핑 시 좌우 여백을 자연스럽게 처리
   image: { width: '100%', height: '100%', backgroundColor: '#f3f4f6' },
   imagePlaceholder: { color: '#6b7280', fontSize: 16, fontWeight: '600' },
   sectionTitle: { fontSize: 16, fontWeight: '700', marginTop: 10, marginBottom: 8 },
