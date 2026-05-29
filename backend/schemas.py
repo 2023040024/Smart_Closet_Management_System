@@ -263,3 +263,7 @@ class OverloadResponse(BaseModel):
     total_warnings: int
     items: list[OverloadItem]
     ai_advice: str
+
+class DisposalResponse(BaseModel):
+    items: list[ClothesResponse]
+    ai_advice: str
