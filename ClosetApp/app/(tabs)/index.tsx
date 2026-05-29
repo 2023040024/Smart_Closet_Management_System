@@ -94,12 +94,23 @@ export default function HomeScreen() {
   const { clothes, fetchClothes } = useCloset();
   const [loading, setLoading] = useState(false);
 
+  // 🚨 [추가] 백엔드 과부하 통계 데이터 응답 모델을 담아둘 상태 변수
+  const [overloadBanner, setOverloadBanner] = useState<{
+    total_warnings: number;
+    ai_advice: string;
+  } | null>(null);
+
   const [selectedType, setSelectedType] = useState<'전체' | Category>('전체');
   const [showFilter, setShowFilter] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ClothesItem | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [currentFilterPage, setCurrentFilterPage] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [disposalBanner, setDisposalBanner] = useState<{
+    items: any[];
+    ai_advice: string;
+  } | null>(null);
 
   const [filter, setFilter] = useState<FilterType>({
     style: '', mood: '', thickness: '', topFit: '', bottomFit: '',
@@ -114,7 +125,7 @@ export default function HomeScreen() {
   const [showAllOptions, setShowAllOptions] = useState<Partial<Record<keyof FilterType, boolean>>>({});
 
   // ✅ 의존성 배열을 빈 배열([])로 설정하고 마운트 상태 락을 걸어 깜빡임/무한 로딩 버그 완벽 수정
-  useFocusEffect(
+useFocusEffect(
     useCallback(() => {
       let isMounted = true;
       const load = async () => {
@@ -122,6 +133,19 @@ export default function HomeScreen() {
         setLoading(true);
         try {
           await fetchClothes();
+          
+          // 기존 과부하 API 호출
+          const statsRes = await api.get('/stats/overload');
+          
+          // 처분 추천 API 호출
+          const disposalRes = await api.get('/stats/dispose', {
+            params: { current_season: getCurrentSeason() } 
+          });
+
+          if (isMounted) {
+            setOverloadBanner(statsRes.data);
+            setDisposalBanner(disposalRes.data); // 데이터 저장
+          }
         } catch (error) {
           console.error("데이터 로드 실패:", error);
         } finally {
@@ -129,9 +153,7 @@ export default function HomeScreen() {
         }
       };
       load();
-      return () => {
-        isMounted = false;
-      };
+      return () => { isMounted = false; };
     }, [])
   );
 
@@ -153,6 +175,14 @@ export default function HomeScreen() {
       },
     ]);
   };
+
+  function getCurrentSeason(): string {
+  const month = new Date().getMonth() + 1;
+  if (month >= 3 && month <= 5) return '봄';
+  if (month >= 6 && month <= 8) return '여름';
+  if (month >= 9 && month <= 11) return '가을';
+  return '겨울';
+  }
 
   const filteredClothes = useMemo(() => {
     return clothes.filter((item) => {
@@ -198,6 +228,10 @@ export default function HomeScreen() {
             await api.delete(`/clothes/${selectedItem.id}`);
             closeMenu();
             await fetchClothes();
+
+            const statsRes = await api.get('/stats/overload');
+            setOverloadBanner(statsRes.data);
+
           } catch (e) { Alert.alert('삭제 실패'); }
           finally { setDeletingId(null); }
         },
@@ -339,6 +373,28 @@ export default function HomeScreen() {
               </View>
             )}
 
+            {/* 🚨 [추가] 추천 2안 적용: 카테고리 필터와 내 옷장 타이틀 틈새에 과부하 분석 배너 삽입 */}
+            {overloadBanner && overloadBanner.total_warnings > 0 && (
+              <View style={styles.overloadBannerBox}>
+                <View style={styles.overloadBannerHeader}>
+                  <Ionicons name="warning" size={16} color="#dc2626" />
+                  <Text style={styles.overloadBannerTitle}>충동 소비 주의보 ({overloadBanner.total_warnings}건)</Text>
+                </View>
+                <Text style={styles.overloadBannerText}>{overloadBanner.ai_advice}</Text>
+              </View>
+            )}
+
+            {/* 🚨 [추가] 처분 추천 배너 (아이템이 있을 때만 표시) */}
+            {disposalBanner && disposalBanner.items?.length > 0 && (
+              <View style={styles.disposalBannerBox}>
+                <View style={styles.disposalBannerHeader}>
+                  <Ionicons name="trash-outline" size={16} color="#d97706" />
+                  <Text style={styles.disposalBannerTitle}>정리가 필요한 옷이 있어요</Text>
+                </View>
+                <Text style={styles.disposalBannerText}>{disposalBanner.ai_advice}</Text>
+              </View>
+            )}
+
             <View style={styles.resultHeader}>
               <Text style={styles.resultTitle}>옷 목록</Text>
               <Text style={styles.resultCount}>{filteredClothes.length}개</Text>
@@ -444,4 +500,57 @@ const styles = StyleSheet.create({
   paginationWrap: { flexDirection: 'row', justifyContent: 'center', marginTop: 12, gap: 6 },
   paginationDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ddd' },
   paginationDotActive: { backgroundColor: '#111', width: 20 },
+
+  // 🚨 [추가] 옷장 과부하 경고 배너용 스타일 테마
+  overloadBannerBox: {
+    backgroundColor: '#fef2f2', 
+    borderWidth: 1, 
+    borderColor: '#fee2e2', 
+    borderRadius: 16, 
+    padding: 14, 
+    marginBottom: 16
+  },
+  overloadBannerHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    marginBottom: 4 
+  },
+  overloadBannerTitle: { 
+    fontSize: 13, 
+    fontWeight: '800', 
+    color: '#dc2626' 
+  },
+  overloadBannerText: { 
+    fontSize: 14, 
+    color: '#4b5563', 
+    lineHeight: 20, 
+    fontWeight: '600' 
+  },
+
+  disposalBannerBox: {
+    backgroundColor: '#fffbeb', // 연한 주황색 바탕
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+  },
+  disposalBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  disposalBannerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#d97706', // 진한 주황색
+  },
+  disposalBannerText: {
+    fontSize: 14,
+    color: '#4b5563',
+    lineHeight: 20,
+    fontWeight: '600',
+  },
 });

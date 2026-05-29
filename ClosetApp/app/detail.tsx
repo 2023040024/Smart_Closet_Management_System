@@ -14,7 +14,6 @@ import api from './_api';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
-// ✅ 1. 관리 팁 데이터를 위한 타입 정의 추가
 interface CareTip {
   "세탁 및 관리": string;
   "보관 방법": string;
@@ -35,6 +34,7 @@ type DetailApiItem = {
   purchase_price?: number | null;
   price?: number | null;
   last_worn_date?: string | null;
+  wear_count?: number; // ✅ 가성비 계산을 위한 착용 횟수 필드 추가
   situation?: string | null; 
   tpo?: string | null;
   tags?: {
@@ -58,7 +58,7 @@ type DetailApiItem = {
   color?: string;
   season?: string;
   style?: string;
-  material?: string; // 소재 정보 추가 매핑용
+  material?: string; 
 };
 
 function resolveImageUri(image?: string | null) {
@@ -69,6 +69,9 @@ function resolveImageUri(image?: string | null) {
   return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
 }
 
+// 뱃지 하이라이트 스타일을 위한 타입 정의
+type HighlightType = 'none' | 'good' | 'normal_cost' | 'warning';
+
 export default function DetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
@@ -76,7 +79,6 @@ export default function DetailScreen() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // ✅ 2. 관리 팁 상태 변수 추가
   const [tipData, setTipData] = useState<TipResponse | null>(null);
   const [tipLoading, setTipLoading] = useState(false);
 
@@ -125,7 +127,6 @@ export default function DetailScreen() {
     }, [fetchDetail])
   );
 
-  // ✅ 3. 옷 상세 정보(item)를 성공적으로 가져오면 관리 팁 API 호출
   useEffect(() => {
     const fetchCareTips = async () => {
       const actualId = item?.id ?? item?.clothes_id;
@@ -144,22 +145,49 @@ export default function DetailScreen() {
     };
 
     fetchCareTips();
-  }, [item?.id, item?.clothes_id]); // ID가 확보될 때만 실행
+  }, [item?.id, item?.clothes_id]);
 
   const visibleTags = useMemo(() => {
     if (!item) return [];
 
     const s = item.tags || {};
     const fitValue = s.top_fit ?? s.topFit ?? s.bottom_fit ?? s.bottomFit ?? '';
-    
     const tpoValue = s.situation ?? s.tpo ?? item.situation ?? item.tpo ?? '';
     
+    // 구매가 및 누적 착용 횟수 세팅
     const rawPrice = item.price ?? item.purchase_price;
+    const wearCount = item.wear_count ?? 0;
+    
     const priceValue = (rawPrice !== null && rawPrice !== undefined)
       ? `${Number(rawPrice).toLocaleString()}원` 
       : '';
 
-    return [
+    // ✅ 가성비(Cost per wear) 산출 로직 및 ZeroDivision 방어
+    let costPerWearStr = '';
+    let costHighlight: HighlightType = 'none';
+    let showCost = false;
+
+    if (rawPrice !== null && rawPrice !== undefined && Number(rawPrice) > 0) {
+      showCost = true;
+      if (wearCount === 0) {
+        // 착용 횟수가 0일 경우 (에러 방어)
+        costPerWearStr = '미착용 (계산 불가)';
+        costHighlight = 'warning';
+      } else {
+        // 정상 나눗셈 계산
+        const costValue = Math.floor(Number(rawPrice) / wearCount);
+        costPerWearStr = `₩${costValue.toLocaleString()} / 회`;
+        
+        // 1회당 비용이 10,000원 이하이면 초록색 뱃지로 '가성비 좋음' 강조
+        if (costValue <= 10000) {
+          costHighlight = 'good';
+        } else {
+          costHighlight = 'normal_cost';
+        }
+      }
+    }
+
+    const tagsArray: Array<{ label: string; value: string | null | undefined; highlight?: HighlightType }> = [
       { label: '이름', value: item.name },
       { label: '카테고리', value: s.category ?? item.category },
       { label: '색상', value: s.color ?? item.color },
@@ -172,9 +200,14 @@ export default function DetailScreen() {
       { label: '두께', value: s.thickness },
       { label: '포인트', value: s.point },
       { label: 'TPO', value: tpoValue },
+      { label: '누적 착용', value: `${wearCount}회` }, // 누적 착용 횟수 표기
       { label: '구매가', value: priceValue },
+      // 조건부 가성비 항목 추가
+      ...(showCost ? [{ label: '가성비', value: costPerWearStr, highlight: costHighlight }] : []),
       { label: '마지막 착용일', value: item.last_worn_date },
-    ].filter(
+    ];
+
+    return tagsArray.filter(
       (tag) =>
         tag.value !== undefined &&
         tag.value !== null &&
@@ -217,18 +250,34 @@ export default function DetailScreen() {
         <Text style={styles.emptyTagText}>표시할 태그가 없습니다.</Text>
       ) : (
         <View style={styles.tagList}>
-          {visibleTags.map((tag) => (
-            <View key={`${tag.label}-${tag.value}`} style={styles.tagRow}>
-              <Text style={styles.tagLabel}>{tag.label}</Text>
-              <View style={styles.tagPill}>
-                <Text style={styles.tagText}>{String(tag.value)}</Text>
+          {visibleTags.map((tag) => {
+            // ✅ 가성비 뱃지 스타일 분기 처리
+            let pillStyle: any[] = [styles.tagPill];
+            let textStyle: any[] = [styles.tagText];
+
+            if (tag.highlight === 'good') {
+              pillStyle.push(styles.goodCostPill);
+              textStyle.push(styles.goodCostText);
+            } else if (tag.highlight === 'normal_cost') {
+              pillStyle.push(styles.normalCostPill);
+              textStyle.push(styles.normalCostText);
+            } else if (tag.highlight === 'warning') {
+              pillStyle.push(styles.warningCostPill);
+              textStyle.push(styles.warningCostText);
+            }
+
+            return (
+              <View key={`${tag.label}-${tag.value}`} style={styles.tagRow}>
+                <Text style={styles.tagLabel}>{tag.label}</Text>
+                <View style={pillStyle}>
+                  <Text style={textStyle}>{String(tag.value)}</Text>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
 
-      {/* ✅ 4. 관리 팁 UI 섹션 추가 (태그 리스트와 수정 버튼 사이) */}
       {tipLoading ? (
         <ActivityIndicator size="small" color="#111827" style={{ marginBottom: 20 }} />
       ) : tipData ? (
@@ -278,10 +327,21 @@ const styles = StyleSheet.create({
   tagList: { marginBottom: 20 },
   tagRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   tagLabel: { width: 88, fontSize: 14, color: '#6b7280' },
+  
+  // 기본 태그 스타일
   tagPill: { flexShrink: 1, backgroundColor: '#111827', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12 },
   tagText: { color: '#fff', fontSize: 14 },
+
+  // ✅ 가성비 뱃지 추가 스타일
+  goodCostPill: { backgroundColor: '#dcfce7', borderWidth: 1, borderColor: '#bbf7d0' },
+  goodCostText: { color: '#166534', fontWeight: '800' }, // 뽕 뽑은 가성비 좋은 옷 (초록)
   
-  // ✅ 5. 관리 팁 관련 스타일
+  normalCostPill: { backgroundColor: '#e0e7ff', borderWidth: 1, borderColor: '#c7d2fe' },
+  normalCostText: { color: '#3730a3', fontWeight: '700' }, // 일반 가성비 (파랑)
+  
+  warningCostPill: { backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb' },
+  warningCostText: { color: '#6b7280', fontStyle: 'italic' }, // 미착용 상태 (회색)
+
   tipContainer: { backgroundColor: '#f9fafb', padding: 16, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: '#e5e7eb' },
   tipTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, color: '#111827' },
   tipBox: { marginBottom: 12 },
