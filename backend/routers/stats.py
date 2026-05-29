@@ -132,10 +132,14 @@ def get_closet_overload(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # 2. 계절(season)과 소재(material)를 group_by 조건에 추가
+    # 2. 계절(season)과 소재(material)를 group_by 조건에 추가 및 NULL 엣지 케이스 방어 로직 추가
     subquery = (
         db.query(Clothes.category, Clothes.color, Clothes.season, Clothes.material)
-        .filter(Clothes.user_id == current_user.id)
+        .filter(
+            Clothes.user_id == current_user.id,
+            Clothes.season.is_not(None),    # [팀원 리뷰 반영] 계절이 미입력된 옷 제외
+            Clothes.material.is_not(None)   # [팀원 리뷰 반영] 소재가 미입력된 옷 제외
+        )
         .group_by(Clothes.category, Clothes.color, Clothes.season, Clothes.material)
         .having(func.count(Clothes.clothes_id) >= threshold)
         .subquery()
