@@ -2,15 +2,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import api from '../_api';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+
+function resolveImageUri(image?: string | null) {
+  if (!image) return null;
+  if (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('file://')) {
+    return image;
+  }
+  return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
+}
 
 // 백엔드 의류 데이터 규격 정의
 type BackendClothesItem = {
@@ -58,12 +68,17 @@ export default function AnalysisScreen() {
         try {
           const [overloadRes, disposalRes] = await Promise.all([
             api.get('/stats/overload'),
-            api.get('/stats/dispose', { params: { current_season: '여름' } }),
+            api.get('/stats/unworn', { params: { current_season: '여름' } }),
           ]);
 
           if (isMounted) {
             setOverloadData(overloadRes.data);
-            setDisposalData(disposalRes.data);
+
+            const disposalArray = disposalRes.data || [];
+            setDisposalData({
+              items: disposalArray,
+              ai_advice: '최근 90일 이상 입지 않은 옷들입니다. 처분이나 나눔을 고민해 보세요!',
+            });
           }
         } catch (error) {
           console.error('분석 데이터 로드 실패:', error);
@@ -80,10 +95,22 @@ export default function AnalysisScreen() {
   );
 
   // 공통 의류 카드 컴포넌트 렌더러 (백엔드 플랫 데이터 매핑)
-  const renderClothesCard = (item: BackendClothesItem, badgeType?: 'overload' | 'dispose') => {
-    // 혹시 백엔드에서 이미지 스트링이 누락되었을 때 터지지 않게 기본 더미 이미지 처리
-    const imageUri = item.image || 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=300&auto=format&fit=crop';
+  const renderClothesCard = (item: any, badgeType?: 'overload' | 'dispose') => {
+    const rawImage = item.image ?? item.image_url;
+    const resolvedUri = resolveImageUri(rawImage);
+    const imageUri = resolvedUri || 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=300&auto=format&fit=crop';
     
+  // ✅ 1. 백엔드 계층형 스펙 반영: tags 객체 내부의 category와 material을 안전하게 참조
+    const displayCategory = item.tags?.category || item.category || '의류';
+    const displayMaterial = item.tags?.material || item.material || '기본';
+    const displayColor = item.tags?.color || item.color || '';
+
+    // ✅ 2. 뱃지 텍스트 동적 분기: 0회 착용이면 [미착용], 그 외에는 [방치됨] 처리
+    let badgeText = '중복';
+    if (badgeType === 'dispose') {
+      badgeText = item.wear_count === 0 ? '미착용' : '방치됨';
+    }
+
     return (
       <TouchableOpacity
         key={item.clothes_id}
@@ -93,18 +120,17 @@ export default function AnalysisScreen() {
       >
         <View style={styles.cardImageWrap}>
           <Image source={{ uri: imageUri }} style={styles.cardImage} resizeMode="contain" />
-          {badgeType === 'overload' && (
-            <View style={[styles.cardBadge, styles.overloadBadge]}><Text style={styles.cardBadgeText}>중복</Text></View>
-          )}
-          {badgeType === 'dispose' && (
-            <View style={[styles.cardBadge, styles.disposeBadge]}><Text style={styles.cardBadgeText}>방치됨</Text></View>
+          {badgeType && (
+            <View style={[styles.cardBadge, badgeType === 'overload' ? styles.overloadBadge : styles.disposeBadge]}>
+              <Text style={styles.cardBadgeText}>{badgeText}</Text>
+            </View>
           )}
         </View>
         <View style={styles.cardBody}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{item.category}</Text>
+          <Text style={styles.cardTitle} numberOfLines={1}>{displayCategory}</Text>
           <View style={styles.cardTagRow}>
-            <Text style={styles.cardTag}>{item.color}</Text>
-            <Text style={styles.cardTag}>{item.material || '기본'}</Text>
+            <Text style={styles.cardTag}>{displayColor}</Text>
+            <Text style={styles.cardTag}>{displayMaterial || '기본'}</Text>
             <Text style={[styles.cardTag, styles.countTag]}>{item.wear_count}회 착용</Text>
           </View>
         </View>
