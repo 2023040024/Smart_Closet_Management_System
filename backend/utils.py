@@ -83,15 +83,15 @@ def get_base_time():
     return base_date, base_time
 
 
-def get_weather_data(address: str) -> dict:
+async def get_weather_data(address: str) -> dict:
     """주소로 기상청 단기예보 API를 직접 호출해 기온·날씨 조건을 반환.
     실패 또는 유효하지 않은 주소면 기본값 {'temperature': 20.0, 'condition': 'sunny'}을 반환한다.
     recommend.py의 fetch_weather()가 자기 서버 HTTP를 호출하는 구조를 제거하기 위해 추가됨.
     """
     service_key = os.getenv("WEATHER_SERVICE_KEY")
 
-    lat, lon = get_coords_from_address(address)
-    if lat is None:
+    lat, lon = await get_coords_from_address(address)
+    if lat is None or lon is None:
         return {"temperature": 20.0, "condition": "sunny"}
 
     nx, ny = convert_grid(lat, lon)
