@@ -47,6 +47,10 @@ class TestFilterClothes:
         )
         assert c in filter_clothes([c], 20.0, "sunny")
 
+    def test_세탁필요_제외(self):
+        c = make_clothes(status=StatusEnum.need_wash)
+        assert filter_clothes([c], 20.0, "sunny") == []
+
     def test_빈리스트(self):
         assert filter_clothes([], 20.0, "sunny") == []
 
@@ -114,6 +118,11 @@ class TestGetCurrentSeason:
             mock_date.today.return_value = date(2026, 7, 1)
             assert get_current_season() == "여름"
 
+    def test_9월_가을(self):
+        with patch("routers.recommend.date") as mock_date:
+            mock_date.today.return_value = date(2026, 9, 1)
+            assert get_current_season() == "가을"
+
     def test_12월_겨울(self):
         with patch("routers.recommend.date") as mock_date:
             mock_date.today.return_value = date(2026, 12, 1)
@@ -144,6 +153,11 @@ class TestCalculateConflictScore:
         c = make_clothes(season="봄", color="블랙")
         with patch("routers.recommend.get_current_season", return_value="봄"):
             assert calculate_conflict_score(c, "면접") == 0
+
+    def test_영문_interview도_면접_60반환(self):
+        c = make_clothes(season="봄", color="레드")
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            assert calculate_conflict_score(c, "interview") == 60
 
 
 class TestFilterClothesF13:
@@ -223,6 +237,33 @@ class TestToSituationKr:
     def test_영문_interview_면접(self):
         assert to_situation_kr("interview") == "면접"
 
+    def test_영문_meeting_미팅(self):
+        assert to_situation_kr("meeting") == "미팅"
+
+    def test_영문_business_비즈니스(self):
+        assert to_situation_kr("business") == "비즈니스"
+
+    def test_영문_wedding_결혼식(self):
+        assert to_situation_kr("wedding") == "결혼식"
+
+    def test_영문_funeral_장례식(self):
+        assert to_situation_kr("funeral") == "장례식"
+
+    def test_영문_exercise_운동(self):
+        assert to_situation_kr("exercise") == "운동"
+
+    def test_영문_date_데이트(self):
+        assert to_situation_kr("date") == "데이트"
+
+    def test_영문_travel_여행(self):
+        assert to_situation_kr("travel") == "여행"
+
+    def test_영문_school_데일리폴백(self):
+        assert to_situation_kr("school") == "데일리"
+
+    def test_영문_cafe_데일리폴백(self):
+        assert to_situation_kr("cafe") == "데일리"
+
     def test_한글_그대로반환(self):
         assert to_situation_kr("데일리") == "데일리"
 
@@ -283,6 +324,12 @@ class TestBuildPrompt:
         prompt = build_prompt([], "daily", 20.0, "sunny", user)
         assert "outfits" in prompt
         assert "items" in prompt
+
+    def test_영문_meeting이_미팅으로_변환됨(self):
+        user = make_user()
+        prompt = build_prompt([], "meeting", 20.0, "sunny", user)
+        assert "미팅" in prompt
+        assert "모임" not in prompt
 
 
 class TestLoadTpoScores:
@@ -496,3 +543,14 @@ class TestRecommendEndpoints:
                               json={"situation": "daily", "temperature": 20.0, "weather_condition": "sunny"})
         assert res.status_code == 200
         assert res.json()["outfits"] == []
+
+    def test_weekly_인증없이_거부(self, client):
+        res = client.get("/recommend/weekly")
+        assert res.status_code in (401, 403)
+
+    def test_weekly_filtered_부족_empty반환(self, client, auth_headers, sample_clothes):
+        with patch("routers.recommend.apply_fallback_filter", return_value=([], False)):
+            res = client.get("/recommend/weekly", headers=auth_headers,
+                             params={"temperature": 20.0, "weather_condition": "sunny"})
+        assert res.status_code == 200
+        assert res.json()["weekly_outfits"] == []
