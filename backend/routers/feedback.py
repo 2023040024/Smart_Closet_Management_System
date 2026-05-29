@@ -1,12 +1,37 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from routers.auth import get_current_user  
+from routers.auth import get_current_user
 
 from database import get_db
-from models import WearHistory, Clothes, User, TpoScore  
-from schemas import FeedbackCreate, FeedbackTempEnum, FeedbackTpoEnum 
+from models import WearHistory, Clothes, User, TpoScore
+from schemas import FeedbackCreate, FeedbackTempEnum, FeedbackTpoEnum
 
 router = APIRouter(prefix="/feedback", tags=["피드백"])
+
+
+def update_tpo_score(db: Session, clothes_id: int, situation: str, feedback_tpo) -> None:
+    """TpoScore 업데이트: bad → -5 (하한 0), good → +5 (상한 100)"""
+    tpo_score_rec = db.query(TpoScore).filter(
+        TpoScore.clothes_id == clothes_id,
+        TpoScore.tpo_name == situation
+    ).first()
+    if feedback_tpo == FeedbackTpoEnum.bad:
+        if not tpo_score_rec:
+            db.add(TpoScore(clothes_id=clothes_id, tpo_name=situation, score=95))
+        else:
+            tpo_score_rec.score = max(0, tpo_score_rec.score - 5)
+    elif feedback_tpo == FeedbackTpoEnum.good:
+        if tpo_score_rec:
+            tpo_score_rec.score = min(100, tpo_score_rec.score + 5)
+
+
+def update_temp_sensitivity(user, feedback_temp) -> None:
+    """온도 민감도 보정: cold → +0.5, hot → -0.5, 범위 -2.0~2.0"""
+    current = user.temp_sensitivity or 0.0
+    if feedback_temp == FeedbackTempEnum.cold:
+        user.temp_sensitivity = max(-2.0, min(2.0, current + 0.5))
+    elif feedback_temp == FeedbackTempEnum.hot:
+        user.temp_sensitivity = max(-2.0, min(2.0, current - 0.5))
 
 @router.post("", status_code=status.HTTP_200_OK)
 def create_feedback(
@@ -40,42 +65,13 @@ def create_feedback(
     # 3. 데이터 업데이트
     if feedback_data.feedback_temperature is not None:
         history.feedback_temperature = feedback_data.feedback_temperature
-        
-        # current_user를 직접 사용하여 로직 간소화
-        current_sensitivity = current_user.temp_sensitivity or 0.0
-        
-        # 보정 가중치를 0.5로 최적화하고, 범위를 -2.0 ~ 2.0 사이로 제한(Clamp)
-        if feedback_data.feedback_temperature == FeedbackTempEnum.cold:
-            new_val = current_sensitivity + 0.5
-            current_user.temp_sensitivity = max(-2.0, min(2.0, new_val))
-        elif feedback_data.feedback_temperature == FeedbackTempEnum.hot:
-            new_val = current_sensitivity - 0.5
-            current_user.temp_sensitivity = max(-2.0, min(2.0, new_val))
-        elif feedback_data.feedback_temperature == FeedbackTempEnum.good:
-            current_user.temp_sensitivity = current_sensitivity
+        update_temp_sensitivity(current_user, feedback_data.feedback_temperature)
 
-    
     if feedback_data.feedback_tpo is not None:
         history.feedback_tpo = feedback_data.feedback_tpo
         situation = history.tpo.value if hasattr(history.tpo, 'value') else history.tpo
-        
         if situation and cloth:
-            tpo_score_rec = db.query(TpoScore).filter(
-                TpoScore.clothes_id == cloth.clothes_id,
-                TpoScore.tpo_name == situation
-            ).first()
-
-            # [점수 보정 로직]
-            if feedback_data.feedback_tpo == FeedbackTpoEnum.bad:
-                if not tpo_score_rec:
-                    db.add(TpoScore(clothes_id=cloth.clothes_id, tpo_name=situation, score=95))
-                else:
-                    tpo_score_rec.score = max(0, tpo_score_rec.score - 5)
-            
-            # '적합' 피드백 시 점수 회복 로직 추가 (최대 100점)
-            elif feedback_data.feedback_tpo == FeedbackTpoEnum.good:
-                if tpo_score_rec:
-                    tpo_score_rec.score = min(100, tpo_score_rec.score + 5)
+            update_tpo_score(db, cloth.clothes_id, situation, feedback_data.feedback_tpo)
 
 
     if feedback_data.memo is not None:

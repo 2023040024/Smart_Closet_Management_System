@@ -1,7 +1,57 @@
 import pytest
 from datetime import datetime
 from unittest.mock import patch
-from utils import get_base_time, get_weather_data
+from utils import get_base_time, get_coords_from_address, get_weather_data, convert_grid
+
+@patch('utils.httpx.AsyncClient.get')
+@pytest.mark.asyncio
+async def test_get_coords_from_address_success(mock_get):
+    """정상적으로 위경도 데이터를 받아오는 경우"""
+    mock_get.return_value.json.return_value = [{'lat': '37.5665', 'lon': '126.9780'}]
+    lat, lon = get_coords_from_address("서울")
+    
+    assert lat == 37.5665
+    assert lon == 126.9780
+
+@patch('utils.requests.get')
+def test_get_coords_from_address_no_data(mock_get):
+    """검색 결과가 빈 배열([])로 반환되는 경우 (if data: 분기 통과 못함)"""
+    mock_get.return_value.json.return_value = []
+    lat, lon = get_coords_from_address("이상한주소")
+    
+    assert lat is None
+    assert lon is None
+
+@patch('utils.requests.get')
+def test_get_coords_from_address_exception(mock_get):
+    """API 호출 중 타임아웃 등 예외(Exception)가 발생하는 경우"""
+    mock_get.side_effect = Exception("API Error")
+    lat, lon = get_coords_from_address("서울")
+    
+    assert lat is None
+    assert lon is None
+
+def test_convert_grid_normal():
+    """일반적인 위경도(예: 서울) 입력 시 정상 격자 반환 검증"""
+    nx, ny = convert_grid(37.5665, 126.9780)
+    
+    assert isinstance(nx, int)
+    assert isinstance(ny, int)
+    assert nx == 60  # 서울시청 부근 기상청 X 격자
+    assert ny == 127 # 서울시청 부근 기상청 Y 격자
+
+def test_convert_grid_edge_cases():
+    """
+    기상청 격자 변환 로직 내의 방위각(theta) 예외 분기 커버
+    if theta > math.pi / if theta < -math.pi 로직을 밟도록 고의적으로 극단적 경도 입력
+    """
+    # theta > math.pi 조건을 충족하는 경도 입력
+    nx1, ny1 = convert_grid(37.0, 310.0)
+    assert isinstance(nx1, int)
+    
+    # theta < -math.pi 조건을 충족하는 경도 입력
+    nx2, ny2 = convert_grid(37.0, -60.0)
+    assert isinstance(nx2, int)
 
 def test_get_base_time_midnight_edge_case():
     """
@@ -12,7 +62,6 @@ def test_get_base_time_midnight_edge_case():
     
     with patch('utils.datetime') as mock_datetime:
         mock_datetime.now.return_value = mock_now
-        
         base_date, base_time = get_base_time()
         
         assert base_date == "20260519"  # 전날 날짜로 정상 계산되는지 검증
@@ -44,7 +93,6 @@ def test_get_base_time_normal_daytime():
     
     with patch('utils.datetime') as mock_datetime:
         mock_datetime.now.return_value = mock_now
-        
         base_date, base_time = get_base_time()
         
         assert base_date == "20260520"  # 당일 날짜 유지
