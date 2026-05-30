@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // ✨ 로그아웃을 위해 추가
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -94,12 +94,23 @@ export default function HomeScreen() {
   const { clothes, fetchClothes } = useCloset();
   const [loading, setLoading] = useState(false);
 
+  // 🚨 [추가] 백엔드 과부하 통계 데이터 응답 모델을 담아둘 상태 변수
+  const [overloadBanner, setOverloadBanner] = useState<{
+    total_warnings: number;
+    ai_advice: string;
+  } | null>(null);
+
   const [selectedType, setSelectedType] = useState<'전체' | Category>('전체');
   const [showFilter, setShowFilter] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ClothesItem | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [currentFilterPage, setCurrentFilterPage] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [disposalBanner, setDisposalBanner] = useState<{
+    items: any[];
+    ai_advice: string;
+  } | null>(null);
 
   const [filter, setFilter] = useState<FilterType>({
     style: '', mood: '', thickness: '', topFit: '', bottomFit: '',
@@ -113,18 +124,39 @@ export default function HomeScreen() {
 
   const [showAllOptions, setShowAllOptions] = useState<Partial<Record<keyof FilterType, boolean>>>({});
 
-  useFocusEffect(
+  // ✅ 의존성 배열을 빈 배열([])로 설정하고 마운트 상태 락을 걸어 깜빡임/무한 로딩 버그 완벽 수정
+useFocusEffect(
     useCallback(() => {
+      let isMounted = true;
       const load = async () => {
+        if (!isMounted) return;
         setLoading(true);
-        await fetchClothes();
-        setLoading(false);
+        try {
+          await fetchClothes();
+          
+          // 기존 과부하 API 호출
+          const statsRes = await api.get('/stats/overload');
+          
+          // 처분 추천 API 호출
+          const disposalRes = await api.get('/stats/dispose', {
+            params: { current_season: getCurrentSeason() } 
+          });
+
+          if (isMounted) {
+            setOverloadBanner(statsRes.data);
+            setDisposalBanner(disposalRes.data); // 데이터 저장
+          }
+        } catch (error) {
+          console.error("데이터 로드 실패:", error);
+        } finally {
+          if (isMounted) setLoading(false);
+        }
       };
       load();
-    }, [fetchClothes])
+      return () => { isMounted = false; };
+    }, [])
   );
 
-  // ✨ 로그아웃 처리 함수 추가
   const handleLogout = () => {
     Alert.alert('로그아웃', '정말 로그아웃 하시겠습니까?', [
       { text: '취소', style: 'cancel' },
@@ -143,6 +175,14 @@ export default function HomeScreen() {
       },
     ]);
   };
+
+  function getCurrentSeason(): string {
+  const month = new Date().getMonth() + 1;
+  if (month >= 3 && month <= 5) return '봄';
+  if (month >= 6 && month <= 8) return '여름';
+  if (month >= 9 && month <= 11) return '가을';
+  return '겨울';
+  }
 
   const filteredClothes = useMemo(() => {
     return clothes.filter((item) => {
@@ -188,6 +228,10 @@ export default function HomeScreen() {
             await api.delete(`/clothes/${selectedItem.id}`);
             closeMenu();
             await fetchClothes();
+
+            const statsRes = await api.get('/stats/overload');
+            setOverloadBanner(statsRes.data);
+
           } catch (e) { Alert.alert('삭제 실패'); }
           finally { setDeletingId(null); }
         },
@@ -250,7 +294,7 @@ export default function HomeScreen() {
   );
 
   if (loading && clothes.length === 0) {
-    return <View style={styles.loadingContainer}><ActivityIndicator size="large" /></View>;
+    return <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#111" /></View>;
   }
 
   return (
@@ -262,7 +306,6 @@ export default function HomeScreen() {
             <Text style={styles.subtitle}>등록한 옷을 확인하고 관리해보세요.</Text>
           </View>
           
-          {/* ✨ 로그아웃 버튼과 추천 버튼을 나란히 배치 */}
           <View style={styles.headerActionBox}>
             <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
               <Text style={styles.logoutText}>로그아웃</Text>
@@ -273,58 +316,95 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={[styles.primaryActionBtn, showFilter && styles.primaryActionBtnActive]} onPress={() => setShowFilter((prev) => !prev)} activeOpacity={0.85}>
-            <Ionicons name={showFilter ? 'close-outline' : 'options-outline'} size={18} color="#fff" style={styles.primaryActionIcon} />
-            <Text style={styles.primaryActionText}>{showFilter ? '닫기' : '필터'}</Text>
-          </TouchableOpacity>
-          {activeFilterCount > 0 && (
-            <TouchableOpacity style={styles.secondaryActionBtn} onPress={resetFilters} activeOpacity={0.85}>
-              <Text style={styles.secondaryActionText}>초기화 {activeFilterCount}</Text>
+        {/* ✅ 옷이 없을 때는 빈 화면(Empty State) 렌더링 */}
+        {clothes.length === 0 ? (
+          <View style={styles.emptyStateContainer}>
+            <Ionicons name="shirt-outline" size={64} color="#d1d5db" />
+            <Text style={styles.emptyStateTitle}>등록된 옷이 없습니다</Text>
+            <Text style={styles.emptyStateDesc}>첫 번째 옷을 등록하고 스마트한 옷장을 시작해보세요!</Text>
+            <TouchableOpacity style={styles.emptyStateBtn} onPress={() => router.push('/(tabs)/register')}>
+              <Text style={styles.emptyStateBtnText}>옷 등록하러 가기</Text>
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        ) : (
+          /* ✅ 문법 에러가 났던 </></> 오타를 정식 Fragment 태그인 </> 로 완벽히 교정 */
+          <>
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={[styles.primaryActionBtn, showFilter && styles.primaryActionBtnActive]} onPress={() => setShowFilter((prev) => !prev)} activeOpacity={0.85}>
+                <Ionicons name={showFilter ? 'close-outline' : 'options-outline'} size={18} color="#fff" style={styles.primaryActionIcon} />
+                <Text style={styles.primaryActionText}>{showFilter ? '닫기' : '필터'}</Text>
+              </TouchableOpacity>
+              {activeFilterCount > 0 && (
+                <TouchableOpacity style={styles.secondaryActionBtn} onPress={resetFilters} activeOpacity={0.85}>
+                  <Text style={styles.secondaryActionText}>초기화 {activeFilterCount}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeScrollContent} style={styles.typeScroll}>
-          {CATEGORY_ORDER.map((type) => (
-            <TouchableOpacity key={type} style={[styles.typeBtn, selectedType === type && styles.typeBtnSelected]} onPress={() => setSelectedType(type)} activeOpacity={0.85}>
-              <Text style={[styles.typeText, selectedType === type && styles.typeTextSelected]}>{type}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {showFilter && (
-          <View style={styles.filterPanel}>
-            <ScrollView ref={filterScrollRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={handleFilterPageChange}>
-              {FILTER_SECTIONS.map((section, index) => (
-                <View key={index} style={{ width: width - 32 }}>
-                  <View style={styles.filterSectionCard}>
-                    <Text style={styles.filterSectionTitle}>{section.title}</Text>
-                    {section.items.map((sectionItem, idx) => (
-                      <View key={idx}>
-                        {renderSection(sectionItem.label, sectionItem.key, sectionItem.options)}
-                      </View>
-                    ))}
-                  </View>
-                </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeScrollContent} style={styles.typeScroll}>
+              {CATEGORY_ORDER.map((type) => (
+                <TouchableOpacity key={type} style={[styles.typeBtn, selectedType === type && styles.typeBtnSelected]} onPress={() => setSelectedType(type)} activeOpacity={0.85}>
+                  <Text style={[styles.typeText, selectedType === type && styles.typeTextSelected]}>{type}</Text>
+                </TouchableOpacity>
               ))}
             </ScrollView>
-            <View style={styles.paginationWrap}>
-              {FILTER_SECTIONS.map((_, index) => (
-                <View key={index} style={[styles.paginationDot, currentFilterPage === index && styles.paginationDotActive]} />
-              ))}
+
+            {showFilter && (
+              <View style={styles.filterPanel}>
+                <ScrollView ref={filterScrollRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={handleFilterPageChange}>
+                  {FILTER_SECTIONS.map((section, index) => (
+                    <View key={index} style={{ width: width - 32 }}>
+                      <View style={styles.filterSectionCard}>
+                        <Text style={styles.filterSectionTitle}>{section.title}</Text>
+                        {section.items.map((sectionItem, idx) => (
+                          <View key={idx}>
+                            {renderSection(sectionItem.label, sectionItem.key, sectionItem.options)}
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+                <View style={styles.paginationWrap}>
+                  {FILTER_SECTIONS.map((_, index) => (
+                    <View key={index} style={[styles.paginationDot, currentFilterPage === index && styles.paginationDotActive]} />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* 🚨 [추가] 추천 2안 적용: 카테고리 필터와 내 옷장 타이틀 틈새에 과부하 분석 배너 삽입 */}
+            {overloadBanner && overloadBanner.total_warnings > 0 && (
+              <View style={styles.overloadBannerBox}>
+                <View style={styles.overloadBannerHeader}>
+                  <Ionicons name="warning" size={16} color="#dc2626" />
+                  <Text style={styles.overloadBannerTitle}>충동 소비 주의보 ({overloadBanner.total_warnings}건)</Text>
+                </View>
+                <Text style={styles.overloadBannerText}>{overloadBanner.ai_advice}</Text>
+              </View>
+            )}
+
+            {/* 🚨 [추가] 처분 추천 배너 (아이템이 있을 때만 표시) */}
+            {disposalBanner && disposalBanner.items?.length > 0 && (
+              <View style={styles.disposalBannerBox}>
+                <View style={styles.disposalBannerHeader}>
+                  <Ionicons name="trash-outline" size={16} color="#d97706" />
+                  <Text style={styles.disposalBannerTitle}>정리가 필요한 옷이 있어요</Text>
+                </View>
+                <Text style={styles.disposalBannerText}>{disposalBanner.ai_advice}</Text>
+              </View>
+            )}
+
+            <View style={styles.resultHeader}>
+              <Text style={styles.resultTitle}>옷 목록</Text>
+              <Text style={styles.resultCount}>{filteredClothes.length}개</Text>
             </View>
-          </View>
+
+            <View style={styles.grid}>
+              {filteredClothes.map((item) => renderCard(item))}
+            </View>
+          </>
         )}
-
-        <View style={styles.resultHeader}>
-          <Text style={styles.resultTitle}>옷 목록</Text>
-          <Text style={styles.resultCount}>{filteredClothes.length}개</Text>
-        </View>
-
-        <View style={styles.grid}>
-          {filteredClothes.map((item) => renderCard(item))}
-        </View>
       </ScrollView>
 
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={closeMenu}>
@@ -351,13 +431,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', marginBottom: 6, color: '#111' },
   subtitle: { fontSize: 14, color: '#6b6b6b', lineHeight: 20 },
   
-  /* ✨ 버튼 그룹 스타일 추가 */
   headerActionBox: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   logoutBtn: { backgroundColor: '#fff', paddingVertical: 9, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: '#ffcccc' },
   logoutText: { color: '#d11a2a', fontSize: 13, fontWeight: '700' },
-  
   moveRecommendBtn: { backgroundColor: '#f3f3f3', paddingVertical: 9, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e4e4e4' },
   moveRecommendText: { color: '#222', fontSize: 13, fontWeight: '700' },
+  
   actionRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 },
   primaryActionBtn: { backgroundColor: '#111', paddingVertical: 11, paddingHorizontal: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center' },
   primaryActionBtnActive: { backgroundColor: '#333' },
@@ -402,6 +481,13 @@ const styles = StyleSheet.create({
   tpoTag: { backgroundColor: '#eef2ff', color: '#4f46e5' },
   cardHint: { fontSize: 11, color: '#7a7a7a', marginTop: 8 },
   loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
+  
+  emptyStateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 80 },
+  emptyStateTitle: { fontSize: 18, fontWeight: '700', color: '#111', marginTop: 16, marginBottom: 8 },
+  emptyStateDesc: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24, paddingHorizontal: 20 },
+  emptyStateBtn: { backgroundColor: '#111', paddingVertical: 14, paddingHorizontal: 24, borderRadius: 12 },
+  emptyStateBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modalBox: { width: '100%', backgroundColor: '#fff', borderRadius: 20, padding: 18 },
   modalTitle: { fontSize: 18, fontWeight: '800', marginBottom: 14, textAlign: 'center', color: '#111' },
@@ -414,4 +500,57 @@ const styles = StyleSheet.create({
   paginationWrap: { flexDirection: 'row', justifyContent: 'center', marginTop: 12, gap: 6 },
   paginationDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ddd' },
   paginationDotActive: { backgroundColor: '#111', width: 20 },
+
+  // 🚨 [추가] 옷장 과부하 경고 배너용 스타일 테마
+  overloadBannerBox: {
+    backgroundColor: '#fef2f2', 
+    borderWidth: 1, 
+    borderColor: '#fee2e2', 
+    borderRadius: 16, 
+    padding: 14, 
+    marginBottom: 16
+  },
+  overloadBannerHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    marginBottom: 4 
+  },
+  overloadBannerTitle: { 
+    fontSize: 13, 
+    fontWeight: '800', 
+    color: '#dc2626' 
+  },
+  overloadBannerText: { 
+    fontSize: 14, 
+    color: '#4b5563', 
+    lineHeight: 20, 
+    fontWeight: '600' 
+  },
+
+  disposalBannerBox: {
+    backgroundColor: '#fffbeb', // 연한 주황색 바탕
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+  },
+  disposalBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  disposalBannerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#d97706', // 진한 주황색
+  },
+  disposalBannerText: {
+    fontSize: 14,
+    color: '#4b5563',
+    lineHeight: 20,
+    fontWeight: '600',
+  },
 });

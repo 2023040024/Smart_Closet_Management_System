@@ -154,7 +154,7 @@ class ClothesResponse(BaseModel):
     status:         Optional[StatusEnum] = None
     wear_count:     int
     last_worn_date: Optional[date] = None
-    cost_per_wear:  Optional[float] = 0.0  # 계산된 값 (wear_count=0이면 null)
+    cost_per_wear:  Optional[float] = None  # 계산된 값 (wear_count=0이면 null)
     created_at:     datetime
     tags:           ClothesTagsResponse
 
@@ -194,8 +194,8 @@ class ClothesResponse(BaseModel):
             # 소수점 둘째 자리까지 반올림하여 계산
             self.cost_per_wear = round(price / count, 2)
         else:
-            # 한 번도 입지 않았다면 구매가 전체를 현재 비용으로 표시하거나 0으로 표시
-            self.cost_per_wear = float(price)
+            # 한 번도 입지 않았다면 가격 대신 None으로 처리
+            self.cost_per_wear = None
             
         return self
 
@@ -251,3 +251,19 @@ class FeedbackCreate(BaseModel):
     @classmethod
     def validate_enums(cls, v: Any, info: Any) -> Any:
         return map_korean_to_enum_logic(v, info)
+
+class OverloadItem(BaseModel):
+    category: str
+    color: str
+    count: int
+    warning_message: str
+    items: list[ClothesResponse]
+
+class OverloadResponse(BaseModel):
+    total_warnings: int
+    items: list[OverloadItem]
+    ai_advice: str
+
+class DisposalResponse(BaseModel):
+    items: list[ClothesResponse]
+    ai_advice: str
