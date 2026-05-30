@@ -56,20 +56,21 @@ export default function HistoryDetailScreen() {
             {clothes.length > 0 ? (
               clothes.map((cloth) => (
                 <View key={cloth.id} style={styles.clothCard}>
-                  <Text style={styles.clothCategory}>{cloth.category}</Text>
+                  {/* 1. 옷 이름을 가장 돋보이게 위로 배치 */}
                   <Text style={styles.clothName}>{cloth.name}</Text>
                   
-                  {/* ✅ Stashed changes: 옷 이름 아래에 이미지 표시 영역 유지 */}
+                  {/* 2. 카테고리와 색상을 깔끔한 뱃지로 묶음 */}
+                  <View style={styles.tagRow}>
+                    <Text style={styles.tagBadge}>{cloth.category}</Text>
+                    <Text style={styles.tagBadge}>{cloth.color || '색상 미상'}</Text>
+                  </View>
+                  
+                  {/* 3. 이미지는 가장 아래에 시원하게 배치 */}
                   <Image 
-                    source={{ 
-                      uri: cloth.imageUrl || 'https://via.placeholder.com/300x300?text=No+Image' 
-                    }} 
+                    source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/300x300?text=No+Image' }} 
                     style={styles.clothImage}
                     resizeMode="contain"
                   />
-
-                  {/* ✅ Updated upstream: 최신 main의 color 노출 기능도 함께 유지 */}
-                  <Text style={styles.clothColor}>색상: {cloth.color || '정보 없음'}</Text>
                 </View>
               ))
             ) : (
@@ -96,18 +97,25 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: '#ececec' 
   },
-  clothCategory: { fontSize: 12, color: '#888', marginBottom: 4 },
-  clothName: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 12 }, // ✅ 이미지와 간격을 위해 여백 추가
+  clothName: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 12 },
   
-  /* ✅ 새로 추가된 이미지 스타일 */
+  tagRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
+  tagBadge: { 
+    backgroundColor: '#f3f4f6', 
+    color: '#374151', 
+    fontSize: 12, 
+    fontWeight: '600', 
+    paddingVertical: 4, 
+    paddingHorizontal: 8, 
+    borderRadius: 6 
+  },
+
   clothImage: {
     width: '100%',
-    height: 200, // 이미지가 시원하게 보이도록 높이 설정
+    height: 220, // 이미지가 시원하게 보이도록 높이 설정
     borderRadius: 8,
     backgroundColor: '#f9f9f9',
-    marginTop: 8, // 이미지 아래 색상 텍스트와의 간격
   },
-  
-  clothColor: { fontSize: 13, color: '#666' },
+
   emptyText: { fontSize: 14, color: '#777' },
 });
