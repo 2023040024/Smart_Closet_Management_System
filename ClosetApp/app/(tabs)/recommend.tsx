@@ -193,12 +193,16 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
 
         {!apiLoading && apiRecommendations && (
           <View style={{ marginTop: 24 }}>
-            <Text style={styles.sectionTitle}>✨ AI 추천 결과</Text>
-            
-            <View style={styles.contextGroup}>
-              <Text style={styles.contextGroupText}>
-                📍 {recommendContext.address || '위치 알 수 없음'} · 🎯 {recommendContext.situation}
-              </Text>
+
+            <View style={styles.resultHeaderRow}>
+              <View style={styles.contextBadge}>
+                <Ionicons name="location" size={14} color="#64748B" />
+                <Text style={styles.contextBadgeText}>{recommendContext.address || '위치 알 수 없음'}</Text>
+              </View>
+              <View style={styles.contextBadge}>
+                <Ionicons name="flag" size={14} color="#64748B" />
+                <Text style={styles.contextBadgeText}>{recommendContext.situation}</Text>
+              </View>
             </View>
 
             <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
@@ -277,8 +281,28 @@ const styles = StyleSheet.create({
   emptyStateTitle: { fontSize: 18, fontWeight: '700', color: '#64748B', marginBottom: 8 },
   emptyStateDesc: { fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 22 },
   
-  contextGroup: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
-  contextGroupText: { fontSize: 14, fontWeight: '700', color: '#475569' },
+  resultHeaderRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8, 
+    marginBottom: 16 // 필터와의 간격
+  },
+
+  contextBadge: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#F1F5F9', // 아주 옅은 파스텔 그레이
+    paddingVertical: 6, 
+    paddingHorizontal: 10, 
+    borderRadius: 8, 
+    gap: 4 
+  },
+  
+  contextBadgeText: { 
+    fontSize: 13, 
+    fontWeight: '600', 
+    color: '#475569' 
+  },
 
   aiMessageBox: { 
     backgroundColor: '#F5F8FF', 
