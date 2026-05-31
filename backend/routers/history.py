@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session, joinedload
-from typing import List, Union
+from datetime import date  
 
 from database import get_db
 from models import Clothes, WearHistory, User
@@ -9,19 +9,21 @@ from .auth import get_current_user
 
 router = APIRouter(prefix="/history", tags=["착용 기록"])
 
-@router.post("", response_model=Union[WearHistoryResponse, List[WearHistoryResponse]], status_code=status.HTTP_201_CREATED)
-def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryCreate]],
-                        db: Session = Depends(get_db),
-                        current_user: User = Depends(get_current_user)
-                        ):
-    is_single = isinstance(history_data, WearHistoryCreate)
-    history_data_list = [history_data] if is_single else history_data
+@router.post("", response_model=list[WearHistoryResponse], status_code=status.HTTP_201_CREATED)
+def create_wear_history(
+    history_data: list[WearHistoryCreate] = Body(
+        ..., 
+        description="등록할 착용 기록 데이터 리스트입니다. 반드시 배열([ ]) 형태로 전달해야 합니다."
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> list[WearHistoryResponse]:
     
-    if not history_data_list:
+    if not history_data:
         raise HTTPException(status_code=400, detail="기록할 옷 데이터가 비어있습니다.")
     
     seen = set()
-    for data in history_data_list:
+    for data in history_data:
         key = (data.clothes_id, data.worn_date)
         if key in seen:
             raise HTTPException(status_code=400, detail="요청 내에 중복된 기록이 포함되어 있습니다.")
@@ -29,42 +31,58 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
 
     created_histories = []
     try:
-        for history_data in history_data_list:
-            cloth = db.query(Clothes).filter(
-                Clothes.clothes_id == history_data.clothes_id,
-                Clothes.user_id == current_user.id
-            ).first()
-            if not cloth:
-                raise HTTPException(status_code=404, detail=f"해당 ID({history_data.clothes_id})의 옷을 찾을 수 없습니다.")
-            existing_record = db.query(WearHistory).filter(
-                WearHistory.clothes_id == history_data.clothes_id,
-                WearHistory.worn_date == history_data.worn_date
-            ).first()
-            if existing_record:
-                raise HTTPException(status_code=400, detail=f"ID({history_data.clothes_id}) 옷은 오늘 이미 기록되었습니다.")
+        clothes_ids = [data.clothes_id for data in history_data]
+        clothes_db = db.query(Clothes).filter(
+            Clothes.clothes_id.in_(clothes_ids),
+            Clothes.user_id == current_user.id
+        ).all()
+        clothes_map = {c.clothes_id: c for c in clothes_db}
 
+        worn_dates = [data.worn_date for data in history_data]
+        existing_records_db = db.query(WearHistory)\
+            .filter(WearHistory.user_id == current_user.id)\
+            .filter(WearHistory.clothes_id.in_(clothes_ids))\
+            .filter(WearHistory.worn_date.in_(worn_dates))\
+            .all()
+        existing_records_set = {(r.clothes_id, r.worn_date) for r in existing_records_db}
+
+        # [Phase 1] 데이터 무결성 사전 검증
+        for hd in history_data:
+            cloth = clothes_map.get(hd.clothes_id)
+            if not cloth:
+                raise HTTPException(status_code=404, detail=f"해당 ID({hd.clothes_id})의 옷을 찾을 수 없습니다.")
+            
+            if (hd.clothes_id, hd.worn_date) in existing_records_set:
+                raise HTTPException(status_code=400, detail=f"ID({hd.clothes_id}) 옷은 오늘 이미 기록되었습니다.")
+
+        # [Phase 2] 안전한 비즈니스 로직 연산 및 DB 적재
+        for hd in history_data:
+            cloth = clothes_map[hd.clothes_id]
             new_history = WearHistory(
                 user_id=current_user.id,
-                clothes_id=history_data.clothes_id,
-                worn_date=history_data.worn_date,
-                tpo=history_data.tpo,
-                style=history_data.style,
-                mood=history_data.mood,
-                feedback_temperature=history_data.feedback_temperature,
-                feedback_tpo=history_data.feedback_tpo,
-                memo=history_data.memo
+                clothes_id=hd.clothes_id,
+                worn_date=hd.worn_date,
+                tpo=hd.tpo,
+                style=hd.style,
+                mood=hd.mood,
+                feedback_temperature=hd.feedback_temperature,
+                feedback_tpo=hd.feedback_tpo,
+                memo=hd.memo
             )
-
+            
             cloth.wear_count = (cloth.wear_count or 0) + 1
-            if cloth.last_worn_date is None or history_data.worn_date > cloth.last_worn_date:
-                cloth.last_worn_date = history_data.worn_date
+            if cloth.last_worn_date is None or hd.worn_date > cloth.last_worn_date:
+                cloth.last_worn_date = hd.worn_date
+            
             db.add(new_history)
             created_histories.append(new_history)
     
         db.commit()
         for h in created_histories:
             db.refresh(h)
-        return created_histories[0] if is_single else created_histories
+            
+        # 단일/다중 상관없이 항상 리스트 형태로만 반환
+        return created_histories
     
     except Exception as e: 
         db.rollback()
@@ -72,26 +90,120 @@ def create_wear_history(history_data: Union[WearHistoryCreate, List[WearHistoryC
             raise e
         raise HTTPException(status_code=500, detail="서버 오류로 인해 기록에 실패했습니다.")
 
-@router.get("", response_model=List[WearHistoryResponse])
+@router.get("", response_model=list[WearHistoryResponse])
 def get_wear_histories(
     skip: int = 0, 
-    limit: int = 100, 
+    limit: int = 100,
+    start_date: date = None,
+    end_date: date = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
-    histories = db.query(WearHistory)\
+) -> list[WearHistoryResponse]: # 반환 타입 힌트
+    
+    # 1. 기본 쿼리 생성 (실행 안 됨)
+    query = db.query(WearHistory)\
         .options(joinedload(WearHistory.clothes))\
-        .filter(WearHistory.user_id == current_user.id)\
-        .order_by(WearHistory.worn_date.desc()).offset(skip).limit(limit)\
-        .all()
+        .filter(WearHistory.user_id == current_user.id)
+    
+    # 2. 동적 날짜 필터링 적용 (조건이 있을 때만 쿼리 추가)
+    if start_date:
+        query = query.filter(WearHistory.worn_date >= start_date)
+    if end_date:
+        query = query.filter(WearHistory.worn_date <= end_date)
+        
+    # 3. 최종 정렬 및 페이징 후 실행
+    histories = query.order_by(WearHistory.worn_date.desc())\
+        .offset(skip).limit(limit).all()
     
     return histories
+
+@router.put("", response_model=list[WearHistoryResponse], status_code=status.HTTP_200_OK)
+def update_daily_wear_history(
+    history_data: list[WearHistoryCreate] = Body(
+        description="수정할 착용 기록 리스트입니다. JSON Root에 배열([ ]) 형태로 전달해야 합니다.",
+        example=[{"clothes_id": 1, "worn_date": "2026-05-25", "tpo": "데일리"}]
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> list[WearHistoryResponse]:
+    if not history_data:
+        raise HTTPException(status_code=400, detail="수정할 옷 데이터가 비어있습니다.")
+
+    target_dates = list({data.worn_date for data in history_data})
+    
+    try:
+        # 기존 기록 삭제 예약
+        existing_records = db.query(WearHistory).filter(
+            WearHistory.user_id == current_user.id,
+            WearHistory.worn_date.in_(target_dates)
+        ).all()
+        
+        for record in existing_records:
+            cloth_to_reduce = db.query(Clothes).filter(Clothes.clothes_id == record.clothes_id).first()
+            if cloth_to_reduce:
+                if cloth_to_reduce.wear_count > 0:
+                    cloth_to_reduce.wear_count -= 1
+                
+                # 삭제될 기록을 제외하고 가장 최신 기록을 다시 조회 (버그 수정)
+                rem_h = db.query(WearHistory).filter(
+                    WearHistory.clothes_id == record.clothes_id,
+                    WearHistory.history_id != record.history_id
+                ).order_by(WearHistory.worn_date.desc()).first()
+                cloth_to_reduce.last_worn_date = rem_h.worn_date if rem_h else None
+            
+            db.delete(record)
+            
+        db.flush()
+
+        # 신규 데이터 삽입
+        created_histories = []
+        clothes_ids = [data.clothes_id for data in history_data]
+        clothes_db = db.query(Clothes).filter(
+            Clothes.clothes_id.in_(clothes_ids),
+            Clothes.user_id == current_user.id
+        ).all()
+        clothes_map = {c.clothes_id: c for c in clothes_db}
+
+        for hd in history_data:
+            if hd.clothes_id not in clothes_map:
+                raise HTTPException(status_code=404, detail=f"해당 ID({hd.clothes_id})의 옷을 찾을 수 없습니다.")
+                
+            cloth = clothes_map[hd.clothes_id]
+            cloth.wear_count = (cloth.wear_count or 0) + 1
+            if not cloth.last_worn_date or hd.worn_date > cloth.last_worn_date:
+                cloth.last_worn_date = hd.worn_date
+
+            new_history = WearHistory(
+                user_id=current_user.id,
+                clothes_id=hd.clothes_id,
+                worn_date=hd.worn_date,
+                tpo=hd.tpo,
+                style=hd.style,
+                mood=hd.mood,
+                feedback_temperature=hd.feedback_temperature,
+                feedback_tpo=hd.feedback_tpo,
+                memo=hd.memo
+            )
+            db.add(new_history)
+            created_histories.append(new_history)
+
+        db.commit()
+        for h in created_histories:
+            db.refresh(h)
+            
+        return created_histories
+
+    except Exception as e:
+        db.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail="서버 오류로 인해 수정에 실패했습니다.")
 
 @router.delete("/{history_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_wear_history(history_id: int, 
                         db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)
-                        ):
+                        ) -> None: # 반환값 없음
     # 1. 삭제할 기록 찾기
     history = db.query(WearHistory).filter(
         WearHistory.history_id == history_id,
@@ -124,85 +236,3 @@ def delete_wear_history(history_id: int,
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="삭제 중 서버 오류가 발생했습니다.")
     
     return None
-
-# =========================================================================
-# "날짜 기반 착용 기록 수정 (PUT)" API 영역
-# =========================================================================
-@router.put("/date/{worn_date}", response_model=List[WearHistoryResponse])
-def update_daily_wear_history(
-    worn_date: str, 
-    history_data_list: List[WearHistoryCreate],
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    if not history_data_list:
-        raise HTTPException(status_code=400, detail="기록할 옷 데이터가 비어있습니다.")
-    
-    try:
-        # 1. 해당 날짜의 기존 착용 기록 모두 불러오기
-        old_records = db.query(WearHistory).filter(
-            WearHistory.worn_date == worn_date,
-            WearHistory.user_id == current_user.id
-        ).all()
-
-        # 2. 기존 옷들의 착용 횟수(wear_count) 1씩 차감하고 기록 삭제
-        for record in old_records:
-            cloth = db.query(Clothes).filter(
-                Clothes.clothes_id == record.clothes_id,
-                Clothes.user_id == current_user.id).first()
-            if cloth and cloth.wear_count and cloth.wear_count > 0:
-                cloth.wear_count -= 1
-
-                remaining_last_history = db.query(WearHistory).filter(
-                    WearHistory.clothes_id == record.clothes_id,
-                    WearHistory.user_id == current_user.id,
-                    WearHistory.history_id != record.history_id
-                ).order_by(WearHistory.worn_date.desc()).first()
-                
-                cloth.last_worn_date = remaining_last_history.worn_date if remaining_last_history else None
-
-            # 세션에 삭제 마킹
-            db.delete(record)
-
-        # 3. 새로운 기록들을 DB에 추가 (POST 로직과 동일)
-        created_histories = []
-        for history_data in history_data_list:
-            cloth = db.query(Clothes).filter(
-                Clothes.clothes_id == history_data.clothes_id,
-                Clothes.user_id == current_user.id
-            ).first()
-            
-            if not cloth:
-                raise HTTPException(status_code=404, detail=f"해당 ID({history_data.clothes_id})의 옷을 찾을 수 없습니다.")
-
-            new_history = WearHistory(
-                user_id=current_user.id,
-                clothes_id=history_data.clothes_id,
-                worn_date=worn_date,
-                tpo=history_data.tpo,
-                style=history_data.style,
-                mood=history_data.mood,
-                feedback_temperature=history_data.feedback_temperature,
-                feedback_tpo=history_data.feedback_tpo,
-                memo=history_data.memo
-            )
-
-            # 새 옷의 착용 횟수 증가 및 최근 착용일 갱신
-            cloth.wear_count = (cloth.wear_count or 0) + 1
-            if cloth.last_worn_date is None or worn_date > cloth.last_worn_date:
-                cloth.last_worn_date = worn_date
-            
-            db.add(new_history)
-            created_histories.append(new_history)
-
-        db.commit()
-        for h in created_histories:
-            db.refresh(h)
-        return created_histories
-
-    except HTTPException as he:
-        db.rollback()
-        raise he
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail="서버 오류로 인해 기록 수정에 실패했습니다.")

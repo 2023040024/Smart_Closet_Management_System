@@ -1,7 +1,4 @@
-import os
-import json
-import re
-import httpx
+import os, json, re, httpx, asyncio
 import google.generativeai as genai
 from dotenv import load_dotenv
 from datetime import date
@@ -11,9 +8,10 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from database import get_db
-from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum
+from models import Clothes, CategoryEnum, StatusEnum, User, ThicknessEnum, TpoScore
 from routers.auth import get_current_user
 from tpo_rules import get_tpo_prompt_text, check_color_conflict
+from utils import get_weather_data
 
 # .env 파일 로드
 load_dotenv()
@@ -24,8 +22,6 @@ router = APIRouter(prefix="/recommend", tags=["코디 추천"])
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("models/gemini-flash-latest")
-
-WEATHER_BASE_URL = os.getenv("WEATHER_BASE_URL", "http://localhost:8000")
 
 # --- 데이터 모델 정의 ---
 class RecommendRequest(BaseModel):
@@ -52,35 +48,7 @@ class RecommendResponse(BaseModel):
 # --- 유틸리티 함수 ---
 def fetch_weather(address: str) -> dict:
     try:
-        with httpx.Client(timeout=5.0) as client:
-            resp = client.get(
-                f"{WEATHER_BASE_URL}/weather/address",
-                params={"address": address}
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-        if data.get("status") != "success":
-            return {"temperature": 20.0, "condition": "sunny"}
-
-        weather = data["weather"]
-        temp_str = weather.get("현재 기온", "20°C").replace("°C", "").strip()
-        temperature = float(temp_str)
-
-        sky  = weather.get("하늘 상태", "맑음")
-        rain = weather.get("강수 형태", "없음")
-
-        if rain in ("비", "소나기", "비/눈"):
-            condition = "rainy"
-        elif rain == "눈":
-            condition = "snowy"
-        elif sky == "맑음":
-            condition = "sunny"
-        else:
-            condition = "cloudy"
-
-        return {"temperature": temperature, "condition": condition}
-
+        return asyncio.run(get_weather_data(address))
     except Exception as e:
         print(f"[날씨 연동 실패, 기본값 사용] {e}")
         return {"temperature": 20.0, "condition": "sunny"}
@@ -130,7 +98,15 @@ def calculate_conflict_score(c: Clothes, situation: str) -> int:
     return 0
 
 
-def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_condition: str, situation: str = "데일리") -> list[Clothes]:
+def filter_clothes(
+    clothes_list: list[Clothes],
+    temperature: float,
+    weather_condition: str,
+    situation: str = "데일리",
+    tpo_scores: dict[int, int] | None = None,
+) -> list[Clothes]:
+    if tpo_scores is None:
+        tpo_scores = {}
     result = []
     for c in clothes_list:
         if c.status is not None and c.status != StatusEnum.wearable.value:
@@ -148,6 +124,9 @@ def filter_clothes(clothes_list: list[Clothes], temperature: float, weather_cond
         # F-13: 계절 불일치(C=80) 제외
         if calculate_conflict_score(c, situation) >= 80:
             continue
+        # 피드백 누적 TpoScore 60 이하 옷 제외 (8회 이상 부정 피드백)
+        if tpo_scores.get(c.clothes_id, 100) <= 60:
+            continue
         result.append(c)
     return result
 
@@ -156,15 +135,18 @@ def apply_fallback_filter(
     temperature: float,
     weather_condition: str,
     situation: str = "데일리",
+    tpo_scores: dict[int, int] | None = None,
 ) -> tuple[list[Clothes], bool]:
     """strict filter 후 상의/하의가 2벌 미만이면 해당 카테고리의 계절·두께 필터를 해제.
 
     옷장 규모가 작은 초기 사용자(3~5벌)도 추천을 받을 수 있도록 fallback 적용.
     반환: (필터 결과, fallback 사용 여부)
     """
+    if tpo_scores is None:
+        tpo_scores = {}
     MIN_PER_CATEGORY = 2
 
-    strict = filter_clothes(all_clothes, temperature, weather_condition, situation)
+    strict = filter_clothes(all_clothes, temperature, weather_condition, situation, tpo_scores)
 
     def _cat(c: Clothes) -> str:
         return c.category.value if hasattr(c.category, "value") else c.category
@@ -227,13 +209,7 @@ def clothes_to_text(c: Clothes) -> str:
     )
 
 def build_prompt(clothes_list: list[Clothes], situation: str, temperature: float, weather_condition: str, user: User) -> str:
-    situation_map = {
-        "daily": "데일리", "business": "비즈니스", "interview": "면접",
-        "wedding": "결혼식", "funeral": "장례식", "exercise": "운동",
-        "date": "데이트", "meeting": "미팅", "travel": "여행",
-        "school": "데일리", "cafe": "데일리",
-    }
-    situation_kr = situation_map.get(situation or "daily", situation or "데일리")
+    situation_kr = to_situation_kr(situation)
     context = get_tpo_prompt_text(situation_kr, temperature, weather_condition)
     profile_text, preferred_style, felt_temp, outer_threshold = get_user_profile_text(user, temperature)
 
@@ -310,6 +286,27 @@ def call_gemini(prompt: str, retries: int = 2) -> dict:
             if attempt == retries:
                 raise HTTPException(status_code=500, detail=f"AI 추천 생성 실패: {str(e)}")
 
+SITUATION_MAP = {
+    "daily": "데일리", "business": "비즈니스", "interview": "면접",
+    "wedding": "결혼식", "funeral": "장례식", "exercise": "운동",
+    "date": "데이트", "meeting": "미팅", "travel": "여행",
+    "school": "데일리", "cafe": "데일리",
+}
+
+def to_situation_kr(situation: str | None) -> str:
+    if not situation:
+        return "데일리"
+    return SITUATION_MAP.get(situation, situation)
+
+def load_tpo_scores(db: Session, user_id: int, situation_kr: str) -> dict[int, int]:
+    rows = (
+        db.query(TpoScore)
+        .join(Clothes, TpoScore.clothes_id == Clothes.clothes_id)
+        .filter(Clothes.user_id == user_id, TpoScore.tpo_name == situation_kr)
+        .all()
+    )
+    return {row.clothes_id: row.score for row in rows}
+
 @router.get("/today", response_model=RecommendResponse)
 def recommend_today(
     situation: Optional[str] = None,
@@ -337,7 +334,9 @@ def recommend_today(
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation or "데일리")
+    situation_kr = to_situation_kr(situation)
+    tpo_scores = load_tpo_scores(db, user_id, situation_kr)
+    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation_kr, tpo_scores)
     if len(filtered) < 2:
         return {
             "outfits": [],
@@ -373,7 +372,9 @@ def recommend_custom(
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
     if len(all_clothes) < 3:
         raise HTTPException(status_code=400, detail="추천을 위해 최소 3벌 이상의 옷을 등록해주세요")
-    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, body.situation or "데일리")
+    situation_kr = to_situation_kr(body.situation)
+    tpo_scores = load_tpo_scores(db, user_id, situation_kr)
+    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation_kr, tpo_scores)
     if len(filtered) < 2:
         return {
             "outfits": [],
@@ -407,14 +408,15 @@ def recommend_weekly(
         all_clothes = db.query(Clothes).filter(Clothes.user_id == user_id).all()
     except LookupError as e:
         raise HTTPException(status_code=500, detail=f"옷 데이터 조회 중 오류 발생: {str(e)}")
-    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation or "데일리")
+    situation_kr = to_situation_kr(situation)
+    tpo_scores = load_tpo_scores(db, user_id, situation_kr)
+    filtered, used_fallback = apply_fallback_filter(all_clothes, temperature, weather_condition, situation_kr, tpo_scores)
     if len(filtered) < 4:
         return {
             "weekly_outfits": [],
             "tip": "주간 추천을 위해 최소 4벌 이상의 옷을 등록해주세요."
         }
     clothes_text = "\n".join([clothes_to_text(c) for c in filtered])
-    situation_kr = situation or "데일리"
 
     prompt = f"""
 당신은 패션 코디 전문가입니다.

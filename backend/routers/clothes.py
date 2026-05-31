@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Clothes, User, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum, SituationEnum, ColorEnum
+from models import Clothes, User, CategoryEnum, SeasonEnum, StyleEnum, ThicknessEnum, StatusEnum, SituationEnum, ColorEnum, TopFitEnum, BottomFitEnum
 from schemas import ClothesUpdate, ClothesStatusUpdate, ClothesResponse, ClothesCreate
 from .auth import get_current_user
 
@@ -95,6 +95,8 @@ async def create_clothes(
     situation:      Optional[SituationEnum] = Form(None),
     thickness:      Optional[ThicknessEnum] = Form(None),
     price:          Optional[int]     = Form(None),
+    top_fit:        Optional[TopFitEnum] = Form(None),
+    bottom_fit:     Optional[BottomFitEnum] = Form(None),
     image:          Optional[UploadFile] = File(None),
     db:             Session           = Depends(get_db),
     current_user:   User = Depends(get_current_user)
@@ -103,7 +105,8 @@ async def create_clothes(
     # 이미지 저장
     image_url = None
     if image and image.filename:
-        ext = image.filename.rsplit(".", 1)[-1].lower()
+        _, ext = os.path.splitext(image.filename)
+        ext = ext.lstrip(".").lower()
         if ext not in ("jpg", "jpeg", "png", "webp"):
             raise HTTPException(status_code=400, detail="jpg, png, webp만 가능합니다")
         filename  = f"{uuid.uuid4()}.{ext}"
@@ -125,6 +128,8 @@ async def create_clothes(
         material       = material.strip() if material else None,
         thickness      = thickness,
         price          = price,
+        top_fit        = top_fit,
+        bottom_fit     = bottom_fit,
         image_url      = image_url,
         status         = StatusEnum.wearable
     )
@@ -186,7 +191,7 @@ def get_clothes_detail(clothes_id: int, db: Session = Depends(get_db)
 # ──────────────────────────────────────────────
 
 @router.put("/{clothes_id}", response_model=ClothesResponse)
-def update_clothes(clothes_id: int, body: ClothesUpdate, db: Session = Depends(get_db)
+async def update_clothes(clothes_id: int, body: ClothesUpdate, db: Session = Depends(get_db)
                    , current_user: User = Depends(get_current_user)):
     clothes = _get_clothes_or_404(db, clothes_id, current_user.id)
 
@@ -221,6 +226,16 @@ def update_status(clothes_id: int, body: ClothesStatusUpdate, db: Session = Depe
 def delete_clothes(clothes_id: int, db: Session = Depends(get_db)
                    , current_user: User = Depends(get_current_user)):
     clothes = _get_clothes_or_404(db, clothes_id, current_user.id)
+
+    # 실제 이미지 파일 삭제 (경로가 존재할 경우)
+    if clothes.image_url:
+        # /images/파일명 -> uploaded_images/파일명 으로 변환하여 삭제
+        file_name = clothes.image_url.split("/")[-1]
+        file_path = os.path.join(IMAGE_DIR, file_name)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            
+    # db 기록 삭제
     db.delete(clothes)
     db.commit()
 
