@@ -74,7 +74,7 @@ export default function RecommendScreen() {
     try {
       setApiLoading(true);
       
-      // 1. 위치 정보는 정상적으로 가져옴 (테스트 환경에서도 중요)
+      // 1. 위치 정보는 정상적으로 가져옴
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return Alert.alert('권한 필요', '위치 권한이 필요합니다.');
 
@@ -118,12 +118,12 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
     // 🎯 오늘 날짜를 백엔드 포맷(YYYY-MM-DD)에 맞게 생성
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    // 선택된 코디에서 존재하는 옷들만 필터링하고 worn_date 필드 필수 추가!
+    // 선택된 코디에서 존재하는 옷들만 필터링하고 worn_date 필드 필수 추가
     const payload = [outfit.top, outfit.bottom, outfit.outer, outfit.shoes]
       .filter(Boolean)
       .map(cloth => ({
         clothes_id: Number(cloth!.id),
-        worn_date: todayStr // 👈 이 필드가 누락되어 422 에러가 났던 것입니다.
+        worn_date: todayStr
       }));
 
     if (payload.length === 0) {
@@ -197,36 +197,28 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
       {/* ✨ 2. 추천 결과가 '나왔을 때' 보여주는 결과 전용 화면 (폼은 숨겨짐) */}
       {apiRecommendations && (
         <View style={styles.section}>
+          
+          {/* ✨ 양쪽 정렬로 깔끔하게 정리된 헤더 */}
           <View style={styles.resultHeaderRow}>
-            <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
-              <View style={styles.contextBadge}>
-                <Ionicons name="location" size={14} color="#64748B" />
-                <Text style={styles.contextBadgeText}>{recommendContext.address || '위치 알 수 없음'}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={styles.locationBadge}>
+                <Ionicons name="location" size={12} color="#64748B" />
+                <Text style={styles.locationBadgeText}>{recommendContext.address || '위치 알 수 없음'}</Text>
               </View>
-              <View style={styles.contextBadge}>
-                <Ionicons name="flag" size={14} color="#64748B" />
-                <Text style={styles.contextBadgeText}>{recommendContext.situation}</Text>
+              <View style={styles.tpoBadge}>
+                <Ionicons name="flag" size={12} color="#2563EB" />
+                <Text style={styles.tpoBadgeText}>{recommendContext.situation}</Text>
               </View>
             </View>
 
-            {/* ✨ 다시 검색 버튼 */}
+            {/* ✨ 회색 덩어리를 없애고 가벼운 텍스트 버튼으로 우측 배치 */}
             <TouchableOpacity style={styles.resetButton} onPress={() => setApiRecommendations(null)}>
-              <Ionicons name="refresh" size={14} color="#475569" />
+              <Ionicons name="refresh" size={14} color="#64748B" />
               <Text style={styles.resetButtonText}>다시 검색</Text>
             </TouchableOpacity>
           </View>
 
           <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
-          
-          {aiMessage && (
-            <View style={styles.aiMessageBox}>
-              <View style={styles.aiMessageHeader}>
-                <Ionicons name="sparkles" size={16} color="#4F46E5" />
-                <Text style={styles.aiMessageTitle}>AI 스타일링 포인트</Text>
-              </View>
-              <Text style={styles.aiMessageText}>{aiMessage}</Text>
-            </View>
-          )}
 
           <ScrollView 
             horizontal 
@@ -264,6 +256,17 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
               </View>
             ))}
           </ScrollView>
+
+          {aiMessage && (
+            <View style={styles.aiMessageBox}>
+              <View style={styles.aiMessageHeader}>
+                <Ionicons name="sparkles" size={16} color="#4F46E5" />
+                <Text style={styles.aiMessageTitle}>AI 스타일링 포인트</Text>
+              </View>
+              <Text style={styles.aiMessageText}>{aiMessage}</Text>
+            </View>
+          )}
+
         </View>
       )}
     </ScrollView>
@@ -290,44 +293,48 @@ const styles = StyleSheet.create({
   emptyStateTitle: { fontSize: 18, fontWeight: '700', color: '#64748B', marginBottom: 8 },
   emptyStateDesc: { fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 22 },
   
+ 
   resultHeaderRow: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    gap: 8, 
-    marginBottom: 16 // 필터와의 간격
+    justifyContent: 'space-between',
+    marginBottom: 16
   },
 
-  contextBadge: { 
+
+  locationBadge: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    backgroundColor: '#F1F5F9', // 아주 옅은 파스텔 그레이
+    backgroundColor: '#F1F5F9', 
     paddingVertical: 6, 
     paddingHorizontal: 10, 
     borderRadius: 8, 
     gap: 4 
   },
+  locationBadgeText: { fontSize: 13, fontWeight: '600', color: '#475569' },
 
-  contextBadgeText: { 
-    fontSize: 13, 
-    fontWeight: '600', 
-    color: '#475569' 
+
+  tpoBadge: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#EFF6FF', 
+    paddingVertical: 6, 
+    paddingHorizontal: 10, 
+    borderRadius: 8, 
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#BFDBFE' 
   },
+  tpoBadgeText: { fontSize: 13, fontWeight: '700', color: '#1D4ED8' }, 
 
   resetButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E2E8F0',
+    gap: 4,
     paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    gap: 4
+    paddingHorizontal: 8,
   },
-  
-  resetButtonText: { 
-    fontSize: 13, 
-    fontWeight: '600', 
-    color: '#475569' 
-  },
+  resetButtonText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
 
   aiMessageBox: { 
     backgroundColor: '#F5F8FF', 
@@ -370,12 +377,12 @@ const styles = StyleSheet.create({
   },
 
   outfitReasonBox: {
-    backgroundColor: '#F1F5F9', // 아주 연한 회색으로 옷 카드와 구분
-    borderLeftWidth: 3,         // 왼쪽에만 선을 그어 답답함 해소
-    borderLeftColor: '#94A3B8', // 차분한 슬레이트 그레이 컬러
+    backgroundColor: '#F1F5F9', 
+    borderLeftWidth: 3,         
+    borderLeftColor: '#94A3B8', 
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderTopRightRadius: 8,    // 오른쪽만 살짝 둥글게
+    borderTopRightRadius: 8,
     borderBottomRightRadius: 8,
     marginBottom: 16
   },
@@ -387,7 +394,7 @@ const styles = StyleSheet.create({
     fontWeight: '500'
   },
   
-  // ✨ 착용하기 버튼 스타일 추가
+
   wearButton: { backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 'auto' },
   wearButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 
