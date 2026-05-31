@@ -189,28 +189,26 @@ export default function AnalysisScreen() {
               <Text style={styles.dashboardTitle}>📊 이달의 옷장 다이어트 요약</Text>
               
               {/* ✨ 차트와 범례를 가로로 나란히 배치! */}
-              <View style={styles.chartRow}>
-                {/* 왼쪽: 크기를 줄인 미니 도넛 차트 */}
-                <View style={styles.donutPlaceholder}>
+              <View style={styles.progressContainer}>
+                <View style={styles.progressTextRow}>
                   <Text style={styles.centerRateText}>{reportData.ecosystem.activity_rate}%</Text>
                 </View>
 
+                <View style={styles.progressBarBg}>
+                  <View style={[
+                    styles.progressBarFill, 
+                    { width: `${Math.min(Math.max(reportData.ecosystem.activity_rate, 0), 100)}%` }
+                  ]} />
+                </View>
+
                 {/* 오른쪽: 활성/방치 의류 범례 리스트 */}
-                <View style={styles.legendColumn}>
-                  <View style={styles.legendItem}>
-                    <Text style={styles.legendIcon}>🔥</Text>
-                    <View>
-                      <Text style={styles.legendLabel}>활성 의류</Text>
-                      <Text style={styles.legendValue}><Text style={styles.boldText}>{reportData.ecosystem.active_clothes}</Text>벌</Text>
-                    </View>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <Text style={styles.legendIcon}>💤</Text>
-                    <View>
-                      <Text style={styles.legendLabel}>방치 의류</Text>
-                      <Text style={styles.legendValue}><Text style={styles.boldText}>{reportData.ecosystem.inactive_clothes}</Text>벌</Text>
-                    </View>
-                  </View>
+                <View style={styles.legendRow}>
+                  <Text style={styles.legendText}>
+                    🔥 활성 의류: <Text style={styles.boldText}>{reportData.ecosystem.active_clothes}</Text>벌
+                  </Text>
+                  <Text style={styles.legendText}>
+                    💤 방치 의류: <Text style={styles.boldText}>{reportData.ecosystem.inactive_clothes}</Text>벌
+                  </Text>
                 </View>
               </View>
 
@@ -286,32 +284,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     marginBottom: 4 
   },
+
+  progressContainer: { marginBottom: 4 },
+  progressTextRow: { alignItems: 'center', marginBottom: 8 },
+  centerRateText: { fontSize: 32, fontWeight: '800', color: '#111827' },
   
-  // 차트 크기 140 -> 100으로 축소
-  donutPlaceholder: { 
-    width: 100, 
-    height: 100, 
-    borderRadius: 50, 
-    borderWidth: 10, 
-    borderColor: '#e5e7eb',
-    borderTopColor: '#111827',
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  progressBarBg: { 
+    height: 16, 
+    backgroundColor: '#f3f4f6', 
+    borderRadius: 8, 
+    overflow: 'hidden', 
+    marginBottom: 16 
   },
-  centerRateText: { fontSize: 18, fontWeight: '800', color: '#111827' }, // 글씨 크기도 24 -> 18로 축소
+  progressBarFill: { 
+    height: '100%', 
+    backgroundColor: '#111827', 
+    borderRadius: 8 
+  },
   
-  // 우측 범례 세로 정렬 스타일
-  legendColumn: { 
-    flex: 1, 
-    marginLeft: 24, 
-    justifyContent: 'center', 
-    gap: 12 // 범례 사이 간격
+  legendRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-around', 
+    backgroundColor: '#f9fafb', 
+    padding: 14, 
+    borderRadius: 12 
   },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  legendIcon: { fontSize: 20 },
-  legendLabel: { fontSize: 12, color: '#6b7280', marginBottom: 2 },
-  legendValue: { fontSize: 15, color: '#4b5563' },
-  boldText: { fontWeight: '800', color: '#111827' },
+  legendText: { fontSize: 13, color: '#6b7280' },
+  boldText: { fontWeight: '800', color: '#111827', fontSize: 14 },
 
   cardDivider: { height: 1, backgroundColor: '#f3f4f6', marginVertical: 16 },
   
