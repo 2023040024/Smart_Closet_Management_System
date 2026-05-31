@@ -22,7 +22,6 @@ function resolveImageUri(image?: string | null) {
   return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
 }
 
-// 백엔드 의류 데이터 규격 정의
 type BackendClothesItem = {
   clothes_id: number;
   category: string;
@@ -47,19 +46,13 @@ export default function AnalysisScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 🚨 옷장 분석 데이터 저장용 상태 관리 스태이트
-  const [overloadData, setOverloadData] = useState<{
-    total_warnings: number;
-    ai_advice: string;
-    items: OverloadGroup[];
-  } | null>(null);
+  // 기존 상세 데이터 상태
+  const [overloadData, setOverloadData] = useState<{ total_warnings: number; ai_advice: string; items: OverloadGroup[]; } | null>(null);
+  const [disposalData, setDisposalData] = useState<{ items: BackendClothesItem[]; ai_advice: string; } | null>(null);
+  
+  // ✨ 새로 추가된 월간 리포트(대시보드) 상태
+  const [reportData, setReportData] = useState<any>(null);
 
-  const [disposalData, setDisposalData] = useState<{
-    items: BackendClothesItem[];
-    ai_advice: string;
-  } | null>(null);
-
-  // ✅ 진단 탭을 누를 때마다 백엔드 서버의 통계 데이터를 최신 상태로 원격 동기화
   useFocusEffect(
     useCallback(() => {
       let isMounted = true;
@@ -68,55 +61,61 @@ export default function AnalysisScreen() {
         setLoading(true);
         try {
           setError(null);
-          const [overloadRes, disposalRes] = await Promise.all([
+          
+          // ✨ API 3개를 동시에 호출하여 대시보드 요약과 상세 리스트를 모두 가져옵니다.
+          const [overloadRes, disposalRes, reportRes] = await Promise.all([
             api.get('/stats/overload'),
             api.get('/stats/dispose', { params: { current_season: getCurrentSeason() } }),
+            api.get('/stats/monthly-report') // 👈 백엔드가 새로 만든 통합 API
           ]);
 
           if (isMounted) {
             setOverloadData(overloadRes.data);
-
-            const disposalResponse = disposalRes.data;
             setDisposalData({
-              items: disposalResponse.items || [],
-              ai_advice: disposalResponse.ai_advice || '최근 90일 이상 입지 않은 옷들입니다. 처분이나 나눔을 고민해 보세요!',
+              items: disposalRes.data.items || [],
+              ai_advice: disposalRes.data.ai_advice || '최근 90일 이상 입지 않은 옷들입니다. 처분이나 나눔을 고민해 보세요!',
             });
+            setReportData(reportRes.data); // 대시보드 데이터 세팅
           }
         } catch (error) {
           console.error('분석 데이터 로드 실패:', error);
+          setError('데이터를 불러오는 중 문제가 발생했습니다.');
         } finally {
           if (isMounted) setLoading(false);
         }
       };
 
       loadAnalysisData();
-      return () => {
-        isMounted = false;
-      };
+      return () => { isMounted = false; };
     }, [])
   );
 
-  // 현재 월(Month)을 가져와서 한국어 계절로 반환해 주는 함수
   const getCurrentSeason = (): string => {
-  const month = new Date().getMonth() + 1;
-  if (month >= 3 && month <= 5) return '봄';
-  if (month >= 6 && month <= 8) return '여름';
-  if (month >= 9 && month <= 11) return '가을';
-  return '겨울';
-}
+    const month = new Date().getMonth() + 1;
+    if (month >= 3 && month <= 5) return '봄';
+    if (month >= 6 && month <= 8) return '여름';
+    if (month >= 9 && month <= 11) return '가을';
+    return '겨울';
+  }
 
-  // 공통 의류 카드 컴포넌트 렌더러 (백엔드 플랫 데이터 매핑)
+  // 백엔드 가이드: 상태 색상 매핑 함수
+  const getBadgeStyles = (colorStr: string) => {
+    switch(colorStr) {
+      case 'green': return { bg: '#dcfce7', text: '#166534' }; 
+      case 'yellow': return { bg: '#fef08a', text: '#854d0e' }; 
+      case 'red': return { bg: '#fee2e2', text: '#991b1b' }; 
+      default: return { bg: '#f3f4f6', text: '#374151' };
+    }
+  };
+
   const renderClothesCard = (item: any, badgeType?: 'overload' | 'dispose') => {
     const rawImage = item.image ?? item.image_url;
-    const resolvedUri = resolveImageUri(rawImage);
-    const imageUri = resolvedUri || 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=300&auto=format&fit=crop';
+    const imageUri = resolveImageUri(rawImage) || 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=300&auto=format&fit=crop';
     
-  // ✅ 1. 백엔드 계층형 스펙 반영: tags 객체 내부의 category와 material을 안전하게 참조
     const displayCategory = item.tags?.category || item.category || '의류';
     const displayMaterial = item.tags?.material || item.material || '기본';
     const displayColor = item.tags?.color || item.color || '';
 
-    // ✅ 2. 뱃지 텍스트 동적 분기: 0회 착용이면 [미착용], 그 외에는 [방치됨] 처리
     let badgeText = '중복';
     if (badgeType === 'dispose') {
       badgeText = item.wear_count === 0 ? '미착용' : '방치됨';
@@ -141,7 +140,7 @@ export default function AnalysisScreen() {
           <Text style={styles.cardTitle} numberOfLines={1}>{displayCategory}</Text>
           <View style={styles.cardTagRow}>
             <Text style={styles.cardTag}>{displayColor}</Text>
-            <Text style={styles.cardTag}>{displayMaterial || '기본'}</Text>
+            <Text style={styles.cardTag}>{displayMaterial}</Text>
             <Text style={[styles.cardTag, styles.countTag]}>{item.wear_count}회 착용</Text>
           </View>
         </View>
@@ -149,10 +148,11 @@ export default function AnalysisScreen() {
     );
   };
 
-  if (loading && !overloadData && !disposalData) {
+  if (loading && !overloadData && !reportData) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#111" />
+        <Text style={{marginTop: 10, color: '#666'}}>옷장 데이터를 분석하는 중...</Text>
       </View>
     );
   }
@@ -165,10 +165,12 @@ export default function AnalysisScreen() {
     );
   }
 
-  // 총 몇 개의 주의 아이템 카드가 바인딩되어야 하는지 계산
   const totalOverloadCount = overloadData?.items?.reduce((acc, cur) => acc + (cur.items?.length || 0), 0) || 0;
   const totalDisposeCount = disposalData?.items?.length || 0;
   const hasAnyItems = totalOverloadCount > 0 || totalDisposeCount > 0;
+
+  // 뱃지 색상 계산
+  const badgeStyle = reportData ? getBadgeStyles(reportData.overload.status_color) : getBadgeStyles('green');
 
   return (
     <View style={styles.container}>
@@ -180,45 +182,43 @@ export default function AnalysisScreen() {
           <Text style={styles.subtitle}>AI가 내 옷장을 분석하여 스마트한 다이어트를 도와줍니다.</Text>
         </View>
 
-        {/* 1. 과부하 분석 배너 영역 */}
-        {overloadData && overloadData.total_warnings > 0 ? (
-          <View style={styles.overloadBannerBox}>
-            <View style={styles.overloadBannerHeader}>
-              <Ionicons name="warning" size={18} color="#dc2626" />
-              <Text style={styles.overloadBannerTitle}>충동 소비 주의보 ({overloadData.total_warnings}건)</Text>
+        {/* ✨ 1. 새로 추가된 월간 리포트 대시보드 영역 */}
+        {reportData && (
+          <View style={styles.dashboardContainer}>
+            {/* 1-1. 옷장 생태계 활성도 (도넛 차트 뷰) */}
+            <View style={styles.dashboardCard}>
+              <Text style={styles.dashboardTitle}>🌱 옷장 생태계 활성도</Text>
+              <View style={styles.chartContainer}>
+                {/* 🚨 추후 react-native-svg-charts 등으로 교체할 임시 차트 UI */}
+                <View style={styles.donutPlaceholder}>
+                  <Text style={styles.centerRateText}>{reportData.ecosystem.activity_rate}%</Text>
+                </View>
+              </View>
+              <View style={styles.legendContainer}>
+                <Text style={styles.legendText}>
+                  🔥 활성 의류: <Text style={styles.boldText}>{reportData.ecosystem.active_clothes}</Text>벌
+                </Text>
+                <Text style={styles.legendText}>
+                  💤 방치 의류: <Text style={styles.boldText}>{reportData.ecosystem.inactive_clothes}</Text>벌
+                </Text>
+              </View>
             </View>
-            <Text style={styles.overloadBannerText}>{overloadData.ai_advice}</Text>
-          </View>
-        ) : (
-          <View style={[styles.overloadBannerBox, styles.safeBannerBox]}>
-            <View style={styles.overloadBannerHeader}>
-              <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
-              <Text style={[styles.overloadBannerTitle, styles.safeBannerTitle]}>옷장 과부하 안전</Text>
+
+            {/* 1-2. 과부하 지수 신호등 뱃지 */}
+            <View style={styles.dashboardCard}>
+              <Text style={styles.dashboardTitle}>⚠️ 옷장 과부하 지수</Text>
+              <View style={[styles.statusBadge, { backgroundColor: badgeStyle.bg }]}>
+                <Text style={[styles.badgeText, { color: badgeStyle.text }]}>
+                  {reportData.overload.status_message}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.overloadBannerText}>중복되거나 과하게 쌓인 카테고리의 아이템이 없습니다.</Text>
           </View>
         )}
 
-        {/* 2. 장기 미착용 의류 처분 제안 배너 영역 */}
-        {disposalData && disposalData.items?.length > 0 ? (
-          <View style={styles.disposalBannerBox}>
-            <View style={styles.disposalBannerHeader}>
-              <Ionicons name="trash-outline" size={18} color="#d97706" />
-              <Text style={styles.disposalBannerTitle}>정리가 필요한 옷 제안</Text>
-            </View>
-            <Text style={styles.disposalBannerText}>{disposalData.ai_advice}</Text>
-          </View>
-        ) : (
-          <View style={[styles.disposalBannerBox, styles.safeBannerBox]}>
-            <View style={styles.disposalBannerHeader}>
-              <Ionicons name="heart-outline" size={18} color="#2563eb" />
-              <Text style={[styles.disposalBannerTitle, styles.infoBannerTitle]}>의류 활용도 양호</Text>
-            </View>
-            <Text style={styles.disposalBannerText}>최근 90일 동안 골고루 잘 입고 계시거나 처분할 옷이 없습니다.</Text>
-          </View>
-        )}
+        <View style={styles.divider} />
 
-        {/* 3. 주의 필요한 아이템 리스트 실시간 그리드 바인딩 */}
+        {/* 2. 상세 아이템 리스트 실시간 그리드 바인딩 */}
         <View style={styles.resultHeader}>
           <Text style={styles.resultTitle}>진단 대상 의류 상세 내역</Text>
           <Text style={styles.resultCount}>총 {totalOverloadCount + totalDisposeCount}개</Text>
@@ -231,12 +231,9 @@ export default function AnalysisScreen() {
           </View>
         ) : (
           <View style={styles.grid}>
-            {/* 과부하 중복 옷 무더기들 바인딩 */}
             {overloadData?.items?.map((group) => 
               group.items?.map((item) => renderClothesCard(item, 'overload'))
             )}
-
-            {/* 90일 이상 안 입은 처분 대상 옷들 바인딩 */}
             {disposalData?.items?.map((item) => 
               renderClothesCard(item, 'dispose')
             )}
@@ -248,49 +245,56 @@ export default function AnalysisScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16, paddingTop: 16, backgroundColor: '#fff' },
+  container: { flex: 1, paddingHorizontal: 16, paddingTop: 16, backgroundColor: '#f9fafb' }, // 배경색 파스텔 톤으로 살짝 변경
   scrollContent: { paddingBottom: 28 },
   loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
+  
   headerRow: { marginBottom: 20 },
   title: { fontSize: 28, fontWeight: '800', marginBottom: 6, color: '#111' },
   subtitle: { fontSize: 14, color: '#6b6b6b', lineHeight: 20 },
   
-  // 과부하 경고 스타일 (Red)
-  overloadBannerBox: {
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fee2e2',
+  // ✨ 대시보드 스타일
+  dashboardContainer: { marginBottom: 10 },
+  dashboardCard: {
+    backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-  },
-  overloadBannerHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  overloadBannerTitle: { fontSize: 14, fontWeight: '800', color: '#dc2626' },
-  overloadBannerText: { fontSize: 14, color: '#4b5563', lineHeight: 22, fontWeight: '600' },
-  
-  // 처분 제안 스타일 (Amber)
-  disposalBannerBox: {
-    backgroundColor: '#fffbeb',
+    padding: 24,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#fef3c7',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
+    borderColor: '#f3f4f6',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
   },
-  disposalBannerHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  disposalBannerTitle: { fontSize: 14, fontWeight: '800', color: '#d97706' },
-  disposalBannerText: { fontSize: 14, color: '#4b5563', lineHeight: 22, fontWeight: '600' },
+  dashboardTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 16 },
+  chartContainer: { alignItems: 'center', marginBottom: 20 },
+  donutPlaceholder: { 
+    width: 140, 
+    height: 140, 
+    borderRadius: 70, 
+    borderWidth: 14, 
+    borderColor: '#e5e7eb', // 비활성 옷(회색)을 상징하는 테두리
+    borderTopColor: '#111827', // 활성 옷을 상징하는 일부 테두리 색상
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  centerRateText: { fontSize: 24, fontWeight: '800', color: '#111827' },
+  legendContainer: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: '#f9fafb', padding: 14, borderRadius: 12 },
+  legendText: { fontSize: 13, color: '#4b5563' },
+  boldText: { fontWeight: '700', color: '#111827' },
   
-  // 안전 상태 안내 공통
-  safeBannerBox: { backgroundColor: '#f9fafb', borderColor: '#f3f4f6' },
-  safeBannerTitle: { color: '#16a34a' },
-  infoBannerTitle: { color: '#2563eb' },
+  statusBadge: { paddingVertical: 16, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center' },
+  badgeText: { fontSize: 15, fontWeight: '700' },
 
+  divider: { height: 1, backgroundColor: '#e5e7eb', marginVertical: 10 },
+
+  // 기존 상세 그리드 스타일
   resultHeader: { marginTop: 10, marginBottom: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 2 },
   resultTitle: { fontSize: 17, fontWeight: '800', color: '#111' },
   resultCount: { fontSize: 14, color: '#6b6b6b', fontWeight: '700' },
 
-  // 2열 바둑판 그리드 스타일
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   card: { width: '48.2%', backgroundColor: '#fff', borderRadius: 18, marginBottom: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#ededed' },
   cardImageWrap: { width: '100%', height: 160, backgroundColor: '#f9fafb', justifyContent: 'center', alignItems: 'center', position: 'relative' },
@@ -301,7 +305,6 @@ const styles = StyleSheet.create({
   cardTag: { fontSize: 11, color: '#4b5563', backgroundColor: '#f3f4f6', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, fontWeight: '500' },
   countTag: { backgroundColor: '#eff6ff', color: '#1d4ed8' },
 
-  // 이미지 좌상단 뱃지 라벨
   cardBadge: { position: 'absolute', top: 8, left: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   overloadBadge: { backgroundColor: '#dc2626' },
   disposeBadge: { backgroundColor: '#d97706' },
