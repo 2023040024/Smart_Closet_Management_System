@@ -145,56 +145,60 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {/* 고정된 상단 헤더 */}
       <View style={styles.headerTitleRow}>
         <Text style={styles.title}>코디 추천</Text>
         <Ionicons name="shirt" size={28} color="#111827" />
       </View>
       <Text style={styles.headerSubtitle}>오늘의 날씨와 외출 목적에 맞는 스타일링</Text>
 
-      <View style={styles.section}>
-        
-        {/* 2. 변경된 섹션 타이틀 영역 */}
-        <View style={styles.sectionTitleRow}>
-          <Ionicons name="partly-sunny" size={22} color="#2563EB" />
-          <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
-        </View>
-        
-        <View style={styles.inputBox}>
-          <TextInput style={styles.textInput} value={situation} onChangeText={setSituation} placeholder="예: 데이트, 출근, 미팅" placeholderTextColor="#9CA3AF" />
-        </View>
-
-        <View style={styles.quickKeywordRow}>
-          {['데이트', '출근', '결혼식', '운동', '카페'].map(keyword => (
-            <TouchableOpacity 
-              key={keyword} 
-              style={styles.quickKeywordChip} 
-              onPress={() => setSituation(keyword)}
-            >
-              <Text style={styles.quickKeywordText}>{keyword}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <TouchableOpacity style={styles.actionButton} onPress={fetchTodayRecommendation} disabled={apiLoading}>
-          <Text style={styles.actionButtonText}>{apiLoading ? '불러오는 중...' : '코디 추천받기'}</Text>
-        </TouchableOpacity>
-
-        {apiLoading && <SkeletonLoader />}
-
-        {!apiLoading && !apiRecommendations && (
-          <View style={styles.emptyStateContainer}>
-            <Ionicons name="sparkles" size={48} color="#D1D5DB" style={{ marginBottom: 16 }} />
-            <Text style={styles.emptyStateTitle}>AI 코디네이터 대기 중</Text>
-            <Text style={styles.emptyStateDesc}>
-              오늘의 외출 목적을 입력하시면,{'\n'}날씨와 옷장 데이터를 분석해 딱 맞는 코디를 제안해 드립니다.
-            </Text>
+      {/* ✨ 1. 추천 결과가 '없을 때'만 보여주는 폼 영역 */}
+      {!apiRecommendations && (
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="partly-sunny" size={22} color="#2563EB" />
+            <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
           </View>
-        )}
+          
+          <View style={styles.inputBox}>
+            <TextInput style={styles.textInput} value={situation} onChangeText={setSituation} placeholder="예: 데이트, 출근, 미팅" placeholderTextColor="#9CA3AF" />
+          </View>
 
-        {!apiLoading && apiRecommendations && (
-          <View style={{ marginTop: 24 }}>
+          <View style={styles.quickKeywordRow}>
+            {['데이트', '출근', '결혼식', '운동', '카페'].map(keyword => (
+              <TouchableOpacity 
+                key={keyword} 
+                style={styles.quickKeywordChip} 
+                onPress={() => setSituation(keyword)}
+              >
+                <Text style={styles.quickKeywordText}>{keyword}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-            <View style={styles.resultHeaderRow}>
+          <TouchableOpacity style={styles.actionButton} onPress={fetchTodayRecommendation} disabled={apiLoading}>
+            <Text style={styles.actionButtonText}>{apiLoading ? '불러오는 중...' : '코디 추천받기'}</Text>
+          </TouchableOpacity>
+
+          {apiLoading && <SkeletonLoader />}
+
+          {!apiLoading && (
+            <View style={styles.emptyStateContainer}>
+              <Ionicons name="sparkles" size={48} color="#D1D5DB" style={{ marginBottom: 16 }} />
+              <Text style={styles.emptyStateTitle}>AI 코디네이터 대기 중</Text>
+              <Text style={styles.emptyStateDesc}>
+                오늘의 외출 목적을 입력하시면,{'\n'}날씨와 옷장 데이터를 분석해 딱 맞는 코디를 제안해 드립니다.
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* ✨ 2. 추천 결과가 '나왔을 때' 보여주는 결과 전용 화면 (폼은 숨겨짐) */}
+      {apiRecommendations && (
+        <View style={styles.section}>
+          <View style={styles.resultHeaderRow}>
+            <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
               <View style={styles.contextBadge}>
                 <Ionicons name="location" size={14} color="#64748B" />
                 <Text style={styles.contextBadgeText}>{recommendContext.address || '위치 알 수 없음'}</Text>
@@ -205,58 +209,63 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
               </View>
             </View>
 
-            <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
-            {aiMessage && (
-              <View style={styles.aiMessageBox}>
-                <View style={styles.aiMessageHeader}>
-                  <Ionicons name="sparkles" size={16} color="#4F46E5" />
-                  <Text style={styles.aiMessageTitle}>AI 스타일링 포인트</Text>
-                </View>
-                <Text style={styles.aiMessageText}>{aiMessage}</Text>
-              </View>
-            )}
-
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={CARD_WIDTH + 16}
-              decelerationRate="fast"
-              contentContainerStyle={{ paddingRight: 16, paddingBottom: 10 }}
-            >
-              {apiRecommendations.map((outfit, index) => (
-                <View key={index} style={[styles.outfitCard, { width: CARD_WIDTH }]}>
-                  <View style={styles.outfitCardHeader}>
-                    <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
-                    <Text style={styles.outfitCardTitle}>추천 코디 {index + 1}</Text>
-                  </View>
-
-                  {outfit.reason && (
-                    <View style={styles.outfitReasonBox}>
-                      <Text style={styles.outfitDescription}>{outfit.reason}</Text>
-                    </View>
-                  )}
-                  
-                  {/* 카드가 너무 길어지지 않게 ScrollView 안에 옷 목록 배치 */}
-                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={{ flexGrow: 1, marginBottom: 16 }}>
-                    {(displayFilter === '전체' || displayFilter === '상의') && outfit.top && <OutfitItemCard label="상의" item={outfit.top} />}
-                    {(displayFilter === '전체' || displayFilter === '하의') && outfit.bottom && <OutfitItemCard label="하의" item={outfit.bottom} />}
-                    {(displayFilter === '전체' || displayFilter === '아우터') && outfit.outer && <OutfitItemCard label="아우터" item={outfit.outer} />}
-                    {(displayFilter === '전체' || displayFilter === '신발') && outfit.shoes && <OutfitItemCard label="신발" item={outfit.shoes} />}
-                  </ScrollView>
-
-                  {/* ✨ 추가된 기능: 추천 코디 착용하기 버튼 */}
-                  <TouchableOpacity 
-                    style={styles.wearButton} 
-                    onPress={() => handleWearOutfit(outfit)}
-                  >
-                    <Text style={styles.wearButtonText}>이 코디 착용하기</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
+            {/* ✨ 다시 검색 버튼 */}
+            <TouchableOpacity style={styles.resetButton} onPress={() => setApiRecommendations(null)}>
+              <Ionicons name="refresh" size={14} color="#475569" />
+              <Text style={styles.resetButtonText}>다시 검색</Text>
+            </TouchableOpacity>
           </View>
-        )}
-      </View>
+
+          <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
+          
+          {aiMessage && (
+            <View style={styles.aiMessageBox}>
+              <View style={styles.aiMessageHeader}>
+                <Ionicons name="sparkles" size={16} color="#4F46E5" />
+                <Text style={styles.aiMessageTitle}>AI 스타일링 포인트</Text>
+              </View>
+              <Text style={styles.aiMessageText}>{aiMessage}</Text>
+            </View>
+          )}
+
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={CARD_WIDTH + 16}
+            decelerationRate="fast"
+            contentContainerStyle={{ paddingRight: 16, paddingBottom: 10 }}
+          >
+            {apiRecommendations.map((outfit, index) => (
+              <View key={index} style={[styles.outfitCard, { width: CARD_WIDTH }]}>
+                <View style={styles.outfitCardHeader}>
+                  <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                  <Text style={styles.outfitCardTitle}>추천 코디 {index + 1}</Text>
+                </View>
+
+                {outfit.reason && (
+                  <View style={styles.outfitReasonBox}>
+                    <Text style={styles.outfitDescription}>{outfit.reason}</Text>
+                  </View>
+                )}
+                
+                <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={{ flexGrow: 1, marginBottom: 16 }}>
+                  {(displayFilter === '전체' || displayFilter === '상의') && outfit.top && <OutfitItemCard label="상의" item={outfit.top} />}
+                  {(displayFilter === '전체' || displayFilter === '하의') && outfit.bottom && <OutfitItemCard label="하의" item={outfit.bottom} />}
+                  {(displayFilter === '전체' || displayFilter === '아우터') && outfit.outer && <OutfitItemCard label="아우터" item={outfit.outer} />}
+                  {(displayFilter === '전체' || displayFilter === '신발') && outfit.shoes && <OutfitItemCard label="신발" item={outfit.shoes} />}
+                </ScrollView>
+
+                <TouchableOpacity 
+                  style={styles.wearButton} 
+                  onPress={() => handleWearOutfit(outfit)}
+                >
+                  <Text style={styles.wearButtonText}>이 코디 착용하기</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -297,8 +306,24 @@ const styles = StyleSheet.create({
     borderRadius: 8, 
     gap: 4 
   },
-  
+
   contextBadgeText: { 
+    fontSize: 13, 
+    fontWeight: '600', 
+    color: '#475569' 
+  },
+
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E2E8F0',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 4
+  },
+  
+  resetButtonText: { 
     fontSize: 13, 
     fontWeight: '600', 
     color: '#475569' 
