@@ -65,10 +65,9 @@ export function OutfitItemCard({ label, item }: { label: string; item?: ClothesI
 }
 
 const styles = StyleSheet.create({
-  itemCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#EEF2F7' },
+  itemCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, marginBottom: 12 },
   itemHeaderRow: { flexDirection: 'row', marginBottom: 10 },
-  itemBadge: { backgroundColor: '#E8EEF9', color: '#2563EB', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, fontSize: 12, fontWeight: '700' },
-  // ✨ Commit 1: 카드 리팩토링 (회색 배경 컨테이너 추가로 이미지와 카드 분리)
+  itemBadge: { backgroundColor: '#F3F4F6', color: '#4B5563', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, fontSize: 12, fontWeight: '700' },
   itemImageContainer: { width: '100%', height: 200, backgroundColor: '#F3F4F6', borderRadius: 12, marginBottom: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   itemImage: { width: '100%', height: '100%' },
   imagePlaceholder: { width: '100%', height: 200, borderRadius: 12, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },

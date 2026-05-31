@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 import {
@@ -150,11 +151,34 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
         <View style={styles.inputBox}>
           <TextInput style={styles.textInput} value={situation} onChangeText={setSituation} placeholder="예: 데이트, 출근, 미팅" placeholderTextColor="#9CA3AF" />
         </View>
+
+        <View style={styles.quickKeywordRow}>
+          {['데이트', '출근', '결혼식', '운동', '카페'].map(keyword => (
+            <TouchableOpacity 
+              key={keyword} 
+              style={styles.quickKeywordChip} 
+              onPress={() => setSituation(keyword)}
+            >
+              <Text style={styles.quickKeywordText}>{keyword}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <TouchableOpacity style={styles.actionButton} onPress={fetchTodayRecommendation} disabled={apiLoading}>
           <Text style={styles.actionButtonText}>{apiLoading ? '불러오는 중...' : '코디 추천받기'}</Text>
         </TouchableOpacity>
 
         {apiLoading && <SkeletonLoader />}
+
+        {!apiLoading && !apiRecommendations && (
+          <View style={styles.emptyStateContainer}>
+            <Ionicons name="sparkles" size={48} color="#D1D5DB" style={{ marginBottom: 16 }} />
+            <Text style={styles.emptyStateTitle}>AI 코디네이터 대기 중</Text>
+            <Text style={styles.emptyStateDesc}>
+              오늘의 외출 목적을 입력하시면,{'\n'}날씨와 옷장 데이터를 분석해 딱 맞는 코디를 제안해 드립니다.
+            </Text>
+          </View>
+        )}
 
         {!apiLoading && apiRecommendations && (
           <View style={{ marginTop: 24 }}>
@@ -216,8 +240,14 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 8 },
   inputBox: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F1F5F9' },
   textInput: { fontSize: 16, color: '#111827', fontWeight: '600' },
+  quickKeywordRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  quickKeywordChip: { backgroundColor: '#F1F5F9', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20 },
+  quickKeywordText: { fontSize: 13, color: '#475569', fontWeight: '600' },
   actionButton: { backgroundColor: '#111827', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
   actionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  emptyStateContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 20 },
+  emptyStateTitle: { fontSize: 18, fontWeight: '700', color: '#64748B', marginBottom: 8 },
+  emptyStateDesc: { fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 22 },
   
   contextGroup: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
   contextGroupText: { fontSize: 14, fontWeight: '700', color: '#475569' },
