@@ -185,15 +185,16 @@ export default function AnalysisScreen() {
         {/* ✨ 1. 새로 추가된 월간 리포트 대시보드 영역 */}
         {reportData && (
           <View style={styles.dashboardContainer}>
-            {/* 1-1. 옷장 생태계 활성도 (도넛 차트 뷰) */}
             <View style={styles.dashboardCard}>
-              <Text style={styles.dashboardTitle}>🌱 옷장 생태계 활성도</Text>
+              <Text style={styles.dashboardTitle}>📊 이달의 옷장 다이어트 요약</Text>
+              
+              {/* 1-1. 옷장 생태계 활성도 (도넛 차트 뷰) */}
               <View style={styles.chartContainer}>
-                {/* 🚨 추후 react-native-svg-charts 등으로 교체할 임시 차트 UI */}
                 <View style={styles.donutPlaceholder}>
                   <Text style={styles.centerRateText}>{reportData.ecosystem.activity_rate}%</Text>
                 </View>
               </View>
+              
               <View style={styles.legendContainer}>
                 <Text style={styles.legendText}>
                   🔥 활성 의류: <Text style={styles.boldText}>{reportData.ecosystem.active_clothes}</Text>벌
@@ -202,11 +203,11 @@ export default function AnalysisScreen() {
                   💤 방치 의류: <Text style={styles.boldText}>{reportData.ecosystem.inactive_clothes}</Text>벌
                 </Text>
               </View>
-            </View>
 
-            {/* 1-2. 과부하 지수 신호등 뱃지 */}
-            <View style={styles.dashboardCard}>
-              <Text style={styles.dashboardTitle}>⚠️ 옷장 과부하 지수</Text>
+              {/* 카드 내부 구분선 */}
+              <View style={styles.cardDivider} />
+
+              {/* 1-2. 과부하 지수 신호등 뱃지 (같은 카드 안에 밀착) */}
               <View style={[styles.statusBadge, { backgroundColor: badgeStyle.bg }]}>
                 <Text style={[styles.badgeText, { color: badgeStyle.text }]}>
                   {reportData.overload.status_message}
@@ -259,7 +260,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 24,
-    marginBottom: 16,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: '#f3f4f6',
     elevation: 2,
@@ -269,7 +270,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   dashboardTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 16 },
-  chartContainer: { alignItems: 'center', marginBottom: 20 },
+  chartContainer: { alignItems: 'center', marginBottom: 16 },
   donutPlaceholder: { 
     width: 140, 
     height: 140, 
@@ -284,6 +285,8 @@ const styles = StyleSheet.create({
   legendContainer: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: '#f9fafb', padding: 14, borderRadius: 12 },
   legendText: { fontSize: 13, color: '#4b5563' },
   boldText: { fontWeight: '700', color: '#111827' },
+
+  cardDivider: { height: 1, backgroundColor: '#f3f4f6', marginVertical: 16 },
   
   statusBadge: { paddingVertical: 16, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center' },
   badgeText: { fontSize: 15, fontWeight: '700' },
