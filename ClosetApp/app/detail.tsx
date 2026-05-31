@@ -324,13 +324,39 @@ const styles = StyleSheet.create({
   imageFallbackText: { color: '#6b7280', fontSize: 15 },
   sectionTitle: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
   emptyTagText: { color: '#6b7280', marginBottom: 20 },
-  tagList: { marginBottom: 20 },
-  tagRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  tagLabel: { width: 88, fontSize: 14, color: '#6b7280' },
+  tagList: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'space-between', 
+    marginBottom: 20 
+  },
+  tagRow: { 
+    minWidth: '48%', // 화면의 절반씩 차지하게 설정 (2열 배치)
+    flexDirection: 'column', // 가로 폭이 좁아지므로 라벨은 위, 뱃지는 아래로 쌓이게 배치
+    alignItems: 'flex-start', 
+    marginBottom: 18, // 여백 살짝 조정
+    paddingRight: 8,
+  },
+
+  tagLabel: { 
+    fontSize: 13, 
+    color: '#6b7280', 
+    marginBottom: 6 
+  },
   
   // 기본 태그 스타일
-  tagPill: { flexShrink: 1, backgroundColor: '#111827', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12 },
-  tagText: { color: '#fff', fontSize: 14 },
+  tagPill: { 
+    backgroundColor: '#f3f4f6', 
+    borderRadius: 999, 
+    paddingVertical: 8,
+    paddingHorizontal: 14 
+  },
+
+  tagText: { 
+    color: '#374151', 
+    fontSize: 15, 
+    fontWeight: '600' 
+  },
 
   // ✅ 가성비 뱃지 추가 스타일
   goodCostPill: { backgroundColor: '#dcfce7', borderWidth: 1, borderColor: '#bbf7d0' },

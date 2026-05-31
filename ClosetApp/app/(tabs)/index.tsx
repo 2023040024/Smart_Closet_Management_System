@@ -191,7 +191,15 @@ useFocusEffect(
         (!filter.style || item.tags.style === filter.style) &&
         (!filter.mood || item.tags.mood === filter.mood) &&
         (!filter.color || item.tags.color === filter.color) &&
-        (!filter.tpo || item.tags.tpo === filter.tpo);
+        (!filter.tpo || item.tags.tpo === filter.tpo) &&
+        (!filter.season || item.tags.season === filter.season) &&
+        (!filter.tone || item.tags.tone === filter.tone) &&
+        (!filter.topFit || item.tags.topFit === filter.topFit) &&
+        (!filter.bottomFit || item.tags.bottomFit === filter.bottomFit) &&
+        (!filter.material || item.tags.material === filter.material) &&
+        (!filter.thickness || item.tags.thickness === filter.thickness) &&
+        (!filter.point || item.tags.point === filter.point);
+
       return matchType && matchFilter;
     });
   }, [clothes, selectedType, filter]);
