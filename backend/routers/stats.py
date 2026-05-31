@@ -230,11 +230,32 @@ def get_monthly_report(
     else:
         activity_rate = 0.0
 
+# 2. 충동구매 방어율 / 과부하 지수
+    overload_data = get_closet_overload(threshold=4, db=db, current_user=current_user)
+    total_warnings = overload_data["total_warnings"]
+    
+    # 프론트엔드 신호등 UI 렌더링을 위한 상태 분기 처리
+    if total_warnings == 0:
+        status_color = "green"
+        status_message = "안전: 완벽한 옷장 다이어트 상태입니다."
+    elif total_warnings <= 2:
+        status_color = "yellow"
+        status_message = "주의: 비슷한 아이템이 모이고 있어요."
+    else:
+        status_color = "red"
+        status_message = "위험: 옷장 다이어트가 시급합니다!"
+
+    # 3. 최종 통합 응답 반환 (기존에 작성한 return 문을 아래 코드로 교체합니다)
     return {
         "ecosystem": {
             "total_clothes": total_clothes_count,
             "active_clothes": active_clothes_count,
             "inactive_clothes": inactive_clothes_count,
             "activity_rate": activity_rate
+        },
+        "overload": {
+            "total_warnings": total_warnings,
+            "status_color": status_color,
+            "status_message": status_message
         }
     }
