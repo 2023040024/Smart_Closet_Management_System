@@ -65,13 +65,34 @@ export function OutfitItemCard({ label, item }: { label: string; item?: ClothesI
 }
 
 const styles = StyleSheet.create({
-  itemCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, marginBottom: 12 },
-  itemHeaderRow: { flexDirection: 'row', marginBottom: 10 },
-  itemBadge: { backgroundColor: '#F3F4F6', color: '#4B5563', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, fontSize: 12, fontWeight: '700' },
-  itemImageContainer: { width: '100%', height: 200, backgroundColor: '#F3F4F6', borderRadius: 12, marginBottom: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  itemCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12 },
+  itemHeaderRow: { flexDirection: 'row', marginBottom: 12 },
+  itemBadge: { backgroundColor: '#F1F5F9', color: '#475569', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, fontSize: 12, fontWeight: '700' },
+  
+  itemImageContainer: { 
+    width: '100%', 
+    height: 280,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12, 
+    marginBottom: 12, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    overflow: 'hidden'
+  },
+
   itemImage: { width: '100%', height: '100%' },
-  imagePlaceholder: { width: '100%', height: 200, borderRadius: 12, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  imagePlaceholderText: { fontSize: 13, color: '#6B7280', fontWeight: '600' },
-  itemName: { fontSize: 17, fontWeight: '800', color: '#111827', marginBottom: 10 },
+
+  imagePlaceholder: { 
+    width: '100%', 
+    height: 280, 
+    borderRadius: 12, 
+    backgroundColor: '#F8FAFC', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    marginBottom: 12 
+  },
+  
+  imagePlaceholderText: { fontSize: 13, color: '#94A3B8', fontWeight: '600' },
+  itemName: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 12 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });

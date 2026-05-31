@@ -359,14 +359,14 @@ const styles = StyleSheet.create({
     fontSize: 15, 
     color: '#1F2937', 
     lineHeight: 26, 
-    fontWeight: '500' // 👈 600에서 400으로 빼서 눈의 피로도를 낮춤
+    fontWeight: '500'
   },
   
   outfitCard: { marginRight: 16, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', maxHeight: 600, justifyContent: 'space-between' }, 
   outfitCardHeader: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    gap: 6, // 아이콘과 텍스트 사이 간격
+    gap: 6,
     marginBottom: 12 
   },
 
@@ -377,10 +377,10 @@ const styles = StyleSheet.create({
   },
 
   outfitReasonBox: {
-    backgroundColor: '#F1F5F9', 
+    backgroundColor: '#F8FAFC',
     borderLeftWidth: 3,         
-    borderLeftColor: '#94A3B8', 
-    paddingHorizontal: 14,
+    borderLeftColor: '#3B82F6',
+    paddingHorizontal: 12,
     paddingVertical: 12,
     borderTopRightRadius: 8,
     borderBottomRightRadius: 8,
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   },
 
   outfitDescription: { 
-    fontSize: 14, 
+    fontSize: 13.5,
     color: '#334155',
     lineHeight: 22,
     fontWeight: '500'
