@@ -331,11 +331,13 @@ const styles = StyleSheet.create({
     marginBottom: 20 
   },
   tagRow: { 
-    width: '48%', // 화면의 절반씩 차지하게 설정 (2열 배치)
+    minWidth: '48%', // 화면의 절반씩 차지하게 설정 (2열 배치)
     flexDirection: 'column', // 가로 폭이 좁아지므로 라벨은 위, 뱃지는 아래로 쌓이게 배치
     alignItems: 'flex-start', 
-    marginBottom: 16 
+    marginBottom: 18, // 여백 살짝 조정
+    paddingRight: 8,
   },
+
   tagLabel: { 
     fontSize: 13, 
     color: '#6b7280', 
@@ -343,8 +345,18 @@ const styles = StyleSheet.create({
   },
   
   // 기본 태그 스타일
-  tagPill: { backgroundColor: '#f3f4f6', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 },
-  tagText: { color: '#374151', fontSize: 13, fontWeight: '600' },
+  tagPill: { 
+    backgroundColor: '#f3f4f6', 
+    borderRadius: 999, 
+    paddingVertical: 8,
+    paddingHorizontal: 14 
+  },
+
+  tagText: { 
+    color: '#374151', 
+    fontSize: 15, 
+    fontWeight: '600' 
+  },
 
   // ✅ 가성비 뱃지 추가 스타일
   goodCostPill: { backgroundColor: '#dcfce7', borderWidth: 1, borderColor: '#bbf7d0' },
