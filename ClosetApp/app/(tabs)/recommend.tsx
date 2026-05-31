@@ -85,7 +85,7 @@ export default function RecommendScreen() {
       const response = await api.get('/recommend/today', { params: { situation, address } });
 
       setRecommendContext({ situation, address });
-      setAiMessage(response.data.ai_message || '');;
+      setAiMessage(response.data.ai_message || '');
       
       // 3. 옷 매칭 로직 (기존과 동일)
       const matched = response.data.outfits.map((outfit: any) => {
@@ -145,9 +145,20 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <Text style={styles.title}>코디 추천</Text>
+      <View style={styles.headerTitleRow}>
+        <Text style={styles.title}>코디 추천</Text>
+        <Ionicons name="shirt" size={28} color="#111827" />
+      </View>
+      <Text style={styles.headerSubtitle}>오늘의 날씨와 외출 목적에 맞는 스타일링</Text>
+
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
+        
+        {/* 2. 변경된 섹션 타이틀 영역 */}
+        <View style={styles.sectionTitleRow}>
+          <Ionicons name="partly-sunny" size={22} color="#2563EB" />
+          <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
+        </View>
+        
         <View style={styles.inputBox}>
           <TextInput style={styles.textInput} value={situation} onChangeText={setSituation} placeholder="예: 데이트, 출근, 미팅" placeholderTextColor="#9CA3AF" />
         </View>
@@ -235,9 +246,12 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F4F6F8' },
   content: { padding: 16, paddingBottom: 40 },
-  title: { fontSize: 30, fontWeight: '800', color: '#111827', marginBottom: 20 },
+  title: { fontSize: 30, fontWeight: '800', color: '#111827', marginBottom: 4 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  headerSubtitle: { fontSize: 14, color: '#64748B', marginBottom: 20 },
   section: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, marginBottom: 20 },
-  sectionTitle: { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  sectionTitle: { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 0 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
   inputBox: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F1F5F9' },
   textInput: { fontSize: 16, color: '#111827', fontWeight: '600' },
   quickKeywordRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
