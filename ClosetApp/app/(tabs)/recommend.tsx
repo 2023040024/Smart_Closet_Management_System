@@ -202,8 +202,16 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
             </View>
 
             <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
-            {aiMessage && <View style={styles.aiMessageBox}><Text style={styles.aiMessageText}>💬 {aiMessage}</Text></View>}
-            
+            {aiMessage && (
+              <View style={styles.aiMessageBox}>
+                <View style={styles.aiMessageHeader}>
+                  <Ionicons name="sparkles" size={16} color="#4F46E5" />
+                  <Text style={styles.aiMessageTitle}>AI 스타일링 포인트</Text>
+                </View>
+                <Text style={styles.aiMessageText}>{aiMessage}</Text>
+              </View>
+            )}
+
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
@@ -214,9 +222,15 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
               {apiRecommendations.map((outfit, index) => (
                 <View key={index} style={[styles.outfitCard, { width: CARD_WIDTH }]}>
                   <View style={styles.outfitCardHeader}>
+                    <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
                     <Text style={styles.outfitCardTitle}>추천 코디 {index + 1}</Text>
                   </View>
-                  {outfit.reason && <Text style={styles.outfitDescription}>{outfit.reason}</Text>}
+
+                  {outfit.reason && (
+                    <View style={styles.outfitReasonBox}>
+                      <Text style={styles.outfitDescription}>{outfit.reason}</Text>
+                    </View>
+                  )}
                   
                   {/* 카드가 너무 길어지지 않게 ScrollView 안에 옷 목록 배치 */}
                   <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={{ flexGrow: 1, marginBottom: 16 }}>
@@ -266,13 +280,63 @@ const styles = StyleSheet.create({
   contextGroup: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
   contextGroupText: { fontSize: 14, fontWeight: '700', color: '#475569' },
 
-  aiMessageBox: { backgroundColor: '#EEF2FF', padding: 20, borderRadius: 16, marginBottom: 20 },
-  aiMessageText: { fontSize: 15, color: '#3730A3', lineHeight: 24, fontWeight: '600' },
+  aiMessageBox: { 
+    backgroundColor: '#F5F8FF', 
+    padding: 20, 
+    borderRadius: 16, 
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E0E7FF'
+  },
+  aiMessageHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    marginBottom: 8 
+  },
+  aiMessageTitle: { 
+    fontSize: 14, 
+    fontWeight: '800', 
+    color: '#4338CA' 
+  },
+  aiMessageText: { 
+    fontSize: 15, 
+    color: '#1F2937', 
+    lineHeight: 26, 
+    fontWeight: '500' // 👈 600에서 400으로 빼서 눈의 피로도를 낮춤
+  },
   
   outfitCard: { marginRight: 16, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', maxHeight: 600, justifyContent: 'space-between' }, 
-  outfitCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  outfitCardTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  outfitDescription: { fontSize: 14, color: '#64748B', marginBottom: 12, lineHeight: 22 },
+  outfitCardHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, // 아이콘과 텍스트 사이 간격
+    marginBottom: 12 
+  },
+
+  outfitCardTitle: { 
+    fontSize: 18, // 폰트 크기 살짝 조정
+    fontWeight: '800', 
+    color: '#111827' 
+  },
+
+  outfitReasonBox: {
+    backgroundColor: '#F1F5F9', // 아주 연한 회색으로 옷 카드와 구분
+    borderLeftWidth: 3,         // 왼쪽에만 선을 그어 답답함 해소
+    borderLeftColor: '#94A3B8', // 차분한 슬레이트 그레이 컬러
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderTopRightRadius: 8,    // 오른쪽만 살짝 둥글게
+    borderBottomRightRadius: 8,
+    marginBottom: 16
+  },
+
+  outfitDescription: { 
+    fontSize: 14, 
+    color: '#334155',
+    lineHeight: 22,
+    fontWeight: '500'
+  },
   
   // ✨ 착용하기 버튼 스타일 추가
   wearButton: { backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 'auto' },
