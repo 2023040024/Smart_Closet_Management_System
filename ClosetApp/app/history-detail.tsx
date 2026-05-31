@@ -33,21 +33,23 @@ export default function HistoryDetailScreen() {
 
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>날짜</Text>
-            <Text style={styles.sectionValue}>{params.date || '-'}</Text>
-          </View>
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>날짜</Text>
+              <Text style={styles.summaryValue}>{params.date || '-'}</Text>
+            </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>피드백 태그</Text>
-            <Text style={styles.sectionValue}>
-              {feedbackTags.length > 0 ? feedbackTags.join(' · ') : '없음'}
-            </Text>
-          </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>태그</Text>
+              <Text style={styles.summaryValue}>
+                {feedbackTags.length > 0 ? feedbackTags.join(' · ') : '없음'}
+              </Text>
+            </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>메모</Text>
-            <Text style={styles.sectionValue}>{params.memo || '메모 없음'}</Text>
+            <View style={styles.memoBox}>
+              <Text style={styles.summaryLabel}>메모</Text>
+              <Text style={styles.memoText}>{params.memo || '메모 없음'}</Text>
+            </View>
           </View>
 
           <View style={styles.section}>
@@ -56,20 +58,21 @@ export default function HistoryDetailScreen() {
             {clothes.length > 0 ? (
               clothes.map((cloth) => (
                 <View key={cloth.id} style={styles.clothCard}>
-                  <Text style={styles.clothCategory}>{cloth.category}</Text>
+                  {/* 1. 옷 이름을 가장 돋보이게 위로 배치 */}
                   <Text style={styles.clothName}>{cloth.name}</Text>
                   
-                  {/* ✅ Stashed changes: 옷 이름 아래에 이미지 표시 영역 유지 */}
+                  {/* 2. 카테고리와 색상을 깔끔한 뱃지로 묶음 */}
+                  <View style={styles.tagRow}>
+                    <Text style={styles.tagBadge}>{cloth.category}</Text>
+                    <Text style={styles.tagBadge}>{cloth.color || '색상 미상'}</Text>
+                  </View>
+                  
+                  {/* 3. 이미지는 가장 아래에 시원하게 배치 */}
                   <Image 
-                    source={{ 
-                      uri: cloth.imageUrl || 'https://via.placeholder.com/300x300?text=No+Image' 
-                    }} 
+                    source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/300x300?text=No+Image' }} 
                     style={styles.clothImage}
                     resizeMode="contain"
                   />
-
-                  {/* ✅ Updated upstream: 최신 main의 color 노출 기능도 함께 유지 */}
-                  <Text style={styles.clothColor}>색상: {cloth.color || '정보 없음'}</Text>
                 </View>
               ))
             ) : (
@@ -87,7 +90,44 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 40 },
   section: { backgroundColor: '#f7f7f7', borderRadius: 14, padding: 16, marginBottom: 12 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#555', marginBottom: 8 },
-  sectionValue: { fontSize: 16, color: '#111', lineHeight: 22 },
+  
+  summaryCard: { 
+    backgroundColor: '#f8f9fa', 
+    borderRadius: 14, 
+    padding: 18, 
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#f1f1f1'
+  },
+  summaryRow: { 
+    flexDirection: 'row', 
+    marginBottom: 12 
+  },
+  summaryLabel: { 
+    width: 70, 
+    fontSize: 14, 
+    fontWeight: '700', 
+    color: '#888' 
+  },
+  summaryValue: { 
+    flex: 1, 
+    fontSize: 15, 
+    color: '#222', 
+    fontWeight: '600' 
+  },
+  memoBox: { 
+    marginTop: 4, 
+    paddingTop: 16, 
+    borderTopWidth: 1, 
+    borderColor: '#eaeaea' 
+  },
+  memoText: { 
+    fontSize: 15, 
+    color: '#444', 
+    lineHeight: 22,
+    marginTop: 4
+  },
+
   clothCard: { 
     backgroundColor: '#fff', 
     borderRadius: 12, 
@@ -96,18 +136,25 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: '#ececec' 
   },
-  clothCategory: { fontSize: 12, color: '#888', marginBottom: 4 },
-  clothName: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 12 }, // ✅ 이미지와 간격을 위해 여백 추가
-  
-  /* ✅ 새로 추가된 이미지 스타일 */
+  clothName: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 12 },
+
+  tagRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
+  tagBadge: { 
+    backgroundColor: '#f3f4f6', 
+    color: '#374151', 
+    fontSize: 12, 
+    fontWeight: '600', 
+    paddingVertical: 4, 
+    paddingHorizontal: 8, 
+    borderRadius: 6 
+  },
+
   clothImage: {
     width: '100%',
-    height: 200, // 이미지가 시원하게 보이도록 높이 설정
+    height: 220, // 이미지가 시원하게 보이도록 높이 설정
     borderRadius: 8,
     backgroundColor: '#f9f9f9',
-    marginTop: 8, // 이미지 아래 색상 텍스트와의 간격
   },
-  
-  clothColor: { fontSize: 13, color: '#666' },
+
   emptyText: { fontSize: 14, color: '#777' },
 });

@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -14,7 +14,17 @@ import api from './_api';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
-// ✅ 빨간 줄 에러를 해결하기 위해 최상위에 situation, tpo 추가
+interface CareTip {
+  "세탁 및 관리": string;
+  "보관 방법": string;
+}
+
+interface TipResponse {
+  clothes_name: string;
+  material: string;
+  tip: CareTip | string;
+}
+
 type DetailApiItem = {
   id?: number;
   clothes_id?: number;
@@ -24,6 +34,7 @@ type DetailApiItem = {
   purchase_price?: number | null;
   price?: number | null;
   last_worn_date?: string | null;
+  wear_count?: number; // ✅ 가성비 계산을 위한 착용 횟수 필드 추가
   situation?: string | null; 
   tpo?: string | null;
   tags?: {
@@ -47,6 +58,7 @@ type DetailApiItem = {
   color?: string;
   season?: string;
   style?: string;
+  material?: string; 
 };
 
 function resolveImageUri(image?: string | null) {
@@ -57,12 +69,18 @@ function resolveImageUri(image?: string | null) {
   return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
 }
 
+// 뱃지 하이라이트 스타일을 위한 타입 정의
+type HighlightType = 'none' | 'good' | 'normal_cost' | 'warning';
+
 export default function DetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [item, setItem] = useState<DetailApiItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const [tipData, setTipData] = useState<TipResponse | null>(null);
+  const [tipLoading, setTipLoading] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     if (!id) {
@@ -109,21 +127,67 @@ export default function DetailScreen() {
     }, [fetchDetail])
   );
 
+  useEffect(() => {
+    const fetchCareTips = async () => {
+      const actualId = item?.id ?? item?.clothes_id;
+      if (!actualId) return;
+
+      try {
+        setTipLoading(true);
+        const response = await api.get<TipResponse>(`/clothes/${actualId}/tips`);
+        setTipData(response.data);
+      } catch (error) {
+        console.error("소재별 관리 팁 로드 실패:", error);
+        setTipData(null);
+      } finally {
+        setTipLoading(false);
+      }
+    };
+
+    fetchCareTips();
+  }, [item?.id, item?.clothes_id]);
+
   const visibleTags = useMemo(() => {
     if (!item) return [];
 
     const s = item.tags || {};
     const fitValue = s.top_fit ?? s.topFit ?? s.bottom_fit ?? s.bottomFit ?? '';
-    
-    // ✅ 에러 없이 안전하게 호출 가능
     const tpoValue = s.situation ?? s.tpo ?? item.situation ?? item.tpo ?? '';
     
+    // 구매가 및 누적 착용 횟수 세팅
     const rawPrice = item.price ?? item.purchase_price;
+    const wearCount = item.wear_count ?? 0;
+    
     const priceValue = (rawPrice !== null && rawPrice !== undefined)
       ? `${Number(rawPrice).toLocaleString()}원` 
       : '';
 
-    return [
+    // ✅ 가성비(Cost per wear) 산출 로직 및 ZeroDivision 방어
+    let costPerWearStr = '';
+    let costHighlight: HighlightType = 'none';
+    let showCost = false;
+
+    if (rawPrice !== null && rawPrice !== undefined && Number(rawPrice) > 0) {
+      showCost = true;
+      if (wearCount === 0) {
+        // 착용 횟수가 0일 경우 (에러 방어)
+        costPerWearStr = '미착용 (계산 불가)';
+        costHighlight = 'warning';
+      } else {
+        // 정상 나눗셈 계산
+        const costValue = Math.floor(Number(rawPrice) / wearCount);
+        costPerWearStr = `₩${costValue.toLocaleString()} / 회`;
+        
+        // 1회당 비용이 10,000원 이하이면 초록색 뱃지로 '가성비 좋음' 강조
+        if (costValue <= 10000) {
+          costHighlight = 'good';
+        } else {
+          costHighlight = 'normal_cost';
+        }
+      }
+    }
+
+    const tagsArray: Array<{ label: string; value: string | null | undefined; highlight?: HighlightType }> = [
       { label: '이름', value: item.name },
       { label: '카테고리', value: s.category ?? item.category },
       { label: '색상', value: s.color ?? item.color },
@@ -132,13 +196,18 @@ export default function DetailScreen() {
       { label: '스타일', value: s.style ?? item.style },
       { label: '분위기', value: s.mood },
       { label: '핏', value: fitValue },
-      { label: '소재', value: s.material },
+      { label: '소재', value: s.material ?? item.material },
       { label: '두께', value: s.thickness },
       { label: '포인트', value: s.point },
       { label: 'TPO', value: tpoValue },
+      { label: '누적 착용', value: `${wearCount}회` }, // 누적 착용 횟수 표기
       { label: '구매가', value: priceValue },
+      // 조건부 가성비 항목 추가
+      ...(showCost ? [{ label: '가성비', value: costPerWearStr, highlight: costHighlight }] : []),
       { label: '마지막 착용일', value: item.last_worn_date },
-    ].filter(
+    ];
+
+    return tagsArray.filter(
       (tag) =>
         tag.value !== undefined &&
         tag.value !== null &&
@@ -149,7 +218,7 @@ export default function DetailScreen() {
   if (loading && !item) {
     return (
       <View style={styles.emptyContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#111827" />
         <Text style={styles.emptyText}>상세 정보를 불러오는 중...</Text>
       </View>
     );
@@ -181,16 +250,56 @@ export default function DetailScreen() {
         <Text style={styles.emptyTagText}>표시할 태그가 없습니다.</Text>
       ) : (
         <View style={styles.tagList}>
-          {visibleTags.map((tag) => (
-            <View key={`${tag.label}-${tag.value}`} style={styles.tagRow}>
-              <Text style={styles.tagLabel}>{tag.label}</Text>
-              <View style={styles.tagPill}>
-                <Text style={styles.tagText}>{String(tag.value)}</Text>
+          {visibleTags.map((tag) => {
+            // ✅ 가성비 뱃지 스타일 분기 처리
+            let pillStyle: any[] = [styles.tagPill];
+            let textStyle: any[] = [styles.tagText];
+
+            if (tag.highlight === 'good') {
+              pillStyle.push(styles.goodCostPill);
+              textStyle.push(styles.goodCostText);
+            } else if (tag.highlight === 'normal_cost') {
+              pillStyle.push(styles.normalCostPill);
+              textStyle.push(styles.normalCostText);
+            } else if (tag.highlight === 'warning') {
+              pillStyle.push(styles.warningCostPill);
+              textStyle.push(styles.warningCostText);
+            }
+
+            return (
+              <View key={`${tag.label}-${tag.value}`} style={styles.tagRow}>
+                <Text style={styles.tagLabel}>{tag.label}</Text>
+                <View style={pillStyle}>
+                  <Text style={textStyle}>{String(tag.value)}</Text>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
+
+      {tipLoading ? (
+        <ActivityIndicator size="small" color="#111827" style={{ marginBottom: 20 }} />
+      ) : tipData ? (
+        <View style={styles.tipContainer}>
+          <Text style={styles.tipTitle}>💡 {tipData.material} 소재 관리 팁</Text>
+          
+          {typeof tipData.tip === 'object' ? (
+            <>
+              <View style={styles.tipBox}>
+                <Text style={styles.tipLabel}>🧼 세탁 및 관리</Text>
+                <Text style={styles.tipValueText}>{tipData.tip["세탁 및 관리"]}</Text>
+              </View>
+              <View style={styles.tipBox}>
+                <Text style={styles.tipLabel}>📦 보관 방법</Text>
+                <Text style={styles.tipValueText}>{tipData.tip["보관 방법"]}</Text>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.errorTipText}>{tipData.tip}</Text>
+          )}
+        </View>
+      ) : null}
 
       <TouchableOpacity
         style={styles.button}
@@ -215,11 +324,57 @@ const styles = StyleSheet.create({
   imageFallbackText: { color: '#6b7280', fontSize: 15 },
   sectionTitle: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
   emptyTagText: { color: '#6b7280', marginBottom: 20 },
-  tagList: { marginBottom: 20 },
-  tagRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  tagLabel: { width: 88, fontSize: 14, color: '#6b7280' },
-  tagPill: { flexShrink: 1, backgroundColor: '#111827', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12 },
-  tagText: { color: '#fff', fontSize: 14 },
+  tagList: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'space-between', 
+    marginBottom: 20 
+  },
+  tagRow: { 
+    minWidth: '48%', // 화면의 절반씩 차지하게 설정 (2열 배치)
+    flexDirection: 'column', // 가로 폭이 좁아지므로 라벨은 위, 뱃지는 아래로 쌓이게 배치
+    alignItems: 'flex-start', 
+    marginBottom: 18, // 여백 살짝 조정
+    paddingRight: 8,
+  },
+
+  tagLabel: { 
+    fontSize: 13, 
+    color: '#6b7280', 
+    marginBottom: 6 
+  },
+  
+  // 기본 태그 스타일
+  tagPill: { 
+    backgroundColor: '#f3f4f6', 
+    borderRadius: 999, 
+    paddingVertical: 8,
+    paddingHorizontal: 14 
+  },
+
+  tagText: { 
+    color: '#374151', 
+    fontSize: 15, 
+    fontWeight: '600' 
+  },
+
+  // ✅ 가성비 뱃지 추가 스타일
+  goodCostPill: { backgroundColor: '#dcfce7', borderWidth: 1, borderColor: '#bbf7d0' },
+  goodCostText: { color: '#166534', fontWeight: '800' }, // 뽕 뽑은 가성비 좋은 옷 (초록)
+  
+  normalCostPill: { backgroundColor: '#e0e7ff', borderWidth: 1, borderColor: '#c7d2fe' },
+  normalCostText: { color: '#3730a3', fontWeight: '700' }, // 일반 가성비 (파랑)
+  
+  warningCostPill: { backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb' },
+  warningCostText: { color: '#6b7280', fontStyle: 'italic' }, // 미착용 상태 (회색)
+
+  tipContainer: { backgroundColor: '#f9fafb', padding: 16, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: '#e5e7eb' },
+  tipTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, color: '#111827' },
+  tipBox: { marginBottom: 12 },
+  tipLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 4 },
+  tipValueText: { fontSize: 14, color: '#4b5563', lineHeight: 20 },
+  errorTipText: { fontSize: 14, color: '#6b7280', fontStyle: 'italic', lineHeight: 20 },
+
   button: { marginTop: 8, backgroundColor: '#111827', paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });
