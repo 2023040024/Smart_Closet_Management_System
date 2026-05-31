@@ -188,26 +188,35 @@ export default function AnalysisScreen() {
             <View style={styles.dashboardCard}>
               <Text style={styles.dashboardTitle}>📊 이달의 옷장 다이어트 요약</Text>
               
-              {/* 1-1. 옷장 생태계 활성도 (도넛 차트 뷰) */}
-              <View style={styles.chartContainer}>
+              {/* ✨ 차트와 범례를 가로로 나란히 배치! */}
+              <View style={styles.chartRow}>
+                {/* 왼쪽: 크기를 줄인 미니 도넛 차트 */}
                 <View style={styles.donutPlaceholder}>
                   <Text style={styles.centerRateText}>{reportData.ecosystem.activity_rate}%</Text>
                 </View>
-              </View>
-              
-              <View style={styles.legendContainer}>
-                <Text style={styles.legendText}>
-                  🔥 활성 의류: <Text style={styles.boldText}>{reportData.ecosystem.active_clothes}</Text>벌
-                </Text>
-                <Text style={styles.legendText}>
-                  💤 방치 의류: <Text style={styles.boldText}>{reportData.ecosystem.inactive_clothes}</Text>벌
-                </Text>
+
+                {/* 오른쪽: 활성/방치 의류 범례 리스트 */}
+                <View style={styles.legendColumn}>
+                  <View style={styles.legendItem}>
+                    <Text style={styles.legendIcon}>🔥</Text>
+                    <View>
+                      <Text style={styles.legendLabel}>활성 의류</Text>
+                      <Text style={styles.legendValue}><Text style={styles.boldText}>{reportData.ecosystem.active_clothes}</Text>벌</Text>
+                    </View>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <Text style={styles.legendIcon}>💤</Text>
+                    <View>
+                      <Text style={styles.legendLabel}>방치 의류</Text>
+                      <Text style={styles.legendValue}><Text style={styles.boldText}>{reportData.ecosystem.inactive_clothes}</Text>벌</Text>
+                    </View>
+                  </View>
+                </View>
               </View>
 
-              {/* 카드 내부 구분선 */}
               <View style={styles.cardDivider} />
 
-              {/* 1-2. 과부하 지수 신호등 뱃지 (같은 카드 안에 밀착) */}
+              {/* 1-2. 과부하 지수 신호등 뱃지 */}
               <View style={[styles.statusBadge, { backgroundColor: badgeStyle.bg }]}>
                 <Text style={[styles.badgeText, { color: badgeStyle.text }]}>
                   {reportData.overload.status_message}
@@ -270,21 +279,39 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   dashboardTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 16 },
-  chartContainer: { alignItems: 'center', marginBottom: 16 },
+  chartRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 8,
+    marginBottom: 4 
+  },
+  
+  // 차트 크기 140 -> 100으로 축소
   donutPlaceholder: { 
-    width: 140, 
-    height: 140, 
-    borderRadius: 70, 
-    borderWidth: 14, 
-    borderColor: '#e5e7eb', // 비활성 옷(회색)을 상징하는 테두리
-    borderTopColor: '#111827', // 활성 옷을 상징하는 일부 테두리 색상
+    width: 100, 
+    height: 100, 
+    borderRadius: 50, 
+    borderWidth: 10, 
+    borderColor: '#e5e7eb',
+    borderTopColor: '#111827',
     justifyContent: 'center', 
     alignItems: 'center' 
   },
-  centerRateText: { fontSize: 24, fontWeight: '800', color: '#111827' },
-  legendContainer: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: '#f9fafb', padding: 14, borderRadius: 12 },
-  legendText: { fontSize: 13, color: '#4b5563' },
-  boldText: { fontWeight: '700', color: '#111827' },
+  centerRateText: { fontSize: 18, fontWeight: '800', color: '#111827' }, // 글씨 크기도 24 -> 18로 축소
+  
+  // 우측 범례 세로 정렬 스타일
+  legendColumn: { 
+    flex: 1, 
+    marginLeft: 24, 
+    justifyContent: 'center', 
+    gap: 12 // 범례 사이 간격
+  },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  legendIcon: { fontSize: 20 },
+  legendLabel: { fontSize: 12, color: '#6b7280', marginBottom: 2 },
+  legendValue: { fontSize: 15, color: '#4b5563' },
+  boldText: { fontWeight: '800', color: '#111827' },
 
   cardDivider: { height: 1, backgroundColor: '#f3f4f6', marginVertical: 16 },
   
