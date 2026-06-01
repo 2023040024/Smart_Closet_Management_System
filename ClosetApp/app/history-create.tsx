@@ -1,3 +1,4 @@
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -5,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -22,8 +24,6 @@ type ClothesApiItem = { clothes_id?: number; id?: number; name?: string; categor
 const tpoOptions = ['데일리', '비즈니스', '면접', '결혼식', '장례식', '운동', '데이트', '모임', '여행'];
 const tpoSuitabilityOptions = ['잘 어울림', '보통', '안 어울림']; 
 const temperatureOptions = ['추움', '적당함', '더움']; 
-
-function formatToday() { return new Date().toISOString().slice(0, 10); }
 
 function normalizeCategory(category?: string) {
   const value = (category || '').trim().toLowerCase();
@@ -49,16 +49,27 @@ export default function HistoryCreateScreen() {
 
   const isEditMode = params.editMode === 'true';
   
-  // 서버 전송용 원본 날짜 (YYYY-MM-DD)
-  const rawDate = isEditMode && params.editDate ? params.editDate : formatToday();
-  
-  // 화면 표시용 예쁜 날짜 (YYYY. MM. DD (요일))
-  let uiDate = rawDate;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
-    const dateObj = new Date(rawDate);
-    const days = ['일', '월', '화', '수', '목', '금', '토'];
-    uiDate = `${rawDate.replace(/-/g, '. ')} (${days[dateObj.getDay()]})`;
-  }
+  // ✨ 날짜 관련 상태 (DatePicker용)
+  const initialDate = (isEditMode && params.editDate) ? new Date(params.editDate) : new Date();
+  const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const handleDateChange = (event: any, date?: Date) => {
+    // 안드로이드는 선택 후 자동으로 닫히고, iOS는 모달을 유지해야 할 수 있음
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
+  // UI에 보여질 예쁜 날짜 포맷 생성
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  const yyyy = selectedDate.getFullYear();
+  const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+  const dd = String(selectedDate.getDate()).padStart(2, '0');
+  const uiDate = `${yyyy}. ${mm}. ${dd} (${days[selectedDate.getDay()]})`;
 
   const [clothesList, setClothesList] = useState<ClothingItem[]>([]);
   const [selectedClothes, setSelectedClothes] = useState<string[]>([]);
@@ -156,18 +167,13 @@ export default function HistoryCreateScreen() {
 
   const toggleCloth = (id: string, category: string) => {
     setSelectedClothes((prev) => {
-      // 1. 이미 선택된 옷을 다시 누르면 선택 해제
       if (prev.includes(id)) {
         return prev.filter((itemId) => itemId !== id);
       }
-      
-      // 2. 새로운 옷을 선택한 경우, 같은 카테고리의 다른 옷이 이미 선택되어 있다면 제거
       const filteredPrev = prev.filter((prevId) => {
         const prevCloth = clothesList.find((c) => c.id === prevId);
         return prevCloth?.category !== category;
       });
-      
-      // 3. 같은 카테고리의 기존 옷이 지워진 상태에서 새 옷 추가
       return [...filteredPrev, id];
     });
   };
@@ -198,16 +204,17 @@ export default function HistoryCreateScreen() {
 
     try {
       setSaving(true);
+      
+      // ✨ 서버 전송용 날짜 포맷 (YYYY-MM-DD)
+      const submitDate = `${yyyy}-${mm}-${dd}`;
 
       const payload = selectedClothes.map((clothesId) => {
         const numericId = Number(clothesId);
-        if (isNaN(numericId)) {
-          throw new Error(`유효하지 않은 옷 ID가 포함되어 있습니다: ${clothesId}`);
-        }
+        if (isNaN(numericId)) throw new Error(`유효하지 않은 옷 ID: ${clothesId}`);
 
         return {
           clothes_id: numericId,
-          worn_date: rawDate, 
+          worn_date: submitDate, 
           tpo: tpo && tpo.trim() !== "" ? tpo.trim() : null,
           style: null,
           mood: null,
@@ -230,11 +237,7 @@ export default function HistoryCreateScreen() {
       }
     } catch (error: any) {
       console.error('착용 기록 저장 실패:', error);
-      if (error.response && error.response.data) {
-        Alert.alert('저장 실패 (422)', JSON.stringify(error.response.data.detail));
-      } else {
-        Alert.alert('저장 실패', error.message || '서버 오류가 발생했습니다.');
-      }
+      Alert.alert('저장 실패', error.response?.data?.detail || error.message || '서버 오류가 발생했습니다.');
     } finally {
       setSaving(false);
     }
@@ -252,16 +255,32 @@ export default function HistoryCreateScreen() {
         ) : (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             
-            {/* ✨ 날짜 섹션: 달력 아이콘과 전용 박스로 강조 */}
+            {/* ✨ 날짜 선택 영역: 터치 시 팝업 띄우기 */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>날짜</Text>
-              <View style={styles.dateBox}>
+              <Pressable style={styles.dateBox} onPress={() => setShowDatePicker(true)}>
                 <Ionicons name="calendar-clear-outline" size={24} color="#4F46E5" />
                 <Text style={styles.dateText}>{uiDate}</Text>
-              </View>
+              </Pressable>
             </View>
 
-            {/* ✨ 입은 옷 섹션: 이미지 썸네일 카드로 개편 */}
+            {/* DatePicker 달력 팝업 렌더링 */}
+            {showDatePicker && (
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
+            )}
+            
+            {/* iOS에서 모달을 직접 닫는 버튼 (필요 시) */}
+            {showDatePicker && Platform.OS === 'ios' && (
+              <Pressable style={styles.iosDatePickerDone} onPress={() => setShowDatePicker(false)}>
+                <Text style={styles.iosDatePickerDoneText}>날짜 선택 완료</Text>
+              </Pressable>
+            )}
+
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>오늘 입은 옷</Text>
               {isUsingMockData && <Text style={styles.mockWarningText}>⚠️ 서버 연결 안됨 (더미 데이터 표시 중)</Text>}
@@ -286,7 +305,6 @@ export default function HistoryCreateScreen() {
                                 style={styles.clothImage} 
                                 resizeMode="contain" 
                               />
-                              {/* 선택 시 나타나는 보라색 반투명 오버레이와 체크 표시 */}
                               {isSelected && (
                                 <View style={styles.checkOverlay}>
                                   <Ionicons name="checkmark-circle" size={28} color="#fff" />
@@ -307,7 +325,6 @@ export default function HistoryCreateScreen() {
               )}
             </View>
 
-            {/* ✨ 폼 섹션: 넓고 깔끔한 디자인 */}
             <View style={styles.section}><Text style={styles.sectionTitle}>TPO (상황)</Text>{renderChips(tpoOptions, tpo, setTpo)}</View>
             <View style={styles.section}><Text style={styles.sectionTitle}>TPO 적합도</Text>{renderChips(tpoSuitabilityOptions, tpoSuitability, setTpoSuitability)}</View>
             <View style={styles.section}><Text style={styles.sectionTitle}>체감온도</Text>{renderChips(temperatureOptions, temperature, setTemperature)}</View>
@@ -340,31 +357,42 @@ const styles = StyleSheet.create({
   section: { marginBottom: 32 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 14 },
   
-  // ✨ 날짜 강조 영역
   dateBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, gap: 10, borderWidth: 1, borderColor: '#E2E8F0' },
   dateText: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
+  
+  iosDatePickerDone: { alignItems: 'center', backgroundColor: '#E2E8F0', padding: 12, borderRadius: 8, marginBottom: 20 },
+  iosDatePickerDoneText: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
   
   categoryBlock: { marginBottom: 20 },
   subTitle: { fontSize: 14, fontWeight: '700', color: '#64748B', marginBottom: 12 },
   
-  // ✨ 옷 이미지 썸네일 카드 영역
   clothRowScroll: { flexDirection: 'row', gap: 12, paddingBottom: 4, paddingRight: 16 },
   clothCard: { width: 90, alignItems: 'center' },
   imageContainer: { width: 90, height: 90, borderRadius: 12, backgroundColor: '#F1F5F9', marginBottom: 8, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
-  imageContainerSelected: { borderColor: '#4F46E5' }, // 선택 시 보라색 테두리
+  imageContainerSelected: { borderColor: '#4F46E5' }, 
   clothImage: { width: '90%', height: '90%' },
   checkOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(79, 70, 229, 0.5)', justifyContent: 'center', alignItems: 'center' },
   clothName: { fontSize: 13, color: '#475569', textAlign: 'center', fontWeight: '500' },
   clothNameSelected: { color: '#4F46E5', fontWeight: '700' },
   
-  // ✨ 태그(칩) 선택 영역
+  // ✨ 피드백 칩(태그) 크기 축소 영역
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0' },
+  chip: { 
+    paddingHorizontal: 14, // 기존 16 -> 14로 축소
+    paddingVertical: 8,    // 기존 10 -> 8로 축소
+    borderRadius: 18,      
+    backgroundColor: '#FFFFFF', 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0' 
+  },
   chipSelected: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
-  chipText: { fontSize: 14, color: '#64748B', fontWeight: '600' },
+  chipText: { 
+    fontSize: 13, // 기존 14 -> 13으로 축소
+    color: '#64748B', 
+    fontWeight: '600' 
+  },
   chipTextSelected: { color: '#FFFFFF' },
   
-  // ✨ 메모 입력 영역
   input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 16, minHeight: 120, textAlignVertical: 'top', fontSize: 15, color: '#334155', lineHeight: 22 },
   
   saveButton: { marginTop: 10, backgroundColor: '#111', paddingVertical: 16, borderRadius: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
