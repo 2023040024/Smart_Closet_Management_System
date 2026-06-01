@@ -352,16 +352,23 @@ export default function HistoryScreen() {
             <View style={styles.card}>
               <Text style={styles.date}>{item.date}</Text>
 
+              {/* ✨ 1. 카테고리를 위로 올리고, 사진 잘림(Crop) 현상을 해결한 스크롤 영역 */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clothesScroll}>
                 {clothes.length > 0 ? (
                   clothes.map((cloth) => (
                     <View key={cloth.id} style={styles.clothThumbnailBox}>
-                      <Image 
-                        source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/100?text=No+Img' }} 
-                        style={styles.clothThumbnailImage} 
-                        resizeMode="cover"
-                      />
+                      {/* 카테고리를 사진 위로 배치 */}
                       <Text style={styles.clothCategory}>{cloth.category}</Text>
+                      
+                      {/* 사진이 잘리지 않도록 래퍼로 감싸고 resizeMode="contain" 적용 */}
+                      <View style={styles.imageWrapper}>
+                        <Image 
+                          source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/100?text=No+Img' }} 
+                          style={styles.clothThumbnailImage} 
+                          resizeMode="contain" 
+                        />
+                      </View>
+                      
                       <Text style={styles.clothName} numberOfLines={1}>{cloth.name}</Text>
                     </View>
                   ))
@@ -372,8 +379,17 @@ export default function HistoryScreen() {
                 )}
               </ScrollView>
 
-              <Text style={styles.tags}>{tagText}</Text>
-              <Text style={styles.memo}>{item.memo || '메모 없음'}</Text>
+              {/* ✨ 2. 태그와 메모를 은은한 회색 박스로 묶고 아이콘 추가 */}
+              <View style={styles.metaContainer}>
+                <View style={styles.metaRow}>
+                  <Ionicons name="pricetag" size={14} color="#3B82F6" />
+                  <Text style={styles.tagsText}>{tagText}</Text>
+                </View>
+                <View style={styles.metaRow}>
+                  <Ionicons name="chatbubble-ellipses" size={14} color="#10B981" />
+                  <Text style={styles.memoText}>{item.memo || '메모 없음'}</Text>
+                </View>
+              </View>
 
               <View style={styles.actionRow}>
                 <Pressable style={styles.actionButton} onPress={() => handleDetailPress(item)} disabled={deletingId === item.id}>
@@ -420,21 +436,37 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#f7f7f7', borderRadius: 14, padding: 16, marginBottom: 12 },
   date: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 10 },
   
-  clothesScroll: { gap: 14, paddingBottom: 12 }, // 사진이 커진 만큼 카드 사이 간격도 12 -> 14로 여유 있게
-  clothThumbnailBox: { width: 100, alignItems: 'center' }, // 너비 80 -> 100으로 확대
-  clothThumbnailImage: { 
-    width: 100, 
-    height: 100, // 높이도 80 -> 100으로 확대하여 큼직하게!
+  // ✨ 옷 이미지 썸네일 관련 스타일 모음
+  clothesScroll: { gap: 14, paddingBottom: 12 },
+  clothThumbnailBox: { width: 110, alignItems: 'center' },
+  clothCategory: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 6 },
+  imageWrapper: { 
+    width: 110, 
+    height: 110, 
+    backgroundColor: '#F1F5F9', 
     borderRadius: 12, 
-    backgroundColor: '#eaeaea', 
-    marginBottom: 8 
+    marginBottom: 8, 
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
-  clothCategory: { fontSize: 12, color: '#888', marginBottom: 4 }, // 글씨도 11 -> 12로 살짝 키움
-  clothName: { fontSize: 13, fontWeight: '600', color: '#222', textAlign: 'center' }, // 글씨 12 -> 13으로 키움
+  clothThumbnailImage: { width: '90%', height: '90%' }, 
+  clothName: { fontSize: 13, fontWeight: '600', color: '#1E293B', textAlign: 'center' },
   clothBox: { minHeight: 72, backgroundColor: '#fff', borderRadius: 10, padding: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#eee' },
   
-  tags: { fontSize: 14, color: '#444', marginBottom: 6 },
-  memo: { fontSize: 14, color: '#666' },
+  // ✨ 태그/메모 스타일
+  metaContainer: { 
+    backgroundColor: '#F8FAFC', 
+    padding: 12, 
+    borderRadius: 12, 
+    gap: 8, 
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9'
+  },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tagsText: { fontSize: 13, fontWeight: '700', color: '#334155' },
+  memoText: { fontSize: 13, color: '#475569', lineHeight: 20 },
   
   actionRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
   actionButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
