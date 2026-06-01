@@ -25,6 +25,11 @@ export default function HistoryDetailScreen() {
     ? JSON.parse(params.clothes)
     : [];
 
+  clothes.sort((a, b) => {
+    const order: Record<string, number> = { '아우터': 1, '상의': 2, '하의': 3, '신발': 4, '악세사리': 5, '기타': 6 };
+    return (order[a.category] || 99) - (order[b.category] || 99);
+  });
+  
   const feedbackTags = [params.tpo, params.tpoSuitability, params.mood].filter(Boolean);
 
   let displayDate = params.date || '-';

@@ -345,7 +345,12 @@ export default function HistoryScreen() {
         data={groupedHistoryData}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
-          const clothes = getClothesByIds(item.clothesIds);
+          // ✨ 카테고리 순서(아우터 > 상의 > 하의 > 신발 > 악세사리 > 기타)대로 정렬
+          const clothes = getClothesByIds(item.clothesIds).sort((a, b) => {
+            const order: Record<string, number> = { '아우터': 1, '상의': 2, '하의': 3, '신발': 4, '악세사리': 5, '기타': 6 };
+            return (order[a.category] || 99) - (order[b.category] || 99);
+          });
+          
           const tagText = [item.tpo, item.tpoSuitability, item.mood].filter((v) => v && v.trim() !== '').join(' · ') || '태그 없음';
           
           let displayDate = item.date;
@@ -360,7 +365,7 @@ export default function HistoryScreen() {
             <View style={styles.card}>
               <Text style={styles.date}>{displayDate}</Text>
 
-              {/* ✨ 1. 카테고리를 위로 올리고, 사진 잘림(Crop) 현상을 해결한 스크롤 영역 */}
+              {/* 1. 카테고리를 위로 올리고, 사진 잘림(Crop) 현상을 해결한 스크롤 영역 */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clothesScroll}>
                 {clothes.length > 0 ? (
                   clothes.map((cloth) => (
@@ -387,7 +392,7 @@ export default function HistoryScreen() {
                 )}
               </ScrollView>
 
-              {/* ✨ 2. 태그와 메모를 은은한 회색 박스로 묶고 아이콘 추가 */}
+              {/* 2. 태그와 메모를 은은한 회색 박스로 묶고 아이콘 추가 */}
               <View style={styles.metaContainer}>
                 <View style={styles.metaRow}>
                   <Ionicons name="pricetag" size={14} color="#3B82F6" />
@@ -444,7 +449,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#f7f7f7', borderRadius: 14, padding: 16, marginBottom: 12 },
   date: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 10 },
   
-  // ✨ 옷 이미지 썸네일 관련 스타일 모음
+  // 옷 이미지 썸네일 관련 스타일 모음
   clothesScroll: { gap: 14, paddingBottom: 12 },
   clothThumbnailBox: { width: 110, alignItems: 'center' },
   clothCategory: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 6 },
@@ -462,7 +467,7 @@ const styles = StyleSheet.create({
   clothName: { fontSize: 13, fontWeight: '600', color: '#1E293B', textAlign: 'center' },
   clothBox: { minHeight: 72, backgroundColor: '#fff', borderRadius: 10, padding: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#eee' },
   
-  // ✨ 태그/메모 스타일
+  // 태그/메모 스타일
   metaContainer: { 
     backgroundColor: '#F8FAFC', 
     padding: 12, 
