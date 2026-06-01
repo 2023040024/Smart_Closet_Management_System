@@ -36,41 +36,24 @@ function normalizeCategory(category?: string) {
 }
 
 export default function HistoryCreateScreen() {
-  // ✨ editHistoryIds 파라미터 추가
   const params = useLocalSearchParams<{
-    editMode?: string;
-    editId?: string;
-    editDate?: string;
-    editMemo?: string;
-    editTpo?: string;
-    editTpoSuitability?: string; 
-    editTemperature?: string;
-    editClothes?: string;
-    editHistoryIds?: string; 
+    editMode?: string; editId?: string; editDate?: string; editMemo?: string;
+    editTpo?: string; editTpoSuitability?: string; editTemperature?: string;
+    editClothesIds?: string; editClothes?: string; editHistoryIds?: string; 
   }>();
 
   const isEditMode = params.editMode === 'true';
-  
-  // 날짜 관련 상태 (DatePicker용)
   const initialDate = (isEditMode && params.editDate) ? new Date(params.editDate) : new Date();
+  
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleDateChange = (event: any, date?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-
-    if (event.type === 'dismissed') {
-      return;
-    }
-
-    if (date) {
-      setSelectedDate(date);
-    }
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (event.type === 'dismissed') return;
+    if (date) setSelectedDate(date);
   };
 
-  // UI에 보여질 날짜 포맷 (YYYY. MM. DD (요일))
   const days = ['일', '월', '화', '수', '목', '금', '토'];
   const yyyy = selectedDate.getFullYear();
   const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
@@ -93,21 +76,26 @@ export default function HistoryCreateScreen() {
       if (params.editMemo) setMemo(params.editMemo);
       if (params.editTpo) setTpo(params.editTpo);
       if (params.editTpoSuitability) setTpoSuitability(params.editTpoSuitability); 
+      if (params.editTemperature) setTemperature(params.editTemperature === '적당' ? '적당함' : params.editTemperature);
       
-      if (params.editTemperature) {
-        setTemperature(params.editTemperature === '적당' ? '적당함' : params.editTemperature);
-      }
-      
-      if (params.editClothes) {
-        try {
-          const parsedClothes: ClothingItem[] = JSON.parse(params.editClothes);
-          setSelectedClothes(parsedClothes.map((cloth) => String(cloth.id)));
-        } catch (e) {
-          console.error('옷 데이터 파싱 에러:', e);
+      // ✨ 파라미터 호환성을 완벽하게 처리하여 무조건 체크 표시가 복구되도록 수정
+      try {
+        let idsToSelect: string[] = [];
+        if (params.editClothesIds) {
+          const parsedIds = JSON.parse(params.editClothesIds);
+          idsToSelect = parsedIds.map(String);
+        } else if (params.editClothes) {
+          const parsedClothes = JSON.parse(params.editClothes);
+          idsToSelect = parsedClothes.map((cloth: any) => String(cloth.id));
         }
+        if (idsToSelect.length > 0) {
+          setSelectedClothes(idsToSelect);
+        }
+      } catch (e) {
+        console.error('옷 선택 복구 에러:', e);
       }
     }
-  }, [isEditMode, params.editMemo, params.editTpo, params.editTpoSuitability, params.editTemperature, params.editClothes]);
+  }, [isEditMode, params.editMemo, params.editTpo, params.editTpoSuitability, params.editTemperature, params.editClothesIds, params.editClothes]);
 
   useEffect(() => {
     const fetchClothes = async () => {
@@ -118,43 +106,26 @@ export default function HistoryCreateScreen() {
         const mapped: ClothingItem[] = data.map((item, index) => {
           const rawId = item.clothes_id ?? item.id;
           if (rawId === undefined || rawId === null) return null;
-          const rawCategory = item.category ?? item.tags?.category;
-          const rawColor = item.color ?? item.tags?.color ?? '';
-          
           const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
           const rawImageUrl = item.image_url;
-          const fullImageUrl = rawImageUrl 
-            ? (rawImageUrl.startsWith('http') ? rawImageUrl : `${API_BASE_URL}${rawImageUrl}`)
-            : undefined;
-
           return { 
-            id: String(rawId), 
-            name: item.name?.trim() || `옷 ${index + 1}`, 
-            category: normalizeCategory(rawCategory), 
-            color: rawColor,
-            imageUrl: fullImageUrl 
+            id: String(rawId), name: item.name?.trim() || `옷 ${index + 1}`, 
+            category: normalizeCategory(item.category ?? item.tags?.category), color: item.color ?? item.tags?.color ?? '',
+            imageUrl: rawImageUrl ? (rawImageUrl.startsWith('http') ? rawImageUrl : `${API_BASE_URL}${rawImageUrl}`) : undefined 
           };
         }).filter(Boolean) as ClothingItem[];
 
         if (mapped.length === 0) {
           setIsUsingMockData(true);
-          setClothesList([
-            { id: '1', name: '블랙 셔츠', category: '상의' },
-            { id: '2', name: '베이지 슬랙스', category: '하의' },
-          ]);
+          setClothesList([{ id: '1', name: '블랙 셔츠', category: '상의' }, { id: '2', name: '베이지 슬랙스', category: '하의' }]);
         } else {
           setIsUsingMockData(false);
           setClothesList(mapped);
         }
       } catch (error: any) {
-        console.error('옷 목록 불러오기 실패:', error);
         setIsUsingMockData(true);
-        if (error.response?.status === 401) {
-          Alert.alert('인증 오류', '세션이 만료되었습니다. 다시 로그인해주세요.');
-        }
-      } finally {
-        setLoadingClothes(false);
-      }
+        if (error.response?.status === 401) Alert.alert('인증 오류', '세션이 만료되었습니다. 다시 로그인해주세요.');
+      } finally { setLoadingClothes(false); }
     };
     fetchClothes();
   }, []);
@@ -173,13 +144,8 @@ export default function HistoryCreateScreen() {
 
   const toggleCloth = (id: string, category: string) => {
     setSelectedClothes((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((itemId) => itemId !== id);
-      }
-      const filteredPrev = prev.filter((prevId) => {
-        const prevCloth = clothesList.find((c) => c.id === prevId);
-        return prevCloth?.category !== category;
-      });
+      if (prev.includes(id)) return prev.filter((itemId) => itemId !== id);
+      const filteredPrev = prev.filter((prevId) => clothesList.find((c) => c.id === prevId)?.category !== category);
       return [...filteredPrev, id];
     });
   };
@@ -187,11 +153,7 @@ export default function HistoryCreateScreen() {
   const renderChips = (options: string[], selected: string, setValue: (value: string) => void) => (
     <View style={styles.chipRow}>
       {options.map((option) => (
-        <Pressable
-          key={option}
-          style={[styles.chip, selected === option && styles.chipSelected]}
-          onPress={() => setValue(option)}
-        >
+        <Pressable key={option} style={[styles.chip, selected === option && styles.chipSelected]} onPress={() => setValue(option)}>
           <Text style={[styles.chipText, selected === option && styles.chipTextSelected]}>{option}</Text>
         </Pressable>
       ))}
@@ -199,69 +161,39 @@ export default function HistoryCreateScreen() {
   );
 
   const handleSave = async () => {
-    if (isUsingMockData) {
-      Alert.alert('안내', '현재는 더미 데이터 상태라 저장이 불가능합니다. 다시 로그인해주세요.');
-      return;
-    }
-    if (selectedClothes.length === 0) {
-      Alert.alert('안내', '옷을 선택해주세요.');
-      return;
-    }
+    if (isUsingMockData) { Alert.alert('안내', '더미 데이터 상태입니다. 다시 로그인해주세요.'); return; }
+    if (selectedClothes.length === 0) { Alert.alert('안내', '옷을 선택해주세요.'); return; }
 
     try {
       setSaving(true);
-      
       const submitDate = `${yyyy}-${mm}-${dd}`;
-
-      const payload = selectedClothes.map((clothesId) => {
-        const numericId = Number(clothesId);
-        if (isNaN(numericId)) throw new Error(`유효하지 않은 옷 ID: ${clothesId}`);
-
-        return {
-          clothes_id: numericId,
-          worn_date: submitDate, 
-          tpo: tpo && tpo.trim() !== "" ? tpo.trim() : null,
-          style: null,
-          mood: null,
-          feedback_temperature: temperature && temperature.trim() !== "" ? temperature.trim() : null,
-          feedback_tpo: tpoSuitability && tpoSuitability.trim() !== "" ? tpoSuitability.trim() : null,
-          memo: memo && memo.trim() !== "" ? memo.trim() : null,
-        };
-      });
+      const payload = selectedClothes.map((clothesId) => ({
+        clothes_id: Number(clothesId), worn_date: submitDate, 
+        tpo: tpo && tpo.trim() !== "" ? tpo.trim() : null, style: null, mood: null,
+        feedback_temperature: temperature && temperature.trim() !== "" ? temperature.trim() : null,
+        feedback_tpo: tpoSuitability && tpoSuitability.trim() !== "" ? tpoSuitability.trim() : null,
+        memo: memo && memo.trim() !== "" ? memo.trim() : null,
+      }));
 
       if (isEditMode) {
         const originalDate = params.editDate;
-        
-        // ✨ 날짜가 변경되었을 경우: 새 날짜로 POST하고, 기존 기록들은 DELETE 처리
         if (originalDate && submitDate !== originalDate) {
           await api.post('/history', payload);
-          
           if (params.editHistoryIds) {
             const oldIds = JSON.parse(params.editHistoryIds);
-            for (const id of oldIds) {
-              await api.delete(`/history/${Number(id)}`);
-            }
+            for (const id of oldIds) await api.delete(`/history/${Number(id)}`);
           }
         } else {
-          // 날짜가 같을 경우: 기존 기록 덮어쓰기 (PUT)
           await api.put(`/history`, payload); 
         }
-
-        Alert.alert('수정 완료', '착용 기록이 수정되었습니다.', [
-          { text: '확인', onPress: () => router.replace('/(tabs)/history') },
-        ]);
+        Alert.alert('수정 완료', '착용 기록이 수정되었습니다.', [{ text: '확인', onPress: () => router.replace('/(tabs)/history') }]);
       } else {
         await api.post('/history', payload);
-        Alert.alert('저장 완료', '착용 기록이 저장되었습니다.', [
-          { text: '확인', onPress: () => router.replace('/(tabs)/history') },
-        ]);
+        Alert.alert('저장 완료', '착용 기록이 저장되었습니다.', [{ text: '확인', onPress: () => router.replace('/(tabs)/history') }]);
       }
     } catch (error: any) {
-      console.error('착용 기록 저장 실패:', error);
       Alert.alert('저장 실패', error.response?.data?.detail || error.message || '서버 오류가 발생했습니다.');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   return (
@@ -269,10 +201,7 @@ export default function HistoryCreateScreen() {
       <Stack.Screen options={{ title: isEditMode ? '착용 기록 수정' : '착용 기록 추가' }} />
       <SafeAreaView style={styles.container}>
         {loadingClothes ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#111" />
-            <Text style={styles.loadingText}>옷 목록 불러오는 중...</Text>
-          </View>
+          <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#111" /><Text style={styles.loadingText}>옷 목록 불러오는 중...</Text></View>
         ) : (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             
@@ -284,20 +213,8 @@ export default function HistoryCreateScreen() {
               </Pressable>
             </View>
 
-            {showDatePicker && (
-              <DateTimePicker
-                value={selectedDate}
-                mode="date"
-                display="default"
-                onChange={handleDateChange}
-              />
-            )}
-            
-            {showDatePicker && Platform.OS === 'ios' && (
-              <Pressable style={styles.iosDatePickerDone} onPress={() => setShowDatePicker(false)}>
-                <Text style={styles.iosDatePickerDoneText}>날짜 선택 완료</Text>
-              </Pressable>
-            )}
+            {showDatePicker && <DateTimePicker value={selectedDate} mode="date" display="default" onChange={handleDateChange} />}
+            {showDatePicker && Platform.OS === 'ios' && <Pressable style={styles.iosDatePickerDone} onPress={() => setShowDatePicker(false)}><Text style={styles.iosDatePickerDoneText}>날짜 선택 완료</Text></Pressable>}
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>오늘 입은 옷</Text>
@@ -307,31 +224,16 @@ export default function HistoryCreateScreen() {
                 groupedClothes.map((group) => (
                   <View key={group.title} style={styles.categoryBlock}>
                     <Text style={styles.subTitle}>{group.title}</Text>
-
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clothRowScroll}>
                       {group.items.map((item) => {
                         const isSelected = selectedClothes.includes(item.id);
                         return (
-                          <Pressable
-                            key={item.id}
-                            style={styles.clothCard}
-                            onPress={() => toggleCloth(item.id, item.category)}
-                          >
+                          <Pressable key={item.id} style={styles.clothCard} onPress={() => toggleCloth(item.id, item.category)}>
                             <View style={[styles.imageContainer, isSelected && styles.imageContainerSelected]}>
-                              <Image 
-                                source={{ uri: item.imageUrl || 'https://via.placeholder.com/100?text=No+Img' }} 
-                                style={styles.clothImage} 
-                                resizeMode="contain" 
-                              />
-                              {isSelected && (
-                                <View style={styles.checkOverlay}>
-                                  <Ionicons name="checkmark-circle" size={28} color="#fff" />
-                                </View>
-                              )}
+                              <Image source={{ uri: item.imageUrl || 'https://via.placeholder.com/100?text=No+Img' }} style={styles.clothImage} resizeMode="contain" />
+                              {isSelected && <View style={styles.checkOverlay}><Ionicons name="checkmark-circle" size={28} color="#fff" /></View>}
                             </View>
-                            <Text style={[styles.clothName, isSelected && styles.clothNameSelected]} numberOfLines={1}>
-                              {item.name}
-                            </Text>
+                            <Text style={[styles.clothName, isSelected && styles.clothNameSelected]} numberOfLines={1}>{item.name}</Text>
                           </Pressable>
                         );
                       })}
@@ -349,14 +251,7 @@ export default function HistoryCreateScreen() {
             
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>메모</Text>
-              <TextInput 
-                style={styles.input} 
-                placeholder="오늘 착장에 대한 메모를 편하게 남겨주세요." 
-                placeholderTextColor="#94A3B8"
-                value={memo} 
-                onChangeText={setMemo} 
-                multiline 
-              />
+              <TextInput style={styles.input} placeholder="오늘 착장에 대한 메모를 편하게 남겨주세요." placeholderTextColor="#94A3B8" value={memo} onChangeText={setMemo} multiline />
             </View>
 
             <Pressable style={[styles.saveButton, (saving || isUsingMockData) && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving || isUsingMockData}>
@@ -374,16 +269,12 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 60 },
   section: { marginBottom: 32 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 14 },
-  
   dateBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, gap: 10, borderWidth: 1, borderColor: '#E2E8F0' },
   dateText: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
-  
   iosDatePickerDone: { alignItems: 'center', backgroundColor: '#E2E8F0', padding: 12, borderRadius: 8, marginBottom: 20 },
   iosDatePickerDoneText: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
-  
   categoryBlock: { marginBottom: 20 },
   subTitle: { fontSize: 14, fontWeight: '700', color: '#64748B', marginBottom: 12 },
-  
   clothRowScroll: { flexDirection: 'row', gap: 12, paddingBottom: 4, paddingRight: 16 },
   clothCard: { width: 90, alignItems: 'center' },
   imageContainer: { width: 90, height: 90, borderRadius: 12, backgroundColor: '#F1F5F9', marginBottom: 8, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
@@ -392,30 +283,15 @@ const styles = StyleSheet.create({
   checkOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(79, 70, 229, 0.5)', justifyContent: 'center', alignItems: 'center' },
   clothName: { fontSize: 13, color: '#475569', textAlign: 'center', fontWeight: '500' },
   clothNameSelected: { color: '#4F46E5', fontWeight: '700' },
-  
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { 
-    paddingHorizontal: 14, 
-    paddingVertical: 8,    
-    borderRadius: 18,      
-    backgroundColor: '#FFFFFF', 
-    borderWidth: 1, 
-    borderColor: '#E2E8F0' 
-  },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0' },
   chipSelected: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
-  chipText: { 
-    fontSize: 13, 
-    color: '#64748B', 
-    fontWeight: '600' 
-  },
+  chipText: { fontSize: 13, color: '#64748B', fontWeight: '600' },
   chipTextSelected: { color: '#FFFFFF' },
-  
   input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 16, minHeight: 120, textAlignVertical: 'top', fontSize: 15, color: '#334155', lineHeight: 22 },
-  
   saveButton: { marginTop: 10, backgroundColor: '#111', paddingVertical: 16, borderRadius: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
   saveButtonDisabled: { opacity: 0.5 },
   saveText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 14, color: '#64748B' },
   mockWarningText: { fontSize: 13, color: '#EF4444', marginBottom: 12, fontWeight: '600' },
