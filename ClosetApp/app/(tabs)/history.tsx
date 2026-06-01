@@ -1,14 +1,17 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
-  View,
+  View
 } from 'react-native';
 
 import api from '../_api';
@@ -18,7 +21,7 @@ type ClothingItem = {
   name: string;
   category: string;
   color?: string;
-  imageUrl?: string; // ✅ 상세 화면으로 보낼 이미지 URL 타입 추가
+  imageUrl?: string;
 };
 
 type WearHistoryItem = {
@@ -47,7 +50,7 @@ type HistoryApiItem = {
     name?: string;
     category?: string;
     color?: string;
-    image_url?: string; // ✅ 백엔드에서 받아올 이미지 필드 추가
+    image_url?: string;
     tags?: {
       category?: string;
       color?: string;
@@ -145,7 +148,7 @@ export default function HistoryScreen() {
           name: item.clothes?.name ?? `옷 ${clothesId}`,
           category: category,
           color: color,
-          imageUrl: fullImageUrl, // ✅ 변환된 절대 경로 저장
+          imageUrl: fullImageUrl,
         };
       });
 
@@ -289,61 +292,10 @@ export default function HistoryScreen() {
     router.push('/history-create');
   };
 
-  const renderItem = ({ item }: { item: GroupedWearHistoryItem }) => {
-    const clothes = getClothesByIds(item.clothesIds);
-
-    const tagText =
-      [item.tpo, item.tpoSuitability, item.mood]
-        .filter((value) => value && value.trim() !== '')
-        .join(' · ') || '태그 없음';
-
-    return (
-      <View style={styles.card}>
-        <Text style={styles.date}>{item.date}</Text>
-
-        <View style={styles.clothesColumn}>
-          {clothes.length > 0 ? (
-            clothes.map((cloth) => (
-              <View key={cloth.id} style={styles.clothBox}>
-                <Text style={styles.clothCategory}>{cloth.category}</Text>
-                <Text style={styles.clothName}>{cloth.name}</Text>
-              </View>
-            ))
-          ) : (
-            <View style={styles.clothBox}>
-              <Text style={styles.clothCategory}>옷 정보</Text>
-              <Text style={styles.clothName}>표시할 옷 정보 없음</Text>
-            </View>
-          )}
-        </View>
-
-        <Text style={styles.tags}>{tagText}</Text>
-        <Text style={styles.memo}>{item.memo || '메모 없음'}</Text>
-
-        <View style={styles.actionRow}>
-          <Pressable style={styles.actionButton} onPress={() => handleDetailPress(item)} disabled={deletingId === item.id}>
-            <Text style={styles.actionButtonText}>상세보기</Text>
-          </Pressable>
-          <Pressable style={styles.actionButton} onPress={() => handleEditPress(item)} disabled={deletingId === item.id}>
-            <Text style={styles.actionButtonText}>수정</Text>
-          </Pressable>
-          <Pressable style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)} disabled={deletingId === item.id}>
-            <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-              {deletingId === item.id ? '삭제 중...' : '삭제'}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  };
-
   const EmptyState = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyTitle}>해당 조건의 착용 기록이 없습니다</Text>
       <Text style={styles.emptyDescription}>다른 필터를 선택하거나 새 기록을 추가해보세요.</Text>
-      <Pressable style={styles.emptyAddButton} onPress={handleCreatePress}>
-        <Text style={styles.emptyAddButtonText}>기록 추가</Text>
-      </Pressable>
     </View>
   );
 
@@ -365,9 +317,6 @@ export default function HistoryScreen() {
           <Pressable style={styles.actionButton} onPress={() => fetchHistoryList()}>
             <Text style={styles.actionButtonText}>다시 시도</Text>
           </Pressable>
-          <Pressable style={[styles.actionButton, styles.headerAddButton]} onPress={handleCreatePress}>
-            <Text style={[styles.actionButtonText, styles.headerAddButtonText]}>기록 추가</Text>
-          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -377,32 +326,80 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>착용 기록</Text>
-        <Pressable style={styles.headerAddButton} onPress={handleCreatePress}>
-          <Text style={styles.headerAddButtonText}>기록 추가</Text>
-        </Pressable>
       </View>
 
-      <View style={styles.filterRow}>
-        {filterOptions.map((filter) => {
-          const isSelected = selectedFilter === filter;
-          return (
-            <Pressable key={filter} style={[styles.filterChip, isSelected && styles.filterChipSelected]} onPress={() => setSelectedFilter(filter)}>
-              <Text style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{filter}</Text>
-            </Pressable>
-          );
-        })}
+      <View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {filterOptions.map((filter) => {
+            const isSelected = selectedFilter === filter;
+            return (
+              <Pressable key={filter} style={[styles.filterChip, isSelected && styles.filterChipSelected]} onPress={() => setSelectedFilter(filter)}>
+                <Text style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{filter}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <FlatList
         data={groupedHistoryData}
         keyExtractor={(item) => item.id}
-        renderItem={renderItem}
+        renderItem={({ item }) => {
+          const clothes = getClothesByIds(item.clothesIds);
+          const tagText = [item.tpo, item.tpoSuitability, item.mood].filter((v) => v && v.trim() !== '').join(' · ') || '태그 없음';
+
+          return (
+            <View style={styles.card}>
+              <Text style={styles.date}>{item.date}</Text>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clothesScroll}>
+                {clothes.length > 0 ? (
+                  clothes.map((cloth) => (
+                    <View key={cloth.id} style={styles.clothThumbnailBox}>
+                      <Image 
+                        source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/100?text=No+Img' }} 
+                        style={styles.clothThumbnailImage} 
+                        resizeMode="cover"
+                      />
+                      <Text style={styles.clothCategory}>{cloth.category}</Text>
+                      <Text style={styles.clothName} numberOfLines={1}>{cloth.name}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <View style={styles.clothBox}>
+                    <Text style={styles.clothName}>옷 정보 없음</Text>
+                  </View>
+                )}
+              </ScrollView>
+
+              <Text style={styles.tags}>{tagText}</Text>
+              <Text style={styles.memo}>{item.memo || '메모 없음'}</Text>
+
+              <View style={styles.actionRow}>
+                <Pressable style={styles.actionButton} onPress={() => handleDetailPress(item)} disabled={deletingId === item.id}>
+                  <Text style={styles.actionButtonText}>상세보기</Text>
+                </Pressable>
+                <Pressable style={styles.actionButton} onPress={() => handleEditPress(item)} disabled={deletingId === item.id}>
+                  <Text style={styles.actionButtonText}>수정</Text>
+                </Pressable>
+                <Pressable style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)} disabled={deletingId === item.id}>
+                  <Text style={[styles.actionButtonText, styles.deleteButtonText]}>{deletingId === item.id ? '삭제 중...' : '삭제'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          );
+        }}
         onRefresh={() => fetchHistoryList(true)}
         refreshing={refreshing}
         contentContainerStyle={[styles.listContent, groupedHistoryData.length === 0 && styles.emptyListContent]}
         ListEmptyComponent={<EmptyState />}
         showsVerticalScrollIndicator={false}
       />
+
+      {/* 우측 하단 플로팅 액션 버튼 (FAB) */}
+      <Pressable style={styles.fab} onPress={handleCreatePress}>
+        <Ionicons name="add" size={28} color="#fff" />
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -411,33 +408,61 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16 },
   header: { marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 28, fontWeight: '700', color: '#111' },
-  headerAddButton: { backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
-  headerAddButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  
+  filterScroll: { gap: 8, paddingBottom: 16 },
   filterChip: { backgroundColor: '#f1f1f1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   filterChipSelected: { backgroundColor: '#111' },
   filterChipText: { fontSize: 13, color: '#333', fontWeight: '500' },
   filterChipTextSelected: { color: '#fff' },
+  
   listContent: { paddingBottom: 24 },
   emptyListContent: { flexGrow: 1 },
   card: { backgroundColor: '#f7f7f7', borderRadius: 14, padding: 16, marginBottom: 12 },
   date: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 10 },
-  clothesColumn: { gap: 8, marginBottom: 10 },
+  
+  clothesScroll: { gap: 14, paddingBottom: 12 }, // 사진이 커진 만큼 카드 사이 간격도 12 -> 14로 여유 있게
+  clothThumbnailBox: { width: 100, alignItems: 'center' }, // 너비 80 -> 100으로 확대
+  clothThumbnailImage: { 
+    width: 100, 
+    height: 100, // 높이도 80 -> 100으로 확대하여 큼직하게!
+    borderRadius: 12, 
+    backgroundColor: '#eaeaea', 
+    marginBottom: 8 
+  },
+  clothCategory: { fontSize: 12, color: '#888', marginBottom: 4 }, // 글씨도 11 -> 12로 살짝 키움
+  clothName: { fontSize: 13, fontWeight: '600', color: '#222', textAlign: 'center' }, // 글씨 12 -> 13으로 키움
   clothBox: { minHeight: 72, backgroundColor: '#fff', borderRadius: 10, padding: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#eee' },
-  clothCategory: { fontSize: 12, color: '#888', marginBottom: 4 },
-  clothName: { fontSize: 13, fontWeight: '600', color: '#222' },
+  
   tags: { fontSize: 14, color: '#444', marginBottom: 6 },
   memo: { fontSize: 14, color: '#666' },
+  
   actionRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
   actionButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
   actionButtonText: { fontSize: 13, fontWeight: '600', color: '#333' },
   deleteButton: { borderColor: '#f0caca' },
   deleteButtonText: { color: '#c0392b' },
+  
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#222', marginBottom: 8, textAlign: 'center' },
   emptyDescription: { fontSize: 14, color: '#777', textAlign: 'center' },
-  emptyAddButton: { marginTop: 16, backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  emptyAddButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  
   loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   errorButtonRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
+
+  fab: { 
+    position: 'absolute', 
+    bottom: 24, 
+    right: 24, 
+    width: 56, 
+    height: 56, 
+    backgroundColor: '#111', 
+    borderRadius: 28, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.3, 
+    shadowRadius: 4, 
+    elevation: 5 
+  },
 });
