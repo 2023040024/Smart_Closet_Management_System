@@ -54,6 +54,10 @@ class TestFilterClothes:
     def test_빈리스트(self):
         assert filter_clothes([], 20.0, "sunny") == []
 
+    def test_status_None_포함(self):
+        c = make_clothes(status=None)
+        assert c in filter_clothes([c], 20.0, "sunny")
+
 
 class TestGetUnwornDays:
     def test_착용기록없음_999반환(self):
@@ -103,6 +107,16 @@ class TestGetUserProfileText:
         u = make_user(preferred_style="미니멀")
         _, preferred_style, _, _ = get_user_profile_text(u, 20.0)
         assert preferred_style == "미니멀"
+
+    def test_민감도_음수_체감기온_실제보다_높음(self):
+        u = make_user(temp_sensitivity=-2.0)
+        _, _, felt_temp, _ = get_user_profile_text(u, 20.0)
+        assert felt_temp == 24.0
+
+    def test_프로필텍스트에_아우터기준온도_포함(self):
+        u = make_user(temp_sensitivity=0.0)
+        profile_text, _, _, outer = get_user_profile_text(u, 20.0)
+        assert str(outer) in profile_text
 
 class TestGetCurrentSeason:
     def test_반환값이_4계절중하나(self):
