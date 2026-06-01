@@ -284,6 +284,7 @@ export default function HistoryScreen() {
         editTpoSuitability: group.tpoSuitability ?? '', 
         editTemperature: group.mood ?? '',
         editClothes: JSON.stringify(clothes),
+        editHistoryIds: JSON.stringify(group.historyIds),
       },
     });
   };

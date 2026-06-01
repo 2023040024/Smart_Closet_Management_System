@@ -1,5 +1,5 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -36,6 +36,7 @@ function normalizeCategory(category?: string) {
 }
 
 export default function HistoryCreateScreen() {
+  // ✨ editHistoryIds 파라미터 추가
   const params = useLocalSearchParams<{
     editMode?: string;
     editId?: string;
@@ -45,17 +46,17 @@ export default function HistoryCreateScreen() {
     editTpoSuitability?: string; 
     editTemperature?: string;
     editClothes?: string;
+    editHistoryIds?: string; 
   }>();
 
   const isEditMode = params.editMode === 'true';
   
-  // ✨ 날짜 관련 상태 (DatePicker용)
+  // 날짜 관련 상태 (DatePicker용)
   const initialDate = (isEditMode && params.editDate) ? new Date(params.editDate) : new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleDateChange = (event: any, date?: Date) => {
-    // 안드로이드는 선택 후 자동으로 닫히고, iOS는 모달을 유지해야 할 수 있음
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
     }
@@ -64,7 +65,7 @@ export default function HistoryCreateScreen() {
     }
   };
 
-  // UI에 보여질 예쁜 날짜 포맷 생성
+  // UI에 보여질 날짜 포맷 (YYYY. MM. DD (요일))
   const days = ['일', '월', '화', '수', '목', '금', '토'];
   const yyyy = selectedDate.getFullYear();
   const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
@@ -205,7 +206,6 @@ export default function HistoryCreateScreen() {
     try {
       setSaving(true);
       
-      // ✨ 서버 전송용 날짜 포맷 (YYYY-MM-DD)
       const submitDate = `${yyyy}-${mm}-${dd}`;
 
       const payload = selectedClothes.map((clothesId) => {
@@ -225,7 +225,23 @@ export default function HistoryCreateScreen() {
       });
 
       if (isEditMode) {
-        await api.put(`/history`, payload); 
+        const originalDate = params.editDate;
+        
+        // ✨ 날짜가 변경되었을 경우: 새 날짜로 POST하고, 기존 기록들은 DELETE 처리
+        if (originalDate && submitDate !== originalDate) {
+          await api.post('/history', payload);
+          
+          if (params.editHistoryIds) {
+            const oldIds = JSON.parse(params.editHistoryIds);
+            for (const id of oldIds) {
+              await api.delete(`/history/${Number(id)}`);
+            }
+          }
+        } else {
+          // 날짜가 같을 경우: 기존 기록 덮어쓰기 (PUT)
+          await api.put(`/history`, payload); 
+        }
+
         Alert.alert('수정 완료', '착용 기록이 수정되었습니다.', [
           { text: '확인', onPress: () => router.replace('/(tabs)/history') },
         ]);
@@ -255,7 +271,6 @@ export default function HistoryCreateScreen() {
         ) : (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             
-            {/* ✨ 날짜 선택 영역: 터치 시 팝업 띄우기 */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>날짜</Text>
               <Pressable style={styles.dateBox} onPress={() => setShowDatePicker(true)}>
@@ -264,7 +279,6 @@ export default function HistoryCreateScreen() {
               </Pressable>
             </View>
 
-            {/* DatePicker 달력 팝업 렌더링 */}
             {showDatePicker && (
               <DateTimePicker
                 value={selectedDate}
@@ -274,7 +288,6 @@ export default function HistoryCreateScreen() {
               />
             )}
             
-            {/* iOS에서 모달을 직접 닫는 버튼 (필요 시) */}
             {showDatePicker && Platform.OS === 'ios' && (
               <Pressable style={styles.iosDatePickerDone} onPress={() => setShowDatePicker(false)}>
                 <Text style={styles.iosDatePickerDoneText}>날짜 선택 완료</Text>
@@ -375,11 +388,10 @@ const styles = StyleSheet.create({
   clothName: { fontSize: 13, color: '#475569', textAlign: 'center', fontWeight: '500' },
   clothNameSelected: { color: '#4F46E5', fontWeight: '700' },
   
-  // ✨ 피드백 칩(태그) 크기 축소 영역
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { 
-    paddingHorizontal: 14, // 기존 16 -> 14로 축소
-    paddingVertical: 8,    // 기존 10 -> 8로 축소
+    paddingHorizontal: 14, 
+    paddingVertical: 8,    
     borderRadius: 18,      
     backgroundColor: '#FFFFFF', 
     borderWidth: 1, 
@@ -387,7 +399,7 @@ const styles = StyleSheet.create({
   },
   chipSelected: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
   chipText: { 
-    fontSize: 13, // 기존 14 -> 13으로 축소
+    fontSize: 13, 
     color: '#64748B', 
     fontWeight: '600' 
   },
