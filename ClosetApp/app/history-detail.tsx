@@ -25,20 +25,20 @@ export default function HistoryDetailScreen() {
     ? JSON.parse(params.clothes)
     : [];
 
+  // ✨ 옷 카테고리 순서대로 정렬 (아우터 > 상의 > 하의 > 신발)
   clothes.sort((a, b) => {
     const order: Record<string, number> = { '아우터': 1, '상의': 2, '하의': 3, '신발': 4, '악세사리': 5, '기타': 6 };
     return (order[a.category] || 99) - (order[b.category] || 99);
   });
-  
+
   const feedbackTags = [params.tpo, params.tpoSuitability, params.mood].filter(Boolean);
 
+  // ✨ 날짜 포맷 변환 (2026-06-01 -> 2026. 06. 01 (요일))
   let displayDate = params.date || '-';
-  if (params.date) {
+  if (params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date)) {
     const dateObj = new Date(params.date);
     const days = ['일', '월', '화', '수', '목', '금', '토'];
-    const dayOfWeek = days[dateObj.getDay()];
-    // 하이픈(-)을 마침표(.)로 바꾸고 뒤에 요일 추가
-    displayDate = `${params.date.replace(/-/g, '.')} (${dayOfWeek})`; 
+    displayDate = `${params.date.replace(/-/g, '. ')} (${days[dateObj.getDay()]})`;
   }
 
   return (
@@ -48,6 +48,7 @@ export default function HistoryDetailScreen() {
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.headerArea}>
+            
             <View style={styles.dateRow}>
               <Ionicons name="calendar-clear-outline" size={26} color="#1E293B" />
               <Text style={styles.headerDate}>{displayDate}</Text>
@@ -65,7 +66,6 @@ export default function HistoryDetailScreen() {
               )}
             </View>
 
-            {/* ✨ 메모 영역: 아이콘과 함께 왼쪽 파란 선이 들어간 인용구 박스로 묶어 가독성 극대화 */}
             {params.memo && params.memo.trim() !== '' && (
               <View style={styles.memoContainer}>
                 <Ionicons name="chatbubble-ellipses" size={18} color="#3B82F6" />
@@ -80,19 +80,22 @@ export default function HistoryDetailScreen() {
             {clothes.length > 0 ? (
               clothes.map((cloth) => (
                 <View key={cloth.id} style={styles.clothCard}>
-                  <Text style={styles.clothName}>{cloth.name}</Text>
-                  
-                  <View style={styles.tagRow}>
-                    <Text style={styles.tagBadge}>{cloth.category}</Text>
-                    <Text style={styles.tagBadge}>{cloth.color || '색상 미상'}</Text>
-                  </View>
-                  
-                  {/* ✨ 옷 사진이 시원하게 보이도록 높이를 키움 */}
+                  {/* ✨ 1. 왼쪽에 정방형 썸네일 렌더링 */}
                   <Image 
-                    source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/300x300?text=No+Image' }} 
-                    style={styles.clothImage}
+                    source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/150x150?text=No+Img' }} 
+                    style={styles.clothThumbnail}
                     resizeMode="contain"
                   />
+                  
+                  {/* ✨ 2. 오른쪽에 옷 정보를 수직으로 정렬하여 배치 */}
+                  <View style={styles.clothInfo}>
+                    <Text style={styles.clothName} numberOfLines={1}>{cloth.name}</Text>
+                    
+                    <View style={styles.tagRow}>
+                      <Text style={styles.tagBadge}>{cloth.category}</Text>
+                      <Text style={styles.tagBadge}>{cloth.color || '색상 미상'}</Text>
+                    </View>
+                  </View>
                 </View>
               ))
             ) : (
@@ -110,36 +113,12 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 40 },
   
   headerArea: { paddingVertical: 10, marginBottom: 24, paddingHorizontal: 4 },
-
-  dateRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 8, 
-    marginBottom: 14 
-  },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  headerDate: { fontSize: 24, fontWeight: '700', color: '#1E293B' },
+  headerTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
+  headerTagChip: { backgroundColor: '#EEF2FF', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
+  headerTagText: { fontSize: 13, fontWeight: '700', color: '#4F46E5' },
   
-  
-  headerDate: { 
-    fontSize: 24, 
-    fontWeight: '700', 
-    color: '#1E293B' 
-  },
-
-  headerTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  headerTagChip: { 
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 14, 
-    paddingVertical: 7, 
-    borderRadius: 20 
-  },
-
-  headerTagText: { 
-    fontSize: 13, 
-    fontWeight: '700', 
-    color: '#4F46E5'
-  },
-  
-  // ✨ 메모 컨테이너 (인용구 스타일 박스)
   memoContainer: { 
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -154,16 +133,17 @@ const styles = StyleSheet.create({
 
   emptyText: { fontSize: 14, color: '#94A3B8' },
 
-  // ✨ 옷 섹션의 불필요한 회색 배경 제거하여 개방감 부여
   section: { marginBottom: 12 }, 
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 16, paddingHorizontal: 4 },
   
-  // ✨ 카드 스타일 고급화 (연한 테두리와 미세한 그림자)
+  // ✨ 가로형 레이아웃으로 변경된 카드 스타일
   clothCard: { 
+    flexDirection: 'row', // 가로 방향 배치
+    alignItems: 'center', // 세로 중앙 정렬
     backgroundColor: '#FFFFFF', 
     borderRadius: 16, 
     padding: 16, 
-    marginBottom: 16, 
+    marginBottom: 14, 
     borderWidth: 1, 
     borderColor: '#E2E8F0',
     shadowColor: '#000',
@@ -172,15 +152,28 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2
   },
-  clothName: { fontSize: 17, fontWeight: '800', color: '#1E293B', marginBottom: 10 },
-  tagRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
-  tagBadge: { backgroundColor: '#F1F5F9', color: '#475569', fontSize: 12, fontWeight: '700', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8 },
   
-  // ✨ 이미지 높이 대폭 확장
-  clothImage: {
-    width: '100%',
-    height: 280, 
+  clothThumbnail: {
+    width: 105,
+    height: 105,
     borderRadius: 12,
     backgroundColor: '#F8FAFC',
+    marginRight: 18, // 오른쪽 텍스트와의 간격
   },
+  
+  // ✨ 우측 텍스트 정보 영역
+  clothInfo: {
+    flex: 1, // 남은 공간을 모두 차지하도록 설정
+    justifyContent: 'center',
+  },
+
+  clothName: { 
+    fontSize: 17,
+    fontWeight: '800', 
+    color: '#1E293B', 
+    marginBottom: 10
+  },
+  
+  tagRow: { flexDirection: 'row', gap: 6 },
+  tagBadge: { backgroundColor: '#F1F5F9', color: '#475569', fontSize: 13, fontWeight: '700', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
 });
