@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from conftest import make_clothes, make_user
 from models import StatusEnum, CategoryEnum, ThicknessEnum, MaterialEnum
 from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score, to_situation_kr, clothes_to_text, build_prompt, load_tpo_scores, fetch_weather, call_gemini
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from datetime import date, timedelta
 import pytest
 from fastapi import HTTPException
@@ -377,40 +377,33 @@ class TestLoadTpoScores:
 
 class TestFetchWeather:
     def test_비오는날_rainy(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {"temperature": 15.0, "condition": "rainy"}
+        with patch("routers.recommend.get_weather_data", return_value={"temperature": 15.0, "condition": "rainy"}):
             result = fetch_weather("서울")
         assert result["condition"] == "rainy"
         assert result["temperature"] == 15.0
 
     def test_눈오는날_snowy(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {"temperature": 0.0, "condition": "snowy"}
+        with patch("routers.recommend.get_weather_data", return_value={"temperature": 0.0, "condition": "snowy"}):
             result = fetch_weather("서울")
         assert result["condition"] == "snowy"
 
     def test_맑은날_sunny(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {"temperature": 25.0, "condition": "sunny"}
+        with patch("routers.recommend.get_weather_data", return_value={"temperature": 25.0, "condition": "sunny"}):
             result = fetch_weather("서울")
         assert result["condition"] == "sunny"
 
     def test_흐린날_cloudy(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {"temperature": 18.0, "condition": "cloudy"}
+        with patch("routers.recommend.get_weather_data", return_value={"temperature": 18.0, "condition": "cloudy"}):
             result = fetch_weather("서울")
         assert result["condition"] == "cloudy"
 
     def test_status_실패시_기본값반환(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {"temperature": 20.0, "condition": "sunny"}
+        with patch("routers.recommend.get_weather_data", return_value={"temperature": 20.0, "condition": "sunny"}):
             result = fetch_weather("서울")
         assert result == {"temperature": 20.0, "condition": "sunny"}
 
     def test_예외발생시_기본값반환(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            # 예외가 터져도 fetch_weather가 예외 처리(except)를 통해 기본값을 내리는지 검증
-            mock_get.side_effect = Exception("연결 실패") 
+        with patch("routers.recommend.get_weather_data", side_effect=Exception("연결 실패")):
             result = fetch_weather("서울")
         assert result == {"temperature": 20.0, "condition": "sunny"}
 

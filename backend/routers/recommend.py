@@ -1,4 +1,4 @@
-import os, json, re, httpx, asyncio
+import os, json, re
 import google.generativeai as genai
 from dotenv import load_dotenv
 from datetime import date
@@ -48,7 +48,7 @@ class RecommendResponse(BaseModel):
 # --- 유틸리티 함수 ---
 def fetch_weather(address: str) -> dict:
     try:
-        return asyncio.run(get_weather_data(address))
+        return get_weather_data(address)
     except Exception as e:
         print(f"[날씨 연동 실패, 기본값 사용] {e}")
         return {"temperature": 20.0, "condition": "sunny"}
