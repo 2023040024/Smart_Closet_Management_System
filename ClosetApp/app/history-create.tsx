@@ -60,6 +60,11 @@ export default function HistoryCreateScreen() {
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
     }
+
+    if (event.type === 'dismissed') {
+      return;
+    }
+
     if (date) {
       setSelectedDate(date);
     }

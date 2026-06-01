@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -6,6 +7,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -96,6 +98,11 @@ function mapApiHistoryToUi(item: HistoryApiItem): WearHistoryItem {
 
 export default function HistoryScreen() {
   const [selectedFilter, setSelectedFilter] = useState('전체');
+  
+  // ✨ 날짜 필터링 상태 추가
+  const [filterDate, setFilterDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  
   const [historyList, setHistoryList] = useState<WearHistoryItem[]>([]);
   const [clothesMap, setClothesMap] = useState<Record<string, ClothingItem>>({});
   const [loading, setLoading] = useState(true);
@@ -112,42 +119,28 @@ export default function HistoryScreen() {
 
   const fetchHistoryList = useCallback(async (isRefresh = false) => {
     try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
       setErrorMessage('');
 
       const response = await api.get('/history');
       const data: HistoryApiItem[] = Array.isArray(response.data) ? response.data : [];
-
       const mappedHistoryList = data.map(mapApiHistoryToUi);
 
       const nextClothesMap: Record<string, ClothingItem> = {};
       data.forEach((item) => {
-        const clothesId =
-          item.clothes?.clothes_id?.toString() ??
-          item.clothes_id?.toString() ??
-          '';
-
+        const clothesId = item.clothes?.clothes_id?.toString() ?? item.clothes_id?.toString() ?? '';
         if (!clothesId) return;
 
-        const category = item.clothes?.category ?? item.clothes?.tags?.category ?? '미분류';
-        const color = item.clothes?.color ?? item.clothes?.tags?.color ?? '색상 정보 없음';
-
         const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
-        
         const rawImageUrl = item.clothes?.image_url;
-        const fullImageUrl = rawImageUrl 
-          ? (rawImageUrl.startsWith('http') ? rawImageUrl : `${API_BASE_URL}${rawImageUrl}`)
-          : undefined;
+        const fullImageUrl = rawImageUrl ? (rawImageUrl.startsWith('http') ? rawImageUrl : `${API_BASE_URL}${rawImageUrl}`) : undefined;
 
         nextClothesMap[clothesId] = {
           id: clothesId,
           name: item.clothes?.name ?? `옷 ${clothesId}`,
-          category: category,
-          color: color,
+          category: item.clothes?.category ?? item.clothes?.tags?.category ?? '미분류',
+          color: item.clothes?.color ?? item.clothes?.tags?.color ?? '색상 정보 없음',
           imageUrl: fullImageUrl,
         };
       });
@@ -156,13 +149,8 @@ export default function HistoryScreen() {
       setClothesMap(nextClothesMap);
     } catch (error: any) {
       console.error('기록 불러오기 실패:', error);
-      if (error.response?.status === 401) {
-        setErrorMessage('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
-      } else {
-        setErrorMessage(
-          error.response?.data?.detail || error.message || '기록을 불러오지 못했습니다.'
-        );
-      }
+      if (error.response?.status === 401) setErrorMessage('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
+      else setErrorMessage(error.response?.data?.detail || error.message || '기록을 불러오지 못했습니다.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -175,12 +163,32 @@ export default function HistoryScreen() {
     }, [fetchHistoryList])
   );
 
-  const groupedHistoryData = useMemo(() => {
-    const filtered =
-      selectedFilter === '전체'
-        ? historyList
-        : historyList.filter((item) => item.tpo === selectedFilter);
+  // ✨ 선택된 날짜를 API 날짜 포맷(YYYY-MM-DD)으로 변환
+  const formattedFilterDate = filterDate 
+    ? `${filterDate.getFullYear()}-${String(filterDate.getMonth() + 1).padStart(2, '0')}-${String(filterDate.getDate()).padStart(2, '0')}`
+    : null;
 
+  const handleDateChange = (event: any, date?: Date) => {
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (event.type === 'dismissed') {
+      return;
+    }
+    if (date) setFilterDate(date);
+  };
+
+  const groupedHistoryData = useMemo(() => {
+    // ✨ 1단계: TPO 및 날짜 필터링 적용
+    let filtered = historyList;
+    
+    if (selectedFilter !== '전체') {
+      filtered = filtered.filter((item) => item.tpo === selectedFilter);
+    }
+    
+    if (formattedFilterDate) {
+      filtered = filtered.filter((item) => item.date === formattedFilterDate);
+    }
+
+    // 2단계: 날짜별로 그룹화
     const groupedMap: Record<string, GroupedWearHistoryItem> = {};
 
     filtered.forEach((item) => {
@@ -188,14 +196,8 @@ export default function HistoryScreen() {
 
       if (!groupedMap[key]) {
         groupedMap[key] = {
-          id: key,
-          date: item.date,
-          clothesIds: [...item.clothesIds],
-          historyIds: [item.id],
-          tpoSuitability: item.tpoSuitability || '', 
-          mood: item.mood || '',
-          tpo: item.tpo || '',
-          memo: item.memo || '',
+          id: key, date: item.date, clothesIds: [...item.clothesIds], historyIds: [item.id],
+          tpoSuitability: item.tpoSuitability || '', mood: item.mood || '', tpo: item.tpo || '', memo: item.memo || '',
         };
         return;
       }
@@ -203,22 +205,14 @@ export default function HistoryScreen() {
       groupedMap[key].clothesIds.push(...item.clothesIds);
       groupedMap[key].historyIds.push(item.id);
 
-      if (!groupedMap[key].tpoSuitability && item.tpoSuitability) {
-        groupedMap[key].tpoSuitability = item.tpoSuitability;
-      }
-      if (!groupedMap[key].mood && item.mood) {
-        groupedMap[key].mood = item.mood;
-      }
-      if (!groupedMap[key].tpo && item.tpo) {
-        groupedMap[key].tpo = item.tpo;
-      }
-      if (!groupedMap[key].memo && item.memo) {
-        groupedMap[key].memo = item.memo;
-      }
+      if (!groupedMap[key].tpoSuitability && item.tpoSuitability) groupedMap[key].tpoSuitability = item.tpoSuitability;
+      if (!groupedMap[key].mood && item.mood) groupedMap[key].mood = item.mood;
+      if (!groupedMap[key].tpo && item.tpo) groupedMap[key].tpo = item.tpo;
+      if (!groupedMap[key].memo && item.memo) groupedMap[key].memo = item.memo;
     });
 
     return Object.values(groupedMap).sort((a, b) => b.date.localeCompare(a.date));
-  }, [historyList, selectedFilter]);
+  }, [historyList, selectedFilter, formattedFilterDate]);
 
   const deleteHistoryByApi = async (id: string) => {
     const numericId = Number(id);
@@ -241,9 +235,7 @@ export default function HistoryScreen() {
         onPress: async () => {
           try {
             setDeletingId(group.id);
-            for (const historyId of group.historyIds) {
-              await deleteHistoryByApi(historyId);
-            }
+            for (const historyId of group.historyIds) await deleteHistoryByApi(historyId);
             setHistoryList((prev) => prev.filter((item) => !group.historyIds.includes(item.id)));
           } catch (error) {
             Alert.alert('삭제 실패', error instanceof Error ? error.message : '서버에서 기록을 삭제하지 못했습니다.');
@@ -260,12 +252,8 @@ export default function HistoryScreen() {
     router.push({
       pathname: '/history-detail',
       params: {
-        id: group.id,
-        date: group.date,
-        tpoSuitability: group.tpoSuitability ?? '', 
-        mood: group.mood ?? '',
-        tpo: group.tpo ?? '',
-        memo: group.memo ?? '',
+        id: group.id, date: group.date, tpoSuitability: group.tpoSuitability ?? '', 
+        mood: group.mood ?? '', tpo: group.tpo ?? '', memo: group.memo ?? '',
         clothes: JSON.stringify(clothes),
       },
     });
@@ -276,27 +264,20 @@ export default function HistoryScreen() {
     router.push({
       pathname: '/history-create',
       params: {
-        editMode: 'true',
-        editId: group.id,
-        editDate: group.date,
-        editMemo: group.memo ?? '',
-        editTpo: group.tpo ?? '',
-        editTpoSuitability: group.tpoSuitability ?? '', 
-        editTemperature: group.mood ?? '',
-        editClothes: JSON.stringify(clothes),
+        editMode: 'true', editId: group.id, editDate: group.date, editMemo: group.memo ?? '',
+        editTpo: group.tpo ?? '', editTpoSuitability: group.tpoSuitability ?? '', 
+        editTemperature: group.mood ?? '', clothes: JSON.stringify(clothes),
         editHistoryIds: JSON.stringify(group.historyIds),
       },
     });
   };
 
-  const handleCreatePress = () => {
-    router.push('/history-create');
-  };
+  const handleCreatePress = () => router.push('/history-create');
 
   const EmptyState = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyTitle}>해당 조건의 착용 기록이 없습니다</Text>
-      <Text style={styles.emptyDescription}>다른 필터를 선택하거나 새 기록을 추가해보세요.</Text>
+      <Text style={styles.emptyDescription}>다른 필터나 날짜를 선택해보세요.</Text>
     </View>
   );
 
@@ -315,9 +296,7 @@ export default function HistoryScreen() {
         <Text style={styles.emptyTitle}>기록을 불러오지 못했습니다</Text>
         <Text style={styles.emptyDescription}>{errorMessage}</Text>
         <View style={styles.errorButtonRow}>
-          <Pressable style={styles.actionButton} onPress={() => fetchHistoryList()}>
-            <Text style={styles.actionButtonText}>다시 시도</Text>
-          </Pressable>
+          <Pressable style={styles.actionButton} onPress={() => fetchHistoryList()}><Text style={styles.actionButtonText}>다시 시도</Text></Pressable>
         </View>
       </SafeAreaView>
     );
@@ -325,9 +304,39 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* ✨ 헤더 영역 (날짜 선택 버튼 및 선택된 날짜 뱃지 추가) */}
       <View style={styles.header}>
-        <Text style={styles.title}>착용 기록</Text>
+        <View>
+          <Text style={styles.title}>착용 기록</Text>
+          {filterDate && (
+            <View style={styles.activeDateBadge}>
+              <Text style={styles.activeDateText}>{formattedFilterDate?.replace(/-/g, '. ')}</Text>
+              <Pressable onPress={() => setFilterDate(null)} hitSlop={10} style={styles.clearDateIcon}>
+                <Ionicons name="close-circle" size={16} color="#4F46E5" />
+              </Pressable>
+            </View>
+          )}
+        </View>
+        <Pressable style={styles.calendarButton} onPress={() => setShowDatePicker(true)}>
+          <Ionicons name="calendar" size={26} color="#111" />
+        </Pressable>
       </View>
+
+      {/* DatePicker 달력 팝업 렌더링 */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={filterDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+        />
+      )}
+      
+      {showDatePicker && Platform.OS === 'ios' && (
+        <Pressable style={styles.iosDatePickerDone} onPress={() => setShowDatePicker(false)}>
+          <Text style={styles.iosDatePickerDoneText}>닫기</Text>
+        </Pressable>
+      )}
 
       <View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
@@ -346,75 +355,47 @@ export default function HistoryScreen() {
         data={groupedHistoryData}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
-          // ✨ 카테고리 순서(아우터 > 상의 > 하의 > 신발 > 악세사리 > 기타)대로 정렬
           const clothes = getClothesByIds(item.clothesIds).sort((a, b) => {
             const order: Record<string, number> = { '아우터': 1, '상의': 2, '하의': 3, '신발': 4, '악세사리': 5, '기타': 6 };
             return (order[a.category] || 99) - (order[b.category] || 99);
           });
-          
           const tagText = [item.tpo, item.tpoSuitability, item.mood].filter((v) => v && v.trim() !== '').join(' · ') || '태그 없음';
           
           let displayDate = item.date;
           if (item.date) {
             const dateObj = new Date(item.date);
             const days = ['일', '월', '화', '수', '목', '금', '토'];
-            const dayOfWeek = days[dateObj.getDay()];
-            displayDate = `${item.date.replace(/-/g, '. ')} (${dayOfWeek})`;
+            displayDate = `${item.date.replace(/-/g, '. ')} (${days[dateObj.getDay()]})`;
           }
 
           return (
             <View style={styles.card}>
               <Text style={styles.date}>{displayDate}</Text>
-
-              {/* 1. 카테고리를 위로 올리고, 사진 잘림(Crop) 현상을 해결한 스크롤 영역 */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clothesScroll}>
                 {clothes.length > 0 ? (
                   clothes.map((cloth) => (
                     <View key={cloth.id} style={styles.clothThumbnailBox}>
-                      {/* 카테고리를 사진 위로 배치 */}
                       <Text style={styles.clothCategory}>{cloth.category}</Text>
-                      
-                      {/* 사진이 잘리지 않도록 래퍼로 감싸고 resizeMode="contain" 적용 */}
                       <View style={styles.imageWrapper}>
-                        <Image 
-                          source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/100?text=No+Img' }} 
-                          style={styles.clothThumbnailImage} 
-                          resizeMode="contain" 
-                        />
+                        <Image source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/100?text=No+Img' }} style={styles.clothThumbnailImage} resizeMode="contain" />
                       </View>
-                      
                       <Text style={styles.clothName} numberOfLines={1}>{cloth.name}</Text>
                     </View>
                   ))
                 ) : (
-                  <View style={styles.clothBox}>
-                    <Text style={styles.clothName}>옷 정보 없음</Text>
-                  </View>
+                  <View style={styles.clothBox}><Text style={styles.clothName}>옷 정보 없음</Text></View>
                 )}
               </ScrollView>
 
-              {/* 2. 태그와 메모를 은은한 회색 박스로 묶고 아이콘 추가 */}
               <View style={styles.metaContainer}>
-                <View style={styles.metaRow}>
-                  <Ionicons name="pricetag" size={14} color="#3B82F6" />
-                  <Text style={styles.tagsText}>{tagText}</Text>
-                </View>
-                <View style={styles.metaRow}>
-                  <Ionicons name="chatbubble-ellipses" size={14} color="#10B981" />
-                  <Text style={styles.memoText}>{item.memo || '메모 없음'}</Text>
-                </View>
+                <View style={styles.metaRow}><Ionicons name="pricetag" size={14} color="#3B82F6" /><Text style={styles.tagsText}>{tagText}</Text></View>
+                <View style={styles.metaRow}><Ionicons name="chatbubble-ellipses" size={14} color="#10B981" /><Text style={styles.memoText}>{item.memo || '메모 없음'}</Text></View>
               </View>
 
               <View style={styles.actionRow}>
-                <Pressable style={styles.actionButton} onPress={() => handleDetailPress(item)} disabled={deletingId === item.id}>
-                  <Text style={styles.actionButtonText}>상세보기</Text>
-                </Pressable>
-                <Pressable style={styles.actionButton} onPress={() => handleEditPress(item)} disabled={deletingId === item.id}>
-                  <Text style={styles.actionButtonText}>수정</Text>
-                </Pressable>
-                <Pressable style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)} disabled={deletingId === item.id}>
-                  <Text style={[styles.actionButtonText, styles.deleteButtonText]}>{deletingId === item.id ? '삭제 중...' : '삭제'}</Text>
-                </Pressable>
+                <Pressable style={styles.actionButton} onPress={() => handleDetailPress(item)} disabled={deletingId === item.id}><Text style={styles.actionButtonText}>상세보기</Text></Pressable>
+                <Pressable style={styles.actionButton} onPress={() => handleEditPress(item)} disabled={deletingId === item.id}><Text style={styles.actionButtonText}>수정</Text></Pressable>
+                <Pressable style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)} disabled={deletingId === item.id}><Text style={[styles.actionButtonText, styles.deleteButtonText]}>{deletingId === item.id ? '삭제 중...' : '삭제'}</Text></Pressable>
               </View>
             </View>
           );
@@ -426,7 +407,6 @@ export default function HistoryScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* 우측 하단 플로팅 액션 버튼 (FAB) */}
       <Pressable style={styles.fab} onPress={handleCreatePress}>
         <Ionicons name="add" size={28} color="#fff" />
       </Pressable>
@@ -436,79 +416,54 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16 },
-  header: { marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 28, fontWeight: '700', color: '#111' },
+  header: { marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  title: { fontSize: 28, fontWeight: '800', color: '#111' },
   
+  // ✨ 날짜 필터 뱃지 및 아이콘 스타일
+  calendarButton: { padding: 4 },
+  activeDateBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 6, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#C7D2FE' },
+  activeDateText: { fontSize: 13, fontWeight: '700', color: '#4F46E5' },
+  clearDateIcon: { marginLeft: 6 },
+  
+  iosDatePickerDone: { alignItems: 'center', backgroundColor: '#E2E8F0', padding: 12, borderRadius: 8, marginBottom: 16 },
+  iosDatePickerDoneText: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
+
   filterScroll: { gap: 8, paddingBottom: 16 },
-  filterChip: { backgroundColor: '#f1f1f1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
-  filterChipSelected: { backgroundColor: '#111' },
-  filterChipText: { fontSize: 13, color: '#333', fontWeight: '500' },
+  filterChip: { backgroundColor: '#F1F5F9', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0' },
+  filterChipSelected: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
+  filterChipText: { fontSize: 13, color: '#475569', fontWeight: '600' },
   filterChipTextSelected: { color: '#fff' },
   
   listContent: { paddingBottom: 24 },
   emptyListContent: { flexGrow: 1 },
-  card: { backgroundColor: '#f7f7f7', borderRadius: 14, padding: 16, marginBottom: 12 },
-  date: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 10 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
+  date: { fontSize: 16, fontWeight: '800', color: '#1E293B', marginBottom: 14 },
   
-  // 옷 이미지 썸네일 관련 스타일 모음
   clothesScroll: { gap: 14, paddingBottom: 12 },
-  clothThumbnailBox: { width: 110, alignItems: 'center' },
-  clothCategory: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 6 },
-  imageWrapper: { 
-    width: 110, 
-    height: 110, 
-    backgroundColor: '#F1F5F9', 
-    borderRadius: 12, 
-    marginBottom: 8, 
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
+  clothThumbnailBox: { width: 100, alignItems: 'center' },
+  clothCategory: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 8 },
+  imageWrapper: { width: 100, height: 100, backgroundColor: '#F8FAFC', borderRadius: 12, marginBottom: 8, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#F1F5F9' },
   clothThumbnailImage: { width: '90%', height: '90%' }, 
-  clothName: { fontSize: 13, fontWeight: '600', color: '#1E293B', textAlign: 'center' },
+  clothName: { fontSize: 13, fontWeight: '700', color: '#334155', textAlign: 'center' },
   clothBox: { minHeight: 72, backgroundColor: '#fff', borderRadius: 10, padding: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#eee' },
   
-  // 태그/메모 스타일
-  metaContainer: { 
-    backgroundColor: '#F8FAFC', 
-    padding: 12, 
-    borderRadius: 12, 
-    gap: 8, 
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#F1F5F9'
-  },
+  metaContainer: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, gap: 8, marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   tagsText: { fontSize: 13, fontWeight: '700', color: '#334155' },
   memoText: { fontSize: 13, color: '#475569', lineHeight: 20 },
   
   actionRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
-  actionButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  actionButtonText: { fontSize: 13, fontWeight: '600', color: '#333' },
-  deleteButton: { borderColor: '#f0caca' },
-  deleteButtonText: { color: '#c0392b' },
+  actionButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  actionButtonText: { fontSize: 13, fontWeight: '700', color: '#475569' },
+  deleteButton: { borderColor: '#FECACA' },
+  deleteButtonText: { color: '#EF4444' },
   
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#222', marginBottom: 8, textAlign: 'center' },
-  emptyDescription: { fontSize: 14, color: '#777', textAlign: 'center' },
+  emptyTitle: { fontSize: 17, fontWeight: '800', color: '#1E293B', marginBottom: 8, textAlign: 'center' },
+  emptyDescription: { fontSize: 14, color: '#64748B', textAlign: 'center' },
   
   loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   errorButtonRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
 
-  fab: { 
-    position: 'absolute', 
-    bottom: 24, 
-    right: 24, 
-    width: 56, 
-    height: 56, 
-    backgroundColor: '#111', 
-    borderRadius: 28, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 4 }, 
-    shadowOpacity: 0.3, 
-    shadowRadius: 4, 
-    elevation: 5 
-  },
+  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, backgroundColor: '#111', borderRadius: 28, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5 },
 });
