@@ -33,23 +33,22 @@ export default function HistoryDetailScreen() {
 
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>날짜</Text>
-              <Text style={styles.summaryValue}>{params.date || '-'}</Text>
+          <View style={styles.headerArea}>
+            <Text style={styles.headerDate}>{params.date || '-'}</Text>
+            
+            <View style={styles.headerTagRow}>
+              {feedbackTags.length > 0 ? (
+                feedbackTags.map((tag, index) => (
+                  <View key={index} style={styles.headerTagChip}>
+                    <Text style={styles.headerTagText}>{tag}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>태그 없음</Text>
+              )}
             </View>
 
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>태그</Text>
-              <Text style={styles.summaryValue}>
-                {feedbackTags.length > 0 ? feedbackTags.join(' · ') : '없음'}
-              </Text>
-            </View>
-
-            <View style={styles.memoBox}>
-              <Text style={styles.summaryLabel}>메모</Text>
-              <Text style={styles.memoText}>{params.memo || '메모 없음'}</Text>
-            </View>
+            <Text style={styles.headerMemoText}>{params.memo || '입력된 메모가 없습니다.'}</Text>
           </View>
 
           <View style={styles.section}>
@@ -91,30 +90,13 @@ const styles = StyleSheet.create({
   section: { backgroundColor: '#f7f7f7', borderRadius: 14, padding: 16, marginBottom: 12 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#555', marginBottom: 8 },
   
-  summaryCard: { 
-    backgroundColor: '#f8f9fa', 
-    borderRadius: 14, 
-    padding: 18, 
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#f1f1f1'
-  },
-  summaryRow: { 
-    flexDirection: 'row', 
-    marginBottom: 12 
-  },
-  summaryLabel: { 
-    width: 70, 
-    fontSize: 14, 
-    fontWeight: '700', 
-    color: '#888' 
-  },
-  summaryValue: { 
-    flex: 1, 
-    fontSize: 15, 
-    color: '#222', 
-    fontWeight: '600' 
-  },
+  headerArea: { paddingVertical: 10, marginBottom: 24, paddingHorizontal: 4 },
+  headerDate: { fontSize: 28, fontWeight: '800', color: '#111', marginBottom: 12 },
+  headerTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
+  headerTagChip: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  headerTagText: { fontSize: 13, fontWeight: '600', color: '#475569' },
+  headerMemoText: { fontSize: 15, color: '#334155', lineHeight: 24 },
+  
   memoBox: { 
     marginTop: 4, 
     paddingTop: 16, 
