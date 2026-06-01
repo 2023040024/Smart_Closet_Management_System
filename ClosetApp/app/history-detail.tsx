@@ -1,13 +1,13 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Image, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native'; // ✅ Image 컴포넌트 추가
+import { Image, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-// ✅ 백엔드에서 넘겨받을 이미지 URL 필드(imageUrl)를 타입에 추가
 type ClothingItem = {
   id: string;
   name: string;
   category: string;
   color: string;
-  imageUrl?: string; // ✅ 이미지 경로가 있을 경우를 위해 타입 추가
+  imageUrl?: string;
 };
 
 export default function HistoryDetailScreen() {
@@ -27,6 +27,15 @@ export default function HistoryDetailScreen() {
 
   const feedbackTags = [params.tpo, params.tpoSuitability, params.mood].filter(Boolean);
 
+  let displayDate = params.date || '-';
+  if (params.date) {
+    const dateObj = new Date(params.date);
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    const dayOfWeek = days[dateObj.getDay()];
+    // 하이픈(-)을 마침표(.)로 바꾸고 뒤에 요일 추가
+    displayDate = `${params.date.replace(/-/g, '.')} (${dayOfWeek})`; 
+  }
+
   return (
     <>
       <Stack.Screen options={{ title: '착용 기록 상세' }} />
@@ -34,7 +43,10 @@ export default function HistoryDetailScreen() {
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.headerArea}>
-            <Text style={styles.headerDate}>{params.date || '-'}</Text>
+            <View style={styles.dateRow}>
+              <Ionicons name="calendar-clear-outline" size={26} color="#1E293B" />
+              <Text style={styles.headerDate}>{displayDate}</Text>
+            </View>
             
             <View style={styles.headerTagRow}>
               {feedbackTags.length > 0 ? (
@@ -48,7 +60,13 @@ export default function HistoryDetailScreen() {
               )}
             </View>
 
-            <Text style={styles.headerMemoText}>{params.memo || '입력된 메모가 없습니다.'}</Text>
+            {/* ✨ 메모 영역: 아이콘과 함께 왼쪽 파란 선이 들어간 인용구 박스로 묶어 가독성 극대화 */}
+            {params.memo && params.memo.trim() !== '' && (
+              <View style={styles.memoContainer}>
+                <Ionicons name="chatbubble-ellipses" size={18} color="#3B82F6" />
+                <Text style={styles.memoText}>{params.memo}</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.section}>
@@ -57,16 +75,14 @@ export default function HistoryDetailScreen() {
             {clothes.length > 0 ? (
               clothes.map((cloth) => (
                 <View key={cloth.id} style={styles.clothCard}>
-                  {/* 1. 옷 이름을 가장 돋보이게 위로 배치 */}
                   <Text style={styles.clothName}>{cloth.name}</Text>
                   
-                  {/* 2. 카테고리와 색상을 깔끔한 뱃지로 묶음 */}
                   <View style={styles.tagRow}>
                     <Text style={styles.tagBadge}>{cloth.category}</Text>
                     <Text style={styles.tagBadge}>{cloth.color || '색상 미상'}</Text>
                   </View>
                   
-                  {/* 3. 이미지는 가장 아래에 시원하게 배치 */}
+                  {/* ✨ 옷 사진이 시원하게 보이도록 높이를 키움 */}
                   <Image 
                     source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/300x300?text=No+Image' }} 
                     style={styles.clothImage}
@@ -87,56 +103,79 @@ export default function HistoryDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 16, paddingBottom: 40 },
-  section: { backgroundColor: '#f7f7f7', borderRadius: 14, padding: 16, marginBottom: 12 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#555', marginBottom: 8 },
   
   headerArea: { paddingVertical: 10, marginBottom: 24, paddingHorizontal: 4 },
-  headerDate: { fontSize: 28, fontWeight: '800', color: '#111', marginBottom: 12 },
-  headerTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
-  headerTagChip: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  headerTagText: { fontSize: 13, fontWeight: '600', color: '#475569' },
-  headerMemoText: { fontSize: 15, color: '#334155', lineHeight: 24 },
+
+  dateRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8, 
+    marginBottom: 14 
+  },
   
-  memoBox: { 
-    marginTop: 4, 
-    paddingTop: 16, 
-    borderTopWidth: 1, 
-    borderColor: '#eaeaea' 
-  },
-  memoText: { 
-    fontSize: 15, 
-    color: '#444', 
-    lineHeight: 22,
-    marginTop: 4
+  
+  headerDate: { 
+    fontSize: 24, 
+    fontWeight: '700', 
+    color: '#1E293B' 
   },
 
-  clothCard: { 
-    backgroundColor: '#fff', 
-    borderRadius: 12, 
+  headerTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  headerTagChip: { 
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 14, 
+    paddingVertical: 7, 
+    borderRadius: 20 
+  },
+
+  headerTagText: { 
+    fontSize: 13, 
+    fontWeight: '700', 
+    color: '#4F46E5'
+  },
+  
+  // ✨ 메모 컨테이너 (인용구 스타일 박스)
+  memoContainer: { 
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F8FAFC', 
     padding: 16, 
-    marginTop: 12, 
+    borderRadius: 12, 
+    gap: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6', 
+  },
+  memoText: { fontSize: 15, color: '#334155', lineHeight: 24, flex: 1, fontWeight: '500' },
+
+  emptyText: { fontSize: 14, color: '#94A3B8' },
+
+  // ✨ 옷 섹션의 불필요한 회색 배경 제거하여 개방감 부여
+  section: { marginBottom: 12 }, 
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 16, paddingHorizontal: 4 },
+  
+  // ✨ 카드 스타일 고급화 (연한 테두리와 미세한 그림자)
+  clothCard: { 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 16, 
+    padding: 16, 
+    marginBottom: 16, 
     borderWidth: 1, 
-    borderColor: '#ececec' 
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2
   },
-  clothName: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 12 },
-
-  tagRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
-  tagBadge: { 
-    backgroundColor: '#f3f4f6', 
-    color: '#374151', 
-    fontSize: 12, 
-    fontWeight: '600', 
-    paddingVertical: 4, 
-    paddingHorizontal: 8, 
-    borderRadius: 6 
-  },
-
+  clothName: { fontSize: 17, fontWeight: '800', color: '#1E293B', marginBottom: 10 },
+  tagRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
+  tagBadge: { backgroundColor: '#F1F5F9', color: '#475569', fontSize: 12, fontWeight: '700', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8 },
+  
+  // ✨ 이미지 높이 대폭 확장
   clothImage: {
     width: '100%',
-    height: 220, // 이미지가 시원하게 보이도록 높이 설정
-    borderRadius: 8,
-    backgroundColor: '#f9f9f9',
+    height: 280, 
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
   },
-
-  emptyText: { fontSize: 14, color: '#777' },
 });

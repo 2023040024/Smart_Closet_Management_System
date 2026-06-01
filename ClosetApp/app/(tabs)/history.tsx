@@ -347,10 +347,18 @@ export default function HistoryScreen() {
         renderItem={({ item }) => {
           const clothes = getClothesByIds(item.clothesIds);
           const tagText = [item.tpo, item.tpoSuitability, item.mood].filter((v) => v && v.trim() !== '').join(' · ') || '태그 없음';
+          
+          let displayDate = item.date;
+          if (item.date) {
+            const dateObj = new Date(item.date);
+            const days = ['일', '월', '화', '수', '목', '금', '토'];
+            const dayOfWeek = days[dateObj.getDay()];
+            displayDate = `${item.date.replace(/-/g, '. ')} (${dayOfWeek})`;
+          }
 
           return (
             <View style={styles.card}>
-              <Text style={styles.date}>{item.date}</Text>
+              <Text style={styles.date}>{displayDate}</Text>
 
               {/* ✨ 1. 카테고리를 위로 올리고, 사진 잘림(Crop) 현상을 해결한 스크롤 영역 */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clothesScroll}>
