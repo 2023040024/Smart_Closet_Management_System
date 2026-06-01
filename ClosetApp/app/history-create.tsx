@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   SafeAreaView,
@@ -78,7 +79,6 @@ export default function HistoryCreateScreen() {
       if (params.editTpoSuitability) setTpoSuitability(params.editTpoSuitability); 
       if (params.editTemperature) setTemperature(params.editTemperature === '적당' ? '적당함' : params.editTemperature);
       
-      // ✨ 파라미터 호환성을 완벽하게 처리하여 무조건 체크 표시가 복구되도록 수정
       try {
         let idsToSelect: string[] = [];
         if (params.editClothesIds) {
@@ -200,65 +200,76 @@ export default function HistoryCreateScreen() {
     <>
       <Stack.Screen options={{ title: isEditMode ? '착용 기록 수정' : '착용 기록 추가' }} />
       <SafeAreaView style={styles.container}>
-        {loadingClothes ? (
-          <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#111" /><Text style={styles.loadingText}>옷 목록 불러오는 중...</Text></View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>날짜</Text>
-              <Pressable style={styles.dateBox} onPress={() => setShowDatePicker(true)}>
-                <Ionicons name="calendar-clear-outline" size={24} color="#4F46E5" />
-                <Text style={styles.dateText}>{uiDate}</Text>
-              </Pressable>
-            </View>
-
-            {showDatePicker && <DateTimePicker value={selectedDate} mode="date" display="default" onChange={handleDateChange} />}
-            {showDatePicker && Platform.OS === 'ios' && <Pressable style={styles.iosDatePickerDone} onPress={() => setShowDatePicker(false)}><Text style={styles.iosDatePickerDoneText}>날짜 선택 완료</Text></Pressable>}
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>오늘 입은 옷</Text>
-              {isUsingMockData && <Text style={styles.mockWarningText}>⚠️ 서버 연결 안됨 (더미 데이터 표시 중)</Text>}
+        {/* ✨ 키보드 회피 뷰 적용 */}
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+        >
+          {loadingClothes ? (
+            <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#111" /><Text style={styles.loadingText}>옷 목록 불러오는 중...</Text></View>
+          ) : (
+            <ScrollView 
+              contentContainerStyle={styles.content} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled" // ✨ 키보드 열린 상태에서도 버튼 탭 유지
+            >
               
-              {groupedClothes.length > 0 ? (
-                groupedClothes.map((group) => (
-                  <View key={group.title} style={styles.categoryBlock}>
-                    <Text style={styles.subTitle}>{group.title}</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clothRowScroll}>
-                      {group.items.map((item) => {
-                        const isSelected = selectedClothes.includes(item.id);
-                        return (
-                          <Pressable key={item.id} style={styles.clothCard} onPress={() => toggleCloth(item.id, item.category)}>
-                            <View style={[styles.imageContainer, isSelected && styles.imageContainerSelected]}>
-                              <Image source={{ uri: item.imageUrl || 'https://via.placeholder.com/100?text=No+Img' }} style={styles.clothImage} resizeMode="contain" />
-                              {isSelected && <View style={styles.checkOverlay}><Ionicons name="checkmark-circle" size={28} color="#fff" /></View>}
-                            </View>
-                            <Text style={[styles.clothName, isSelected && styles.clothNameSelected]} numberOfLines={1}>{item.name}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
-                ))
-              ) : (
-                !isUsingMockData && <Text style={styles.emptyText}>선택할 수 있는 옷이 없습니다.</Text>
-              )}
-            </View>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>날짜</Text>
+                <Pressable style={styles.dateBox} onPress={() => setShowDatePicker(true)}>
+                  <Ionicons name="calendar-clear-outline" size={24} color="#4F46E5" />
+                  <Text style={styles.dateText}>{uiDate}</Text>
+                </Pressable>
+              </View>
 
-            <View style={styles.section}><Text style={styles.sectionTitle}>TPO (상황)</Text>{renderChips(tpoOptions, tpo, setTpo)}</View>
-            <View style={styles.section}><Text style={styles.sectionTitle}>TPO 적합도</Text>{renderChips(tpoSuitabilityOptions, tpoSuitability, setTpoSuitability)}</View>
-            <View style={styles.section}><Text style={styles.sectionTitle}>체감온도</Text>{renderChips(temperatureOptions, temperature, setTemperature)}</View>
-            
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>메모</Text>
-              <TextInput style={styles.input} placeholder="오늘 착장에 대한 메모를 편하게 남겨주세요." placeholderTextColor="#94A3B8" value={memo} onChangeText={setMemo} multiline />
-            </View>
+              {showDatePicker && <DateTimePicker value={selectedDate} mode="date" display="default" onChange={handleDateChange} />}
+              {showDatePicker && Platform.OS === 'ios' && <Pressable style={styles.iosDatePickerDone} onPress={() => setShowDatePicker(false)}><Text style={styles.iosDatePickerDoneText}>날짜 선택 완료</Text></Pressable>}
 
-            <Pressable style={[styles.saveButton, (saving || isUsingMockData) && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving || isUsingMockData}>
-              <Text style={styles.saveText}>{saving ? '저장 중...' : (isEditMode ? '수정 완료' : '저장하기')}</Text>
-            </Pressable>
-          </ScrollView>
-        )}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>오늘 입은 옷</Text>
+                {isUsingMockData && <Text style={styles.mockWarningText}>⚠️ 서버 연결 안됨 (더미 데이터 표시 중)</Text>}
+                
+                {groupedClothes.length > 0 ? (
+                  groupedClothes.map((group) => (
+                    <View key={group.title} style={styles.categoryBlock}>
+                      <Text style={styles.subTitle}>{group.title}</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clothRowScroll}>
+                        {group.items.map((item) => {
+                          const isSelected = selectedClothes.includes(item.id);
+                          return (
+                            <Pressable key={item.id} style={styles.clothCard} onPress={() => toggleCloth(item.id, item.category)}>
+                              <View style={[styles.imageContainer, isSelected && styles.imageContainerSelected]}>
+                                <Image source={{ uri: item.imageUrl || 'https://via.placeholder.com/100?text=No+Img' }} style={styles.clothImage} resizeMode="contain" />
+                                {isSelected && <View style={styles.checkOverlay}><Ionicons name="checkmark-circle" size={28} color="#fff" /></View>}
+                              </View>
+                              <Text style={[styles.clothName, isSelected && styles.clothNameSelected]} numberOfLines={1}>{item.name}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  ))
+                ) : (
+                  !isUsingMockData && <Text style={styles.emptyText}>선택할 수 있는 옷이 없습니다.</Text>
+                )}
+              </View>
+
+              <View style={styles.section}><Text style={styles.sectionTitle}>TPO (상황)</Text>{renderChips(tpoOptions, tpo, setTpo)}</View>
+              <View style={styles.section}><Text style={styles.sectionTitle}>TPO 적합도</Text>{renderChips(tpoSuitabilityOptions, tpoSuitability, setTpoSuitability)}</View>
+              <View style={styles.section}><Text style={styles.sectionTitle}>체감온도</Text>{renderChips(temperatureOptions, temperature, setTemperature)}</View>
+              
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>메모</Text>
+                <TextInput style={styles.input} placeholder="오늘 착장에 대한 메모를 편하게 남겨주세요." placeholderTextColor="#94A3B8" value={memo} onChangeText={setMemo} multiline />
+              </View>
+
+              <Pressable style={[styles.saveButton, (saving || isUsingMockData) && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving || isUsingMockData}>
+                <Text style={styles.saveText}>{saving ? '저장 중...' : (isEditMode ? '수정 완료' : '저장하기')}</Text>
+              </Pressable>
+            </ScrollView>
+          )}
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </>
   );

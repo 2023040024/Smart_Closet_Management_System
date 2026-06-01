@@ -221,7 +221,10 @@ export default function HistoryScreen() {
             const order: Record<string, number> = { '아우터': 1, '상의': 2, '하의': 3, '신발': 4, '악세사리': 5, '기타': 6 };
             return (order[a.category] || 99) - (order[b.category] || 99);
           });
-          const tagText = [item.tpo, item.tpoSuitability, item.mood].filter((v) => v && v.trim() !== '').join(' · ') || '태그 없음';
+          
+          // ✨ 개별 태그 배열 생성
+          const tags = [item.tpo, item.tpoSuitability, item.mood].filter((v) => v && v.trim() !== '');
+          
           let displayDate = item.date;
           if (item.date) {
             const days = ['일', '월', '화', '수', '목', '금', '토'];
@@ -230,7 +233,25 @@ export default function HistoryScreen() {
 
           return (
             <View style={styles.card}>
-              <Text style={styles.date}>{displayDate}</Text>
+              <View style={styles.cardHeader}>
+                <Text style={styles.date}>{displayDate}</Text>
+                
+                {/* ✨ 쪼개진 태그 렌더링 */}
+                <View style={styles.tagWrapper}>
+                  {tags.length > 0 ? (
+                    tags.map((tag, index) => (
+                      <View key={index} style={styles.headerTagBadge}>
+                        <Text style={styles.headerTagText}>{tag}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={styles.headerTagBadge}>
+                      <Text style={styles.headerTagText}>태그 없음</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clothesScroll}>
                 {clothes.length > 0 ? (
                   clothes.map((cloth) => (
@@ -243,10 +264,13 @@ export default function HistoryScreen() {
                 ) : (<View style={styles.clothBox}><Text style={styles.clothName}>옷 정보 없음</Text></View>)}
               </ScrollView>
 
-              <View style={styles.metaContainer}>
-                <View style={styles.metaRow}><Ionicons name="pricetag" size={14} color="#3B82F6" /><Text style={styles.tagsText}>{tagText}</Text></View>
-                <View style={styles.metaRow}><Ionicons name="chatbubble-ellipses" size={14} color="#10B981" /><Text style={styles.memoText}>{item.memo || '메모 없음'}</Text></View>
-              </View>
+              {/* ✨ 인용구 스타일의 메모 영역 */}
+              {item.memo && item.memo.trim() !== '' && (
+                <View style={styles.memoBox}>
+                  <Ionicons name="pencil" size={14} color="#4F46E5" style={{ marginTop: 2 }} />
+                  <Text style={styles.memoText} numberOfLines={2}>{item.memo}</Text>
+                </View>
+              )}
 
               <View style={styles.actionRow}>
                 <Pressable style={styles.actionButton} onPress={() => handleDetailPress(item)} disabled={deletingId === item.id}><Text style={styles.actionButtonText}>상세보기</Text></Pressable>
@@ -280,8 +304,16 @@ const styles = StyleSheet.create({
   filterChipTextSelected: { color: '#fff' },
   listContent: { paddingBottom: 24 },
   emptyListContent: { flexGrow: 1 },
+  
   card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
-  date: { fontSize: 16, fontWeight: '800', color: '#1E293B', marginBottom: 14 },
+  
+  // ✨ 카드 헤더 및 쪼개진 태그 스타일
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  date: { fontSize: 16, fontWeight: '800', color: '#1E293B' },
+  tagWrapper: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end', marginLeft: 12 },
+  headerTagBadge: { backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  headerTagText: { fontSize: 12, fontWeight: '700', color: '#4F46E5' },
+  
   clothesScroll: { gap: 14, paddingBottom: 12 },
   clothThumbnailBox: { width: 100, alignItems: 'center' },
   clothCategory: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 8 },
@@ -289,10 +321,11 @@ const styles = StyleSheet.create({
   clothThumbnailImage: { width: '90%', height: '90%' }, 
   clothName: { fontSize: 13, fontWeight: '700', color: '#334155', textAlign: 'center' },
   clothBox: { minHeight: 72, backgroundColor: '#fff', borderRadius: 10, padding: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#eee' },
-  metaContainer: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, gap: 8, marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  tagsText: { fontSize: 13, fontWeight: '700', color: '#334155' },
-  memoText: { fontSize: 13, color: '#475569', lineHeight: 20 },
+  
+  // ✨ 왼쪽 띠를 적용한 감성적인 메모 박스 스타일
+  memoBox: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#F8FAFC', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, gap: 8, marginTop: 8, borderLeftWidth: 3, borderLeftColor: '#4F46E5' },
+  memoText: { fontSize: 13, color: '#334155', fontWeight: '500', lineHeight: 20, flex: 1 },
+  
   actionRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
   actionButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
   actionButtonText: { fontSize: 13, fontWeight: '700', color: '#475569' },
