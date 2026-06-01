@@ -113,24 +113,19 @@ export default function RecommendScreen() {
     }
   };
 
-const handleWearOutfit = async (outfit: OutfitSet) => {
-  try {
-    // 🎯 오늘 날짜를 백엔드 포맷(YYYY-MM-DD)에 맞게 생성
-    const todayStr = new Date().toISOString().slice(0, 10);
-
-    // 선택된 코디에서 존재하는 옷들만 필터링하고 worn_date 필드 필수 추가
-    const payload = [outfit.top, outfit.bottom, outfit.outer, outfit.shoes]
-      .filter(Boolean)
-      .map(cloth => ({
-        clothes_id: Number(cloth!.id),
-        worn_date: todayStr
-      }));
+  const handleWearOutfit = async (outfit: OutfitSet) => {
+    try {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const payload = [outfit.top, outfit.bottom, outfit.outer, outfit.shoes]
+        .filter(Boolean)
+        .map(cloth => ({
+          clothes_id: Number(cloth!.id),
+          worn_date: todayStr
+        }));
 
     if (payload.length === 0) {
       return Alert.alert('알림', '착용할 옷 정보가 없습니다.');
     }
-
-    console.log('🚀 백엔드로 보낼 데이터 구조:', payload);
 
     await api.post('/history', payload);
     Alert.alert('성공', '오늘의 착용 기록에 저장되었습니다!');
@@ -165,7 +160,7 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
           </View>
 
           <View style={styles.quickKeywordRow}>
-            {['데이트', '출근', '결혼식', '운동', '카페'].map(keyword => (
+            {['데일리', '비즈니스', '데이트', '운동', '미팅'].map(keyword => (
               <TouchableOpacity 
                 key={keyword} 
                 style={styles.quickKeywordChip} 
