@@ -9,8 +9,10 @@ import {
     Modal,
     NativeScrollEvent,
     NativeSyntheticEvent,
+    Platform,
     Pressable,
     ScrollView,
+    StatusBar,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -94,7 +96,6 @@ export default function HomeScreen() {
   const { clothes, fetchClothes } = useCloset();
   const [loading, setLoading] = useState(false);
 
-  // 🚨 [추가] 백엔드 과부하 통계 데이터 응답 모델을 담아둘 상태 변수
   const [overloadBanner, setOverloadBanner] = useState<{
     total_warnings: number;
     ai_advice: string;
@@ -124,8 +125,7 @@ export default function HomeScreen() {
 
   const [showAllOptions, setShowAllOptions] = useState<Partial<Record<keyof FilterType, boolean>>>({});
 
-  // ✅ 의존성 배열을 빈 배열([])로 설정하고 마운트 상태 락을 걸어 깜빡임/무한 로딩 버그 완벽 수정
-useFocusEffect(
+  useFocusEffect(
     useCallback(() => {
       let isMounted = true;
       const load = async () => {
@@ -134,17 +134,14 @@ useFocusEffect(
         try {
           await fetchClothes();
           
-          // 기존 과부하 API 호출
           const statsRes = await api.get('/stats/overload');
-          
-          // 처분 추천 API 호출
           const disposalRes = await api.get('/stats/dispose', {
             params: { current_season: getCurrentSeason() } 
           });
 
           if (isMounted) {
             setOverloadBanner(statsRes.data);
-            setDisposalBanner(disposalRes.data); // 데이터 저장
+            setDisposalBanner(disposalRes.data);
           }
         } catch (error) {
           console.error("데이터 로드 실패:", error);
@@ -177,11 +174,11 @@ useFocusEffect(
   };
 
   function getCurrentSeason(): string {
-  const month = new Date().getMonth() + 1;
-  if (month >= 3 && month <= 5) return '봄';
-  if (month >= 6 && month <= 8) return '여름';
-  if (month >= 9 && month <= 11) return '가을';
-  return '겨울';
+    const month = new Date().getMonth() + 1;
+    if (month >= 3 && month <= 5) return '봄';
+    if (month >= 6 && month <= 8) return '여름';
+    if (month >= 9 && month <= 11) return '가을';
+    return '겨울';
   }
 
   const filteredClothes = useMemo(() => {
@@ -239,7 +236,6 @@ useFocusEffect(
 
             const statsRes = await api.get('/stats/overload');
             setOverloadBanner(statsRes.data);
-
           } catch (e) { Alert.alert('삭제 실패'); }
           finally { setDeletingId(null); }
         },
@@ -261,23 +257,32 @@ useFocusEffect(
           <View style={styles.filterItemHeaderLeft}>
             <Text style={styles.filterItemLabel}>{label}</Text>
             {!!filter[key] && <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>선택됨</Text></View>}
+            
+            {/* 더보기 버튼을 라벨 우측으로 이동시켜 공간 절약 */}
+            {expanded[key] && options.length > 5 && (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setShowAllOptions((prev) => ({ ...prev, [key]: !prev[key] }));
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.moreButtonInlineText}>
+                  {showAllOptions[key] ? '접기' : `더보기 +${options.length - 5}`}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
           <Text style={styles.arrowText}>{expanded[key] ? '▲' : '▼'}</Text>
         </TouchableOpacity>
+        
         {expanded[key] && (
-          <View>
-            <View style={styles.optionWrap}>
-              {visibleOptions.map((item, index) => (
-                <TouchableOpacity key={`${key}-${item}-${index}`} style={[styles.optionChip, filter[key] === item && styles.optionChipSelected]} onPress={() => toggleFilter(key, item)} activeOpacity={0.85}>
-                  <Text style={[styles.optionChipText, filter[key] === item && styles.optionChipTextSelected]}>{item}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {options.length > 5 && (
-              <TouchableOpacity style={styles.moreButton} onPress={() => setShowAllOptions((prev) => ({ ...prev, [key]: !prev[key] }))} activeOpacity={0.85}>
-                <Text style={styles.moreButtonText}>{showAllOptions[key] ? '접기' : `더보기 +${options.length - 5}`}</Text>
+          <View style={styles.optionWrap}>
+            {visibleOptions.map((item, index) => (
+              <TouchableOpacity key={`${key}-${item}-${index}`} style={[styles.optionChip, filter[key] === item && styles.optionChipSelected]} onPress={() => toggleFilter(key, item)} activeOpacity={0.85}>
+                <Text style={[styles.optionChipText, filter[key] === item && styles.optionChipTextSelected]}>{item}</Text>
               </TouchableOpacity>
-            )}
+            ))}
           </View>
         )}
       </View>
@@ -296,7 +301,7 @@ useFocusEffect(
           {!!item.tags.style && <Text style={styles.cardTag}>{item.tags.style}</Text>}
           {!!item.tags.tpo && <Text style={[styles.cardTag, styles.tpoTag]}>{item.tags.tpo}</Text>}
         </View>
-        <Text style={styles.cardHint}>길게 눌러 상세 메뉴 보기</Text>
+        {/* 안내 문구를 삭제하여 더욱 깔끔한 디자인 확보 */}
       </View>
     </TouchableOpacity>
   );
@@ -308,10 +313,18 @@ useFocusEffect(
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        
+        {/* ✨ 중복되던 헤더 영역을 하나로 깔끔하게 통합했습니다 */}
         <View style={styles.headerRow}>
-          <View style={styles.headerTextBox}>
-            <Text style={styles.title}>내 옷장</Text>
-            <Text style={styles.subtitle}>등록한 옷을 확인하고 관리해보세요.</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, flex: 1 }}>
+            <TouchableOpacity onPress={() => router.back()} hitSlop={10} style={{ marginTop: 2 }}>
+              <Ionicons name="arrow-back" size={28} color="#111" />
+            </TouchableOpacity>
+            
+            <View style={styles.headerTextBox}>
+              <Text style={styles.title}>내 옷장</Text>
+              <Text style={styles.subtitle}>등록한 옷을 확인하고 관리해보세요.</Text>
+            </View>
           </View>
           
           <View style={styles.headerActionBox}>
@@ -324,7 +337,6 @@ useFocusEffect(
           </View>
         </View>
 
-        {/* ✅ 옷이 없을 때는 빈 화면(Empty State) 렌더링 */}
         {clothes.length === 0 ? (
           <View style={styles.emptyStateContainer}>
             <Ionicons name="shirt-outline" size={64} color="#d1d5db" />
@@ -335,7 +347,6 @@ useFocusEffect(
             </TouchableOpacity>
           </View>
         ) : (
-          /* ✅ 문법 에러가 났던 </></> 오타를 정식 Fragment 태그인 </> 로 완벽히 교정 */
           <>
             <View style={styles.actionRow}>
               <TouchableOpacity style={[styles.primaryActionBtn, showFilter && styles.primaryActionBtnActive]} onPress={() => setShowFilter((prev) => !prev)} activeOpacity={0.85}>
@@ -381,7 +392,6 @@ useFocusEffect(
               </View>
             )}
 
-            {/* 🚨 [추가] 추천 2안 적용: 카테고리 필터와 내 옷장 타이틀 틈새에 과부하 분석 배너 삽입 */}
             {overloadBanner && overloadBanner.total_warnings > 0 && (
               <View style={styles.overloadBannerBox}>
                 <View style={styles.overloadBannerHeader}>
@@ -392,7 +402,6 @@ useFocusEffect(
               </View>
             )}
 
-            {/* 🚨 [추가] 처분 추천 배너 (아이템이 있을 때만 표시) */}
             {disposalBanner && disposalBanner.items?.length > 0 && (
               <View style={styles.disposalBannerBox}>
                 <View style={styles.disposalBannerHeader}>
@@ -432,7 +441,7 @@ useFocusEffect(
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16, paddingTop: 16, backgroundColor: '#fff' },
+  container: { flex: 1, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 16 : 16, backgroundColor: '#fff' },
   scrollContent: { paddingBottom: 28 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 10 },
   headerTextBox: { flex: 1, paddingRight: 8 },
@@ -458,36 +467,41 @@ const styles = StyleSheet.create({
   typeBtnSelected: { backgroundColor: '#111' },
   typeText: { color: '#222', fontSize: 14, fontWeight: '600' },
   typeTextSelected: { color: '#fff' },
+  
   filterPanel: { marginBottom: 16 },
   filterSectionCard: { backgroundColor: '#fafafa', borderWidth: 1, borderColor: '#ededed', borderRadius: 18, padding: 14 },
   filterSectionTitle: { fontSize: 15, fontWeight: '800', color: '#111', marginBottom: 10 },
+  
+  /* ✨ 필터 아이템 디자인 슬림하게 최적화 (다이어트 UI 적용) */
   filterItemBlock: { marginBottom: 10 },
-  filterItemHeader: { minHeight: 44, borderRadius: 12, backgroundColor: '#f8f8f8', paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#e4e4e4', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  filterItemHeader: { minHeight: 38, borderRadius: 10, backgroundColor: '#f8f8f8', paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#e4e4e4', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   filterItemHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
-  filterItemLabel: { fontSize: 14, fontWeight: '700', color: '#111' },
-  activeBadge: { backgroundColor: '#efefef', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: '#d9d9d9' },
-  activeBadgeText: { color: '#333', fontSize: 11, fontWeight: '700' },
-  arrowText: { fontSize: 12, color: '#444', fontWeight: '700' },
-  optionWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 8 },
-  optionChip: { minHeight: 38, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#dcdcdc', justifyContent: 'center' },
+  filterItemLabel: { fontSize: 13, fontWeight: '700', color: '#111' },
+  activeBadge: { backgroundColor: '#efefef', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: '#d9d9d9' },
+  activeBadgeText: { color: '#333', fontSize: 10, fontWeight: '700' },
+  moreButtonInlineText: { fontSize: 11, color: '#4f46e5', fontWeight: '700', marginLeft: 4 }, 
+  arrowText: { fontSize: 11, color: '#444', fontWeight: '700' },
+  optionWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, gap: 6 }, 
+  optionChip: { minHeight: 32, paddingVertical: 6, paddingHorizontal: 10, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#dcdcdc', justifyContent: 'center' }, 
   optionChipSelected: { backgroundColor: '#111', borderColor: '#111', borderWidth: 1.5 },
-  optionChipText: { color: '#333', fontSize: 13, fontWeight: '600' },
+  optionChipText: { color: '#333', fontSize: 12, fontWeight: '600' },
   optionChipTextSelected: { color: '#fff', fontWeight: '800' },
-  moreButton: { marginTop: 6, alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 2 },
-  moreButtonText: { fontSize: 12, color: '#555', fontWeight: '700' },
+  
   resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingHorizontal: 2 },
   resultTitle: { fontSize: 17, fontWeight: '800', color: '#111' },
   resultCount: { fontSize: 13, color: '#666', fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  card: { width: '48.2%', backgroundColor: '#fff', borderRadius: 18, marginBottom: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#ededed' },
-  cardImageWrap: { width: '100%', height: 180, backgroundColor: '#f9fafb', justifyContent: 'center', alignItems: 'center' },
+  
+  /* ✨ 카드 다이어트 및 폰트 크기 조정 적용 */
+  card: { width: '48.2%', backgroundColor: '#fff', borderRadius: 16, marginBottom: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#ededed' },
+  cardImageWrap: { width: '100%', height: 155, backgroundColor: '#f9fafb', justifyContent: 'center', alignItems: 'center' }, 
   cardImage: { width: '100%', height: '100%' },
-  cardBody: { padding: 12 },
-  cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  cardTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  cardTag: { fontSize: 12, color: '#4b5563', backgroundColor: '#f3f4f6', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, fontWeight: '500' },
+  cardBody: { padding: 10 }, 
+  cardTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 }, 
+  cardTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  cardTag: { fontSize: 11, color: '#4b5563', backgroundColor: '#f3f4f6', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, fontWeight: '500' },
   tpoTag: { backgroundColor: '#eef2ff', color: '#4f46e5' },
-  cardHint: { fontSize: 11, color: '#7a7a7a', marginTop: 8 },
+  
   loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
   
   emptyStateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 80 },
@@ -509,56 +523,13 @@ const styles = StyleSheet.create({
   paginationDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ddd' },
   paginationDotActive: { backgroundColor: '#111', width: 20 },
 
-  // 🚨 [추가] 옷장 과부하 경고 배너용 스타일 테마
-  overloadBannerBox: {
-    backgroundColor: '#fef2f2', 
-    borderWidth: 1, 
-    borderColor: '#fee2e2', 
-    borderRadius: 16, 
-    padding: 14, 
-    marginBottom: 16
-  },
-  overloadBannerHeader: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 6, 
-    marginBottom: 4 
-  },
-  overloadBannerTitle: { 
-    fontSize: 13, 
-    fontWeight: '800', 
-    color: '#dc2626' 
-  },
-  overloadBannerText: { 
-    fontSize: 14, 
-    color: '#4b5563', 
-    lineHeight: 20, 
-    fontWeight: '600' 
-  },
+  overloadBannerBox: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fee2e2', borderRadius: 16, padding: 14, marginBottom: 16 },
+  overloadBannerHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  overloadBannerTitle: { fontSize: 13, fontWeight: '800', color: '#dc2626' },
+  overloadBannerText: { fontSize: 14, color: '#4b5563', lineHeight: 20, fontWeight: '600' },
 
-  disposalBannerBox: {
-    backgroundColor: '#fffbeb', // 연한 주황색 바탕
-    borderWidth: 1,
-    borderColor: '#fef3c7',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
-  },
-  disposalBannerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  disposalBannerTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#d97706', // 진한 주황색
-  },
-  disposalBannerText: {
-    fontSize: 14,
-    color: '#4b5563',
-    lineHeight: 20,
-    fontWeight: '600',
-  },
+  disposalBannerBox: { backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fef3c7', borderRadius: 16, padding: 14, marginBottom: 16 },
+  disposalBannerHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  disposalBannerTitle: { fontSize: 13, fontWeight: '800', color: '#d97706' },
+  disposalBannerText: { fontSize: 14, color: '#4b5563', lineHeight: 20, fontWeight: '600' },
 });
