@@ -1,10 +1,13 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Alert,
   Image,
+  Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -200,7 +203,15 @@ export default function RegisterScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>옷 등록</Text>
+      {/* ✨ 뒤로가기 버튼 추가 */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
+          <Ionicons name="arrow-back" size={28} color="#111" />
+        </TouchableOpacity>
+        <Text style={[styles.title, { marginBottom: 0 }]}>옷 등록</Text>
+      </View>
+
+
       <TouchableOpacity style={styles.imageBox} onPress={pickImage}>
         {/* ✅ 수정 포인트: resizeMode를 contain으로 수정하여 이미지 상/하단 짤림 해결 */}
         {image ? <Image source={{ uri: image }} style={styles.image} resizeMode="contain" /> : <Text style={styles.imagePlaceholder}>+ 사진 추가</Text>}
@@ -243,8 +254,13 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 16, paddingBottom: 32 },
-  title: { fontSize: 26, fontWeight: '700', marginBottom: 16 },
+  content: { 
+    padding: 16, 
+    paddingBottom: 32, 
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 16 : 16 
+  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  title: { fontSize: 26, fontWeight: '700' }, // (marginBottom: 16 제거)
   imageBox: { height: 220, borderRadius: 16, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginBottom: 20 },
   // ✅ 배경색을 한 번 더 선언하여 원본 비율 매핑 시 좌우 여백을 자연스럽게 처리
   image: { width: '100%', height: '100%', backgroundColor: '#f3f4f6' },
