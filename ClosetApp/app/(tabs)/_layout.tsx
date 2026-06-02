@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router';
 
 export default function TabLayout() {
   return (
-    <Tabs>
+    <Tabs screenOptions={{ tabBarActiveTintColor: '#111', headerShown: false }}>
       <Tabs.Screen
         name="index"
         options={{
@@ -14,12 +14,13 @@ export default function TabLayout() {
         }}
       />
 
+      {/* ✨ 새로 추가된 옷장 탭 */}
       <Tabs.Screen
-        name="register"
+        name="closet"
         options={{
-          title: '등록',
+          title: '옷장',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle" size={size} color={color} />
+            <Ionicons name="shirt" size={size} color={color} />
           ),
         }}
       />
@@ -28,8 +29,9 @@ export default function TabLayout() {
         name="recommend"
         options={{
           title: '추천',
+          // 옷장 아이콘과 겹치지 않게 반짝이는 아이콘으로 변경
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="shirt" size={size} color={color} />
+            <Ionicons name="sparkles" size={size} color={color} />
           ),
         }}
       />
@@ -51,6 +53,15 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="analytics" size={size} color={color} />
           ),
+        }}
+      />
+
+      {/* ✨ 등록 화면은 탭 바에서는 숨기고 홈 화면의 버튼으로 접근 */}
+      <Tabs.Screen
+        name="register"
+        options={{
+          href: null, 
+          title: '등록',
         }}
       />
     </Tabs>
