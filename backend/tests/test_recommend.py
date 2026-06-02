@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from conftest import make_clothes, make_user
 from models import StatusEnum, CategoryEnum, ThicknessEnum, MaterialEnum
 from routers.recommend import filter_clothes, apply_fallback_filter, get_unworn_days, get_user_profile_text, get_current_season, calculate_conflict_score, to_situation_kr, clothes_to_text, build_prompt, load_tpo_scores, fetch_weather, call_gemini
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from datetime import date, timedelta
 import pytest
 from fastapi import HTTPException
@@ -53,6 +53,10 @@ class TestFilterClothes:
 
     def test_빈리스트(self):
         assert filter_clothes([], 20.0, "sunny") == []
+
+    def test_status_None_포함(self):
+        c = make_clothes(status=None)
+        assert c in filter_clothes([c], 20.0, "sunny")
 
 
 class TestGetUnwornDays:
@@ -103,6 +107,16 @@ class TestGetUserProfileText:
         u = make_user(preferred_style="미니멀")
         _, preferred_style, _, _ = get_user_profile_text(u, 20.0)
         assert preferred_style == "미니멀"
+
+    def test_민감도_음수_체감기온_실제보다_높음(self):
+        u = make_user(temp_sensitivity=-2.0)
+        _, _, felt_temp, _ = get_user_profile_text(u, 20.0)
+        assert felt_temp == 24.0
+
+    def test_프로필텍스트에_아우터기준온도_포함(self):
+        u = make_user(temp_sensitivity=0.0)
+        profile_text, _, _, outer = get_user_profile_text(u, 20.0)
+        assert str(outer) in profile_text
 
 class TestGetCurrentSeason:
     def test_반환값이_4계절중하나(self):
@@ -170,6 +184,24 @@ class TestFilterClothesF13:
         c = make_clothes(season="사계절", status=StatusEnum.wearable)
         with patch("routers.recommend.get_current_season", return_value="봄"):
             assert c in filter_clothes([c], 20.0, "sunny")
+
+    def test_세탁필요_제외(self):
+        c = make_clothes(status=StatusEnum.need_wash)
+        assert filter_clothes([c], 20.0, "sunny") == []
+
+
+class TestGetCurrentSeasonExtra:
+    def test_9월_가을(self):
+        with patch("routers.recommend.date") as mock_date:
+            mock_date.today.return_value = date(2026, 9, 1)
+            assert get_current_season() == "가을"
+
+
+class TestCalculateConflictScoreExtra:
+    def test_면접_영어상황도_60반환(self):
+        c = make_clothes(season="봄", color="레드")
+        with patch("routers.recommend.get_current_season", return_value="봄"):
+            assert calculate_conflict_score(c, "interview") == 60
 
 
 class TestApplyFallbackFilter:
@@ -359,40 +391,33 @@ class TestLoadTpoScores:
 
 class TestFetchWeather:
     def test_비오는날_rainy(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {"temperature": 15.0, "condition": "rainy"}
+        with patch("routers.recommend.get_weather_data", return_value={"temperature": 15.0, "condition": "rainy"}):
             result = fetch_weather("서울")
         assert result["condition"] == "rainy"
         assert result["temperature"] == 15.0
 
     def test_눈오는날_snowy(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {"temperature": 0.0, "condition": "snowy"}
+        with patch("routers.recommend.get_weather_data", return_value={"temperature": 0.0, "condition": "snowy"}):
             result = fetch_weather("서울")
         assert result["condition"] == "snowy"
 
     def test_맑은날_sunny(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {"temperature": 25.0, "condition": "sunny"}
+        with patch("routers.recommend.get_weather_data", return_value={"temperature": 25.0, "condition": "sunny"}):
             result = fetch_weather("서울")
         assert result["condition"] == "sunny"
 
     def test_흐린날_cloudy(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {"temperature": 18.0, "condition": "cloudy"}
+        with patch("routers.recommend.get_weather_data", return_value={"temperature": 18.0, "condition": "cloudy"}):
             result = fetch_weather("서울")
         assert result["condition"] == "cloudy"
 
     def test_status_실패시_기본값반환(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {"temperature": 20.0, "condition": "sunny"}
+        with patch("routers.recommend.get_weather_data", return_value={"temperature": 20.0, "condition": "sunny"}):
             result = fetch_weather("서울")
         assert result == {"temperature": 20.0, "condition": "sunny"}
 
     def test_예외발생시_기본값반환(self):
-        with patch("routers.recommend.get_weather_data", new_callable=AsyncMock) as mock_get:
-            # 예외가 터져도 fetch_weather가 예외 처리(except)를 통해 기본값을 내리는지 검증
-            mock_get.side_effect = Exception("연결 실패") 
+        with patch("routers.recommend.get_weather_data", side_effect=Exception("연결 실패")):
             result = fetch_weather("서울")
         assert result == {"temperature": 20.0, "condition": "sunny"}
 

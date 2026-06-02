@@ -92,15 +92,21 @@ def get_base_time():
     return base_date, base_time
 
 
-async def get_weather_data(address: str) -> dict:
+def get_weather_data(address: str) -> dict:
     """주소로 기상청 단기예보 API를 직접 호출해 기온·날씨 조건을 반환.
     실패 또는 유효하지 않은 주소면 기본값 {'temperature': 20.0, 'condition': 'sunny'}을 반환한다.
-    recommend.py의 fetch_weather()가 자기 서버 HTTP를 호출하는 구조를 제거하기 위해 추가됨.
+    동기 컨텍스트(fetch_weather)에서 호출되므로 sync 함수로 구현한다.
     """
     service_key = os.getenv("WEATHER_SERVICE_KEY")
 
-    lat, lon = await get_coords_from_address(address)
-    if lat is None or lon is None:
+    try:
+        geo_url = f"https://nominatim.openstreetmap.org/search?q={address}&format=json"
+        geo_resp = requests.get(geo_url, headers={"User-Agent": "SmartClosetApp"}, timeout=5)
+        geo_data = geo_resp.json()
+        if not geo_data:
+            return {"temperature": 20.0, "condition": "sunny"}
+        lat, lon = float(geo_data[0]["lat"]), float(geo_data[0]["lon"])
+    except Exception:
         return {"temperature": 20.0, "condition": "sunny"}
 
     nx, ny = convert_grid(lat, lon)
