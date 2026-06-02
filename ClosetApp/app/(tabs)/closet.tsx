@@ -476,8 +476,24 @@ const styles = StyleSheet.create({
   cardImage: { width: '100%', height: '100%' },
   cardBody: { padding: 12 }, 
   cardTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 }, 
-  cardTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  cardTag: { fontSize: 11, color: '#4b5563', backgroundColor: '#f3f4f6', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, fontWeight: '500' },
+  cardTagRow: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    gap: 4,
+    alignItems: 'center' 
+  },
+  cardTag: { 
+    fontSize: 11, 
+    color: '#4b5563', 
+    backgroundColor: '#f3f4f6', 
+    paddingHorizontal: 8, 
+    height: 24,              // 높이 고정
+    lineHeight: 24,          // 높이와 동일하게 설정하여 글씨를 중앙 정렬
+    borderRadius: 6, 
+    fontWeight: '500',
+    textAlign: 'center',
+    overflow: 'hidden',      // 배경색 둥근 모서리 바깥으로 나가는 것 방지
+  },
   tpoTag: { backgroundColor: '#eef2ff', color: '#4f46e5' },
   
   loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
