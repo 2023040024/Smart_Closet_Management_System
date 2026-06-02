@@ -11,6 +11,7 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(false);
   const [overloadData, setOverloadData] = useState<any>(null);
   const [disposalData, setDisposalData] = useState<any>(null);
+  const [reportData, setReportData] = useState<any>(null); // ✨ 추가: 월간 리포트 데이터 상태
 
   useFocusEffect(
     useCallback(() => {
@@ -18,14 +19,17 @@ export default function DashboardScreen() {
       const fetchDashboardStats = async () => {
         setLoading(true);
         try {
-          const [overloadRes, disposalRes] = await Promise.all([
+          // ✨ API 3개 동시 호출 (진단 화면에 구현된 monthly-report 활용)
+          const [overloadRes, disposalRes, reportRes] = await Promise.all([
             api.get('/stats/overload').catch(() => ({ data: null })),
-            api.get('/stats/dispose').catch(() => ({ data: null }))
+            api.get('/stats/dispose').catch(() => ({ data: null })),
+            api.get('/stats/monthly-report').catch(() => ({ data: null }))
           ]);
 
           if (isMounted) {
             setOverloadData(overloadRes.data);
             setDisposalData(disposalRes.data);
+            setReportData(reportRes.data);
           }
         } catch (error) {
           console.error('대시보드 통계 로드 실패:', error);
@@ -67,7 +71,7 @@ export default function DashboardScreen() {
         <View>
           <Text style={styles.systemText}>SMART CLOSET MANAGEMENT</Text>
           <Text style={styles.title}>
-            Re<Text style={styles.accentColor}>:</Text>fit
+            Re<Text style={styles.accentColor}>:</Text>fit 브리핑
           </Text>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} hitSlop={10}>
@@ -75,13 +79,12 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 2. AI 코디 추천 요약 카드 (문구 및 가독성 개선) */}
+      {/* 2. AI 코디 추천 요약 카드 */}
       <View style={styles.aiCard}>
         <View style={styles.aiHeader}>
           <Ionicons name="sparkles" size={18} color="#2563EB" />
           <Text style={styles.aiTitle}>오늘의 AI 추천 코디</Text>
         </View>
-        {/* ✨ 줄바꿈을 명시적으로 추가하여 글이 더 잘 읽히도록 수정 */}
         <Text style={styles.aiDesc}>
           오늘 날씨와 TPO에 딱 맞는 맞춤형 스타일링을 준비했어요.{'\n'}옷장 속 아이템들의 새로운 조합을 지금 확인해 보세요!
         </Text>
@@ -90,9 +93,7 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 3. 빠른 이동 (메뉴) */}
-      {/* ✨ '빠른 이동' -> '바로가기' 로 더 간결하게 수정 */}
-      <Text style={styles.sectionTitle}>바로가기</Text>
+      {/* 3. 액션 버튼 그리드 (문구 없음) */}
       <View style={styles.actionGrid}>
         <TouchableOpacity style={[styles.actionCard, { backgroundColor: '#F0F9FF', borderColor: '#E0F2FE' }]} onPress={() => router.push('/(tabs)/register')} activeOpacity={0.8}>
           <View style={[styles.iconBox, { backgroundColor: '#FFFFFF' }]}>
@@ -117,10 +118,9 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 4. 옷장 인사이트 */}
+      {/* 4. 옷장 인사이트 (리포트) */}
       <View style={styles.statsContainer}>
         <View style={styles.insightHeader}>
-          {/* ✨ '내 옷장 요약' -> '나의 옷장 리포트' 로 전문성 강조 */}
           <Text style={styles.sectionTitle}>나의 옷장 리포트</Text>
           <TouchableOpacity onPress={() => router.push('/(tabs)/analysis')} hitSlop={10}>
             <Text style={styles.moreLink}>자세히 보기</Text>
@@ -131,6 +131,32 @@ export default function DashboardScreen() {
           <ActivityIndicator size="small" color="#2563EB" style={{ marginVertical: 20 }} />
         ) : (
           <>
+            {/* ✨ 아이디어 1: 활용률 미니 프로그레스 바 적용 */}
+            {reportData && reportData.ecosystem && (
+              <View style={styles.ecosystemCard}>
+                <View style={styles.ecoHeaderRow}>
+                  <Text style={styles.ecoTitle}>이달의 옷장 활용률</Text>
+                  <Text style={styles.ecoRateText}>{reportData.ecosystem.activity_rate}%</Text>
+                </View>
+                
+                <View style={styles.progressBarBg}>
+                  <View style={[
+                    styles.progressBarFill, 
+                    { width: `${Math.min(Math.max(reportData.ecosystem.activity_rate, 0), 100)}%` }
+                  ]} />
+                </View>
+                
+                <View style={styles.ecoLegendRow}>
+                  <Text style={styles.ecoLegendText}>
+                    🔥 활성 <Text style={styles.ecoBoldText}>{reportData.ecosystem.active_clothes}</Text>벌
+                  </Text>
+                  <Text style={styles.ecoLegendText}>
+                    💤 방치 <Text style={styles.ecoBoldText}>{reportData.ecosystem.inactive_clothes}</Text>벌
+                  </Text>
+                </View>
+              </View>
+            )}
+
             {overloadData && overloadData.total_warnings > 0 ? (
               <View style={styles.alertBoxOverload}>
                 <View style={styles.alertHeader}>
@@ -182,9 +208,8 @@ const styles = StyleSheet.create({
   aiCard: { backgroundColor: '#EEF2FF', borderRadius: 20, padding: 20, marginBottom: 32, borderWidth: 1, borderColor: '#E0E7FF' },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
   aiTitle: { fontSize: 16, fontWeight: '800', color: '#1E3A8A' },
-  // ✨ 가독성을 위해 줄간격(lineHeight)을 24로 늘리고 마진을 살짝 더 주었습니다.
   aiDesc: { fontSize: 14, color: '#475569', lineHeight: 24, marginBottom: 18, letterSpacing: -0.2 },
-  aiBtn: { backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 12, alignItems: 'center' }, // ✨ 버튼 상하 여백(14)을 늘려 터치감 개선
+  aiBtn: { backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   aiBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' }, 
   
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 16 },
@@ -197,6 +222,17 @@ const styles = StyleSheet.create({
   statsContainer: { marginBottom: 20 },
   insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   moreLink: { fontSize: 13, color: '#2563EB', fontWeight: '600', marginBottom: 16 },
+
+  // ✨ 옷장 생태계 (활용률) 카드 스타일
+  ecosystemCard: { backgroundColor: '#F8FAFC', padding: 20, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
+  ecoHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
+  ecoTitle: { fontSize: 15, fontWeight: '700', color: '#334155' },
+  ecoRateText: { fontSize: 24, fontWeight: '800', color: '#111827' },
+  progressBarBg: { height: 10, backgroundColor: '#E2E8F0', borderRadius: 5, overflow: 'hidden', marginBottom: 16 },
+  progressBarFill: { height: '100%', backgroundColor: '#2563EB', borderRadius: 5 },
+  ecoLegendRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
+  ecoLegendText: { fontSize: 13, color: '#64748B' },
+  ecoBoldText: { fontWeight: '700', color: '#334155' },
   
   statBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', padding: 16, borderRadius: 12, gap: 10, borderWidth: 1, borderColor: '#DCFCE7' },
   statText: { fontSize: 13, color: '#065F46', fontWeight: '600', flex: 1, lineHeight: 20 },
