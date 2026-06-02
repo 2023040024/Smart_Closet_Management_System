@@ -229,8 +229,10 @@ export default function ClosetScreen() {
     setCurrentFilterPage(Math.round(offsetX / pageWidthSize));
   };
 
+  // ✨ 수정: 가로 스크롤 대신 줄바꿈(Wrap)으로 원복하고, 디자인만 최신 테마 유지!
   const renderSection = (label: string, key: keyof FilterType, options: string[]) => {
     const visibleOptions = showAllOptions[key] ? options : options.slice(0, 5);
+
     return (
       <View style={styles.filterItemBlock}>
         <TouchableOpacity style={styles.filterItemHeader} onPress={() => toggleExpand(key)} activeOpacity={0.85}>
@@ -238,6 +240,7 @@ export default function ClosetScreen() {
             <Text style={styles.filterItemLabel}>{label}</Text>
             {!!filter[key] && <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>선택됨</Text></View>}
             
+            {/* ✨ 스크롤 충돌 방지를 위해 '더보기' 버튼 부활 */}
             {expanded[key] && options.length > 5 && (
               <TouchableOpacity
                 onPress={(e) => {
@@ -258,7 +261,12 @@ export default function ClosetScreen() {
         {expanded[key] && (
           <View style={styles.optionWrap}>
             {visibleOptions.map((item, index) => (
-              <TouchableOpacity key={`${key}-${item}-${index}`} style={[styles.optionChip, filter[key] === item && styles.optionChipSelected]} onPress={() => toggleFilter(key, item)} activeOpacity={0.85}>
+              <TouchableOpacity 
+                key={`${key}-${item}-${index}`} 
+                style={[styles.optionChip, filter[key] === item && styles.optionChipSelected]} 
+                onPress={() => toggleFilter(key, item)} 
+                activeOpacity={0.85}
+              >
                 <Text style={[styles.optionChipText, filter[key] === item && styles.optionChipTextSelected]}>{item}</Text>
               </TouchableOpacity>
             ))}
@@ -292,7 +300,6 @@ export default function ClosetScreen() {
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
-        {/* ✨ 수정된 헤더 영역 (버튼 삭제 및 한 줄 정렬) */}
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={10} style={styles.backButton}>
             <Ionicons name="arrow-back" size={28} color="#111" />
@@ -300,7 +307,6 @@ export default function ClosetScreen() {
           
           <View style={styles.headerTextBox}>
             <Text style={styles.title}>내 옷장</Text>
-            {/* numberOfLines={1} 적용으로 문구 줄바꿈 방지 */}
             <Text style={styles.subtitle} numberOfLines={1}>등록한 옷을 확인하고 관리해보세요.</Text>
           </View>
         </View>
@@ -412,7 +418,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 16 : 16, backgroundColor: '#fff' },
   scrollContent: { paddingBottom: 28 },
   
-  // ✨ 다듬어진 헤더 영역 스타일
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   backButton: { marginRight: 12 },
   headerTextBox: { flex: 1 },
@@ -445,55 +450,37 @@ const styles = StyleSheet.create({
   activeBadgeText: { color: '#333', fontSize: 10, fontWeight: '700' },
   moreButtonInlineText: { fontSize: 11, color: '#4f46e5', fontWeight: '700', marginLeft: 4 }, 
   arrowText: { fontSize: 11, color: '#444', fontWeight: '700' },
-  optionWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, gap: 6 }, 
-  optionChip: { minHeight: 32, paddingVertical: 6, paddingHorizontal: 10, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#dcdcdc', justifyContent: 'center' }, 
-  optionChipSelected: { backgroundColor: '#111', borderColor: '#111', borderWidth: 1.5 },
-  optionChipText: { color: '#333', fontSize: 12, fontWeight: '600' },
-  optionChipTextSelected: { color: '#fff', fontWeight: '800' },
+  
+  // ✨ 줄바꿈 모드로 원복하고 간격 최적화
+  optionWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 }, 
+  optionChip: { 
+    minHeight: 34, 
+    paddingVertical: 6, 
+    paddingHorizontal: 14, 
+    backgroundColor: '#F8FAFC', 
+    borderRadius: 20, 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0', 
+    justifyContent: 'center', 
+    marginRight: 8,
+    marginBottom: 8
+  },
+  optionChipSelected: { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
+  optionChipText: { color: '#64748B', fontSize: 13, fontWeight: '600' },
+  optionChipTextSelected: { color: '#2563EB', fontWeight: '800' },
   
   resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingHorizontal: 2 },
   resultTitle: { fontSize: 17, fontWeight: '800', color: '#111' },
   resultCount: { fontSize: 13, color: '#666', fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   
-  // ✨ 옷 박스 도형 및 비율을 딱 떨어지게 다듬음
-  card: { 
-    width: '48%', 
-    backgroundColor: '#fff', 
-    borderRadius: 16, 
-    marginBottom: 16, 
-    overflow: 'hidden', 
-    borderWidth: 1, 
-    borderColor: '#f1f5f9' 
-  },
-  cardImageWrap: { 
-    width: '100%', 
-    height: 160, 
-    backgroundColor: '#f8fafc', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
+  card: { width: '48%', backgroundColor: '#fff', borderRadius: 16, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#f1f5f9' },
+  cardImageWrap: { width: '100%', height: 160, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center' },
   cardImage: { width: '100%', height: '100%' },
   cardBody: { padding: 12 }, 
   cardTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 }, 
-  cardTagRow: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    gap: 4,
-    alignItems: 'center' 
-  },
-  cardTag: { 
-    fontSize: 11, 
-    color: '#4b5563', 
-    backgroundColor: '#f3f4f6', 
-    paddingHorizontal: 8, 
-    height: 24,              // 높이 고정
-    lineHeight: 24,          // 높이와 동일하게 설정하여 글씨를 중앙 정렬
-    borderRadius: 6, 
-    fontWeight: '500',
-    textAlign: 'center',
-    overflow: 'hidden',      // 배경색 둥근 모서리 바깥으로 나가는 것 방지
-  },
+  cardTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, alignItems: 'center' },
+  cardTag: { fontSize: 11, color: '#4b5563', backgroundColor: '#f3f4f6', paddingHorizontal: 8, height: 24, lineHeight: 24, borderRadius: 6, fontWeight: '500', textAlign: 'center', overflow: 'hidden' },
   tpoTag: { backgroundColor: '#eef2ff', color: '#4f46e5' },
   
   loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
