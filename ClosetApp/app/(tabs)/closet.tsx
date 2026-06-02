@@ -229,7 +229,6 @@ export default function ClosetScreen() {
     setCurrentFilterPage(Math.round(offsetX / pageWidthSize));
   };
 
-  // ✨ 수정: 가로 스크롤 대신 줄바꿈(Wrap)으로 원복하고, 디자인만 최신 테마 유지!
   const renderSection = (label: string, key: keyof FilterType, options: string[]) => {
     const visibleOptions = showAllOptions[key] ? options : options.slice(0, 5);
 
@@ -240,7 +239,6 @@ export default function ClosetScreen() {
             <Text style={styles.filterItemLabel}>{label}</Text>
             {!!filter[key] && <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>선택됨</Text></View>}
             
-            {/* ✨ 스크롤 충돌 방지를 위해 '더보기' 버튼 부활 */}
             {expanded[key] && options.length > 5 && (
               <TouchableOpacity
                 onPress={(e) => {
@@ -276,13 +274,13 @@ export default function ClosetScreen() {
     );
   };
 
+  // ✨ 옷 카드의 렌더링 부분에서 불필요한 카테고리 텍스트 타이틀을 제거했습니다.
   const renderCard = (item: ClothesItem) => (
     <TouchableOpacity key={item.id} style={styles.card} activeOpacity={0.9} onLongPress={() => openMenu(item)} onPress={() => router.push({ pathname: '/detail', params: { id: item.id } })} delayLongPress={250}>
       <View style={styles.cardImageWrap}>
         <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="contain" />
       </View>
       <View style={styles.cardBody}>
-        <Text style={styles.cardTitle}>{item.tags.category || '미분류'}</Text>
         <View style={styles.cardTagRow}>
           {!!item.tags.color && <Text style={styles.cardTag}>{item.tags.color}</Text>}
           {!!item.tags.style && <Text style={styles.cardTag}>{item.tags.style}</Text>}
@@ -451,7 +449,6 @@ const styles = StyleSheet.create({
   moreButtonInlineText: { fontSize: 11, color: '#4f46e5', fontWeight: '700', marginLeft: 4 }, 
   arrowText: { fontSize: 11, color: '#444', fontWeight: '700' },
   
-  // ✨ 줄바꿈 모드로 원복하고 간격 최적화
   optionWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 }, 
   optionChip: { 
     minHeight: 34, 
@@ -477,8 +474,8 @@ const styles = StyleSheet.create({
   card: { width: '48%', backgroundColor: '#fff', borderRadius: 16, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#f1f5f9' },
   cardImageWrap: { width: '100%', height: 160, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center' },
   cardImage: { width: '100%', height: '100%' },
+  // ✨ cardTitle(카테고리 텍스트) 스타일 삭제 및 cardBody 패딩 조정
   cardBody: { padding: 12 }, 
-  cardTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 }, 
   cardTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, alignItems: 'center' },
   cardTag: { fontSize: 11, color: '#4b5563', backgroundColor: '#f3f4f6', paddingHorizontal: 8, height: 24, lineHeight: 24, borderRadius: 6, fontWeight: '500', textAlign: 'center', overflow: 'hidden' },
   tpoTag: { backgroundColor: '#eef2ff', color: '#4f46e5' },
