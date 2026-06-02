@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router'; // ✨ 필수 import
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -20,7 +20,6 @@ import { RecommendFilter } from '../../components/recommend/RecommendFilter';
 import api from '../_api';
 import { ClothesItem, useCloset } from '../_closetStore';
 
-// 타입 정의
 type OutfitSet = {
   top?: ClothesItem;
   bottom?: ClothesItem;
@@ -29,7 +28,6 @@ type OutfitSet = {
   reason?: string;
 };
 
-// 기기 화면 너비 설정
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.75; 
 
@@ -56,7 +54,7 @@ function SkeletonLoader() {
 }
 
 export default function RecommendScreen() {
-  const router = useRouter(); // ✨ router 객체 선언 (에러 해결)
+  const router = useRouter();
   const { clothes, fetchClothes } = useCloset();
   const [situation, setSituation] = useState('');
   const [apiLoading, setApiLoading] = useState(false);
@@ -125,15 +123,15 @@ export default function RecommendScreen() {
           worn_date: todayStr
         }));
 
-    if (payload.length === 0) return Alert.alert('알림', '착용할 옷 정보가 없습니다.');
+      if (payload.length === 0) return Alert.alert('알림', '착용할 옷 정보가 없습니다.');
 
-    await api.post('/history', payload);
-    Alert.alert('성공', '오늘의 착용 기록에 저장되었습니다!');
-  } catch (error: any) {
-    console.error(error);
-    Alert.alert('오류', '착용 기록 저장에 실패했습니다.');
-  }
-};
+      await api.post('/history', payload);
+      Alert.alert('성공', '오늘의 착용 기록에 저장되었습니다!');
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('오류', '착용 기록 저장에 실패했습니다.');
+    }
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -142,7 +140,8 @@ export default function RecommendScreen() {
           <Ionicons name="arrow-back" size={28} color="#111827" />
         </TouchableOpacity>
         <Text style={[styles.title, { marginBottom: 0 }]}>코디 추천</Text>
-        <Ionicons name="shirt" size={28} color="#111827" />
+        {/* ✨ 스크린샷과 동일하게 👕 이모지 반영 */}
+        <Text style={{ fontSize: 26 }}>👕</Text>
       </View>
 
       <Text style={styles.headerSubtitle}>오늘의 날씨와 외출 목적에 맞는 스타일링</Text>
@@ -150,23 +149,40 @@ export default function RecommendScreen() {
       {!apiRecommendations && (
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
-            <Ionicons name="partly-sunny" size={22} color="#2563EB" />
+            {/* ✨ ⛅ 이모지로 디자인 원복 */}
+            <Text style={{ fontSize: 22 }}>⛅</Text>
             <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
           </View>
+          
           <View style={styles.inputBox}>
             <TextInput style={styles.textInput} value={situation} onChangeText={setSituation} placeholder="예: 데이트, 출근, 미팅" placeholderTextColor="#9CA3AF" />
           </View>
+          
           <View style={styles.quickKeywordRow}>
+            {/* ✨ 추천 키워드 스크린샷과 동일하게 변경 */}
             {['데일리', '비즈니스', '데이트', '운동', '미팅'].map(keyword => (
               <TouchableOpacity key={keyword} style={styles.quickKeywordChip} onPress={() => setSituation(keyword)}>
                 <Text style={styles.quickKeywordText}>{keyword}</Text>
               </TouchableOpacity>
             ))}
           </View>
+          
           <TouchableOpacity style={styles.actionButton} onPress={fetchTodayRecommendation} disabled={apiLoading}>
             <Text style={styles.actionButtonText}>{apiLoading ? '불러오는 중...' : '코디 추천받기'}</Text>
           </TouchableOpacity>
-          {apiLoading && <SkeletonLoader />}
+
+          {/* ✨ 삭제되었던 'AI 코디네이터 대기 중' 상태 완벽 복구 */}
+          {apiLoading ? (
+            <SkeletonLoader />
+          ) : (
+            <View style={styles.emptyStateBox}>
+              <Ionicons name="sparkles" size={44} color="#CBD5E1" style={{ marginBottom: 12 }} />
+              <Text style={styles.emptyStateTitle}>AI 코디네이터 대기 중</Text>
+              <Text style={styles.emptyStateDesc}>
+                오늘의 외출 목적을 입력하시면,{'\n'}날씨와 옷장 데이터를 분석해 딱 맞는 코디를 제안해{'\n'}드립니다.
+              </Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -181,7 +197,9 @@ export default function RecommendScreen() {
               <Ionicons name="refresh" size={14} color="#64748B" /><Text style={styles.resetButtonText}>다시 검색</Text>
             </TouchableOpacity>
           </View>
+          
           <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
+          
           <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={CARD_WIDTH + 16} decelerationRate="fast" contentContainerStyle={{ paddingRight: 16, paddingBottom: 10 }}>
             {apiRecommendations.map((outfit, index) => (
               <View key={index} style={[styles.outfitCard, { width: CARD_WIDTH }]}>
@@ -252,7 +270,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F8FF', 
     padding: 20, 
     borderRadius: 16, 
-    marginTop: 20, // 리스트 아래에 딱 붙도록 위쪽 여백 추가
+    marginTop: 20, 
     borderWidth: 1,
     borderColor: '#E0E7FF'
   },
@@ -274,4 +292,22 @@ const styles = StyleSheet.create({
     fontWeight: '500'
   },
   
+  // ✨ AI 대기 중 상태 박스 스타일 추가
+  emptyStateBox: {
+    alignItems: 'center',
+    marginTop: 40,
+    marginBottom: 20,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 10,
+  },
+  emptyStateDesc: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
 });
