@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 import {
@@ -73,7 +74,7 @@ export default function RecommendScreen() {
     try {
       setApiLoading(true);
       
-      // 1. 위치 정보는 정상적으로 가져옴 (테스트 환경에서도 중요)
+      // 1. 위치 정보는 정상적으로 가져옴
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return Alert.alert('권한 필요', '위치 권한이 필요합니다.');
 
@@ -84,7 +85,7 @@ export default function RecommendScreen() {
       const response = await api.get('/recommend/today', { params: { situation, address } });
 
       setRecommendContext({ situation, address });
-      setAiMessage(response.data.ai_message || '');;
+      setAiMessage(response.data.ai_message || '');
       
       // 3. 옷 매칭 로직 (기존과 동일)
       const matched = response.data.outfits.map((outfit: any) => {
@@ -112,24 +113,19 @@ export default function RecommendScreen() {
     }
   };
 
-const handleWearOutfit = async (outfit: OutfitSet) => {
-  try {
-    // 🎯 오늘 날짜를 백엔드 포맷(YYYY-MM-DD)에 맞게 생성
-    const todayStr = new Date().toISOString().slice(0, 10);
-
-    // 선택된 코디에서 존재하는 옷들만 필터링하고 worn_date 필드 필수 추가!
-    const payload = [outfit.top, outfit.bottom, outfit.outer, outfit.shoes]
-      .filter(Boolean)
-      .map(cloth => ({
-        clothes_id: Number(cloth!.id),
-        worn_date: todayStr // 👈 이 필드가 누락되어 422 에러가 났던 것입니다.
-      }));
+  const handleWearOutfit = async (outfit: OutfitSet) => {
+    try {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const payload = [outfit.top, outfit.bottom, outfit.outer, outfit.shoes]
+        .filter(Boolean)
+        .map(cloth => ({
+          clothes_id: Number(cloth!.id),
+          worn_date: todayStr
+        }));
 
     if (payload.length === 0) {
       return Alert.alert('알림', '착용할 옷 정보가 없습니다.');
     }
-
-    console.log('🚀 백엔드로 보낼 데이터 구조:', payload);
 
     await api.post('/history', payload);
     Alert.alert('성공', '오늘의 착용 기록에 저장되었습니다!');
@@ -144,66 +140,130 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <Text style={styles.title}>코디 추천</Text>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
-        <View style={styles.inputBox}>
-          <TextInput style={styles.textInput} value={situation} onChangeText={setSituation} placeholder="예: 데이트, 출근, 미팅" placeholderTextColor="#9CA3AF" />
-        </View>
-        <TouchableOpacity style={styles.actionButton} onPress={fetchTodayRecommendation} disabled={apiLoading}>
-          <Text style={styles.actionButtonText}>{apiLoading ? '불러오는 중...' : '코디 추천받기'}</Text>
-        </TouchableOpacity>
+      {/* 고정된 상단 헤더 */}
+      <View style={styles.headerTitleRow}>
+        <Text style={styles.title}>코디 추천</Text>
+        <Ionicons name="shirt" size={28} color="#111827" />
+      </View>
+      <Text style={styles.headerSubtitle}>오늘의 날씨와 외출 목적에 맞는 스타일링</Text>
 
-        {apiLoading && <SkeletonLoader />}
+      {/* ✨ 1. 추천 결과가 '없을 때'만 보여주는 폼 영역 */}
+      {!apiRecommendations && (
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="partly-sunny" size={22} color="#2563EB" />
+            <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
+          </View>
+          
+          <View style={styles.inputBox}>
+            <TextInput style={styles.textInput} value={situation} onChangeText={setSituation} placeholder="예: 데이트, 출근, 미팅" placeholderTextColor="#9CA3AF" />
+          </View>
 
-        {!apiLoading && apiRecommendations && (
-          <View style={{ marginTop: 24 }}>
-            <Text style={styles.sectionTitle}>✨ AI 추천 결과</Text>
-            
-            <View style={styles.contextGroup}>
-              <Text style={styles.contextGroupText}>
-                📍 {recommendContext.address || '위치 알 수 없음'} · 🎯 {recommendContext.situation}
+          <View style={styles.quickKeywordRow}>
+            {['데일리', '비즈니스', '데이트', '운동', '미팅'].map(keyword => (
+              <TouchableOpacity 
+                key={keyword} 
+                style={styles.quickKeywordChip} 
+                onPress={() => setSituation(keyword)}
+              >
+                <Text style={styles.quickKeywordText}>{keyword}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TouchableOpacity style={styles.actionButton} onPress={fetchTodayRecommendation} disabled={apiLoading}>
+            <Text style={styles.actionButtonText}>{apiLoading ? '불러오는 중...' : '코디 추천받기'}</Text>
+          </TouchableOpacity>
+
+          {apiLoading && <SkeletonLoader />}
+
+          {!apiLoading && (
+            <View style={styles.emptyStateContainer}>
+              <Ionicons name="sparkles" size={48} color="#D1D5DB" style={{ marginBottom: 16 }} />
+              <Text style={styles.emptyStateTitle}>AI 코디네이터 대기 중</Text>
+              <Text style={styles.emptyStateDesc}>
+                오늘의 외출 목적을 입력하시면,{'\n'}날씨와 옷장 데이터를 분석해 딱 맞는 코디를 제안해 드립니다.
               </Text>
             </View>
+          )}
+        </View>
+      )}
 
-            <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
-            {aiMessage && <View style={styles.aiMessageBox}><Text style={styles.aiMessageText}>💬 {aiMessage}</Text></View>}
-            
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={CARD_WIDTH + 16}
-              decelerationRate="fast"
-              contentContainerStyle={{ paddingRight: 16, paddingBottom: 10 }}
-            >
-              {apiRecommendations.map((outfit, index) => (
-                <View key={index} style={[styles.outfitCard, { width: CARD_WIDTH }]}>
-                  <View style={styles.outfitCardHeader}>
-                    <Text style={styles.outfitCardTitle}>추천 코디 {index + 1}</Text>
-                  </View>
-                  {outfit.reason && <Text style={styles.outfitDescription}>{outfit.reason}</Text>}
-                  
-                  {/* 카드가 너무 길어지지 않게 ScrollView 안에 옷 목록 배치 */}
-                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={{ flexGrow: 1, marginBottom: 16 }}>
-                    {(displayFilter === '전체' || displayFilter === '상의') && outfit.top && <OutfitItemCard label="상의" item={outfit.top} />}
-                    {(displayFilter === '전체' || displayFilter === '하의') && outfit.bottom && <OutfitItemCard label="하의" item={outfit.bottom} />}
-                    {(displayFilter === '전체' || displayFilter === '아우터') && outfit.outer && <OutfitItemCard label="아우터" item={outfit.outer} />}
-                    {(displayFilter === '전체' || displayFilter === '신발') && outfit.shoes && <OutfitItemCard label="신발" item={outfit.shoes} />}
-                  </ScrollView>
+      {/* ✨ 2. 추천 결과가 '나왔을 때' 보여주는 결과 전용 화면 (폼은 숨겨짐) */}
+      {apiRecommendations && (
+        <View style={styles.section}>
+          
+          {/* ✨ 양쪽 정렬로 깔끔하게 정리된 헤더 */}
+          <View style={styles.resultHeaderRow}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={styles.locationBadge}>
+                <Ionicons name="location" size={12} color="#64748B" />
+                <Text style={styles.locationBadgeText}>{recommendContext.address || '위치 알 수 없음'}</Text>
+              </View>
+              <View style={styles.tpoBadge}>
+                <Ionicons name="flag" size={12} color="#2563EB" />
+                <Text style={styles.tpoBadgeText}>{recommendContext.situation}</Text>
+              </View>
+            </View>
 
-                  {/* ✨ 추가된 기능: 추천 코디 착용하기 버튼 */}
-                  <TouchableOpacity 
-                    style={styles.wearButton} 
-                    onPress={() => handleWearOutfit(outfit)}
-                  >
-                    <Text style={styles.wearButtonText}>이 코디 착용하기</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
+            {/* ✨ 회색 덩어리를 없애고 가벼운 텍스트 버튼으로 우측 배치 */}
+            <TouchableOpacity style={styles.resetButton} onPress={() => setApiRecommendations(null)}>
+              <Ionicons name="refresh" size={14} color="#64748B" />
+              <Text style={styles.resetButtonText}>다시 검색</Text>
+            </TouchableOpacity>
           </View>
-        )}
-      </View>
+
+          <RecommendFilter activeFilter={displayFilter} onFilterChange={setDisplayFilter} />
+
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={CARD_WIDTH + 16}
+            decelerationRate="fast"
+            contentContainerStyle={{ paddingRight: 16, paddingBottom: 10 }}
+          >
+            {apiRecommendations.map((outfit, index) => (
+              <View key={index} style={[styles.outfitCard, { width: CARD_WIDTH }]}>
+                <View style={styles.outfitCardHeader}>
+                  <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+                  <Text style={styles.outfitCardTitle}>추천 코디 {index + 1}</Text>
+                </View>
+
+                {outfit.reason && (
+                  <View style={styles.outfitReasonBox}>
+                    <Text style={styles.outfitDescription}>{outfit.reason}</Text>
+                  </View>
+                )}
+                
+                <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={{ flexGrow: 1, marginBottom: 16 }}>
+                  {(displayFilter === '전체' || displayFilter === '상의') && outfit.top && <OutfitItemCard label="상의" item={outfit.top} />}
+                  {(displayFilter === '전체' || displayFilter === '하의') && outfit.bottom && <OutfitItemCard label="하의" item={outfit.bottom} />}
+                  {(displayFilter === '전체' || displayFilter === '아우터') && outfit.outer && <OutfitItemCard label="아우터" item={outfit.outer} />}
+                  {(displayFilter === '전체' || displayFilter === '신발') && outfit.shoes && <OutfitItemCard label="신발" item={outfit.shoes} />}
+                </ScrollView>
+
+                <TouchableOpacity 
+                  style={styles.wearButton} 
+                  onPress={() => handleWearOutfit(outfit)}
+                >
+                  <Text style={styles.wearButtonText}>이 코디 착용하기</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+
+          {aiMessage && (
+            <View style={styles.aiMessageBox}>
+              <View style={styles.aiMessageHeader}>
+                <Ionicons name="sparkles" size={16} color="#4F46E5" />
+                <Text style={styles.aiMessageTitle}>AI 스타일링 포인트</Text>
+              </View>
+              <Text style={styles.aiMessageText}>{aiMessage}</Text>
+            </View>
+          )}
+
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -211,26 +271,125 @@ const handleWearOutfit = async (outfit: OutfitSet) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F4F6F8' },
   content: { padding: 16, paddingBottom: 40 },
-  title: { fontSize: 30, fontWeight: '800', color: '#111827', marginBottom: 20 },
+  title: { fontSize: 30, fontWeight: '800', color: '#111827', marginBottom: 4 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  headerSubtitle: { fontSize: 14, color: '#64748B', marginBottom: 20 },
   section: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, marginBottom: 20 },
-  sectionTitle: { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  sectionTitle: { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 0 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
   inputBox: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F1F5F9' },
   textInput: { fontSize: 16, color: '#111827', fontWeight: '600' },
+  quickKeywordRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  quickKeywordChip: { backgroundColor: '#F1F5F9', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20 },
+  quickKeywordText: { fontSize: 13, color: '#475569', fontWeight: '600' },
   actionButton: { backgroundColor: '#111827', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
   actionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  emptyStateContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 20 },
+  emptyStateTitle: { fontSize: 18, fontWeight: '700', color: '#64748B', marginBottom: 8 },
+  emptyStateDesc: { fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 22 },
   
-  contextGroup: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
-  contextGroupText: { fontSize: 14, fontWeight: '700', color: '#475569' },
+ 
+  resultHeaderRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    marginBottom: 16
+  },
 
-  aiMessageBox: { backgroundColor: '#EEF2FF', padding: 20, borderRadius: 16, marginBottom: 20 },
-  aiMessageText: { fontSize: 15, color: '#3730A3', lineHeight: 24, fontWeight: '600' },
+
+  locationBadge: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#F1F5F9', 
+    paddingVertical: 6, 
+    paddingHorizontal: 10, 
+    borderRadius: 8, 
+    gap: 4 
+  },
+  locationBadgeText: { fontSize: 13, fontWeight: '600', color: '#475569' },
+
+
+  tpoBadge: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#EFF6FF', 
+    paddingVertical: 6, 
+    paddingHorizontal: 10, 
+    borderRadius: 8, 
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#BFDBFE' 
+  },
+  tpoBadgeText: { fontSize: 13, fontWeight: '700', color: '#1D4ED8' }, 
+
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  resetButtonText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
+
+  aiMessageBox: { 
+    backgroundColor: '#F5F8FF', 
+    padding: 20, 
+    borderRadius: 16, 
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E0E7FF'
+  },
+  aiMessageHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    marginBottom: 8 
+  },
+  aiMessageTitle: { 
+    fontSize: 14, 
+    fontWeight: '800', 
+    color: '#4338CA' 
+  },
+  aiMessageText: { 
+    fontSize: 15, 
+    color: '#1F2937', 
+    lineHeight: 26, 
+    fontWeight: '500'
+  },
   
   outfitCard: { marginRight: 16, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', maxHeight: 600, justifyContent: 'space-between' }, 
-  outfitCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  outfitCardTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  outfitDescription: { fontSize: 14, color: '#64748B', marginBottom: 12, lineHeight: 22 },
+  outfitCardHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6,
+    marginBottom: 12 
+  },
+
+  outfitCardTitle: { 
+    fontSize: 18, // 폰트 크기 살짝 조정
+    fontWeight: '800', 
+    color: '#111827' 
+  },
+
+  outfitReasonBox: {
+    backgroundColor: '#F8FAFC',
+    borderLeftWidth: 3,         
+    borderLeftColor: '#3B82F6',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    marginBottom: 16
+  },
+
+  outfitDescription: { 
+    fontSize: 13.5,
+    color: '#334155',
+    lineHeight: 22,
+    fontWeight: '500'
+  },
   
-  // ✨ 착용하기 버튼 스타일 추가
+
   wearButton: { backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 'auto' },
   wearButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 
