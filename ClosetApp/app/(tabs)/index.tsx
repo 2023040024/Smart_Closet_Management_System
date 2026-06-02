@@ -1,17 +1,45 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function DashboardScreen() {
   const router = useRouter();
 
+  // ✨ 옷장에서 이사 온 로그아웃 함수
+  const handleLogout = () => {
+    Alert.alert('로그아웃', '정말 로그아웃 하시겠습니까?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '로그아웃',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await AsyncStorage.removeItem('userToken');
+            router.replace('/login');
+          } catch (error) {
+            console.error('로그아웃 에러:', error);
+            Alert.alert('오류', '로그아웃 처리 중 문제가 발생했습니다.');
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       
-      {/* 1. 상단 환영 헤더 */}
+      {/* 1. 상단 환영 헤더 및 로그아웃 버튼 */}
       <View style={styles.header}>
-        <Text style={styles.greeting}>안녕하세요! ☀️</Text>
-        <Text style={styles.title}>오늘의 옷장 브리핑</Text>
+        <View>
+          <Text style={styles.greeting}>안녕하세요! ☀️</Text>
+          <Text style={styles.title}>오늘의 옷장 브리핑</Text>
+        </View>
+        
+        {/* ✨ 우측 상단 로그아웃 버튼 */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} hitSlop={10}>
+          <Ionicons name="log-out-outline" size={24} color="#64748B" />
+        </TouchableOpacity>
       </View>
 
       {/* 2. AI 코디 추천 요약 카드 */}
@@ -83,9 +111,21 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 20, paddingBottom: 40, paddingTop: 60 },
   
-  header: { marginBottom: 24 },
+  // ✨ 헤더 레이아웃 조정 (로그아웃 버튼 우측 정렬)
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'flex-start', 
+    marginBottom: 24 
+  },
   greeting: { fontSize: 16, color: '#64748B', fontWeight: '600', marginBottom: 4 },
   title: { fontSize: 26, fontWeight: '800', color: '#111827' },
+  
+  logoutBtn: {
+    padding: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+  },
   
   aiCard: { backgroundColor: '#F8FAFC', borderRadius: 20, padding: 20, marginBottom: 32, borderWidth: 1, borderColor: '#E2E8F0' },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },

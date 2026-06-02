@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -88,7 +87,7 @@ const FILTER_SECTIONS: Array<{
   },
 ];
 
-export default function HomeScreen() {
+export default function ClosetScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const filterScrollRef = useRef<ScrollView | null>(null);
@@ -153,25 +152,6 @@ export default function HomeScreen() {
       return () => { isMounted = false; };
     }, [])
   );
-
-  const handleLogout = () => {
-    Alert.alert('로그아웃', '정말 로그아웃 하시겠습니까?', [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '로그아웃',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await AsyncStorage.removeItem('userToken');
-            router.replace('/login');
-          } catch (error) {
-            console.error('로그아웃 에러:', error);
-            Alert.alert('오류', '로그아웃 처리 중 문제가 발생했습니다.');
-          }
-        },
-      },
-    ]);
-  };
 
   function getCurrentSeason(): string {
     const month = new Date().getMonth() + 1;
@@ -258,7 +238,6 @@ export default function HomeScreen() {
             <Text style={styles.filterItemLabel}>{label}</Text>
             {!!filter[key] && <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>선택됨</Text></View>}
             
-            {/* 더보기 버튼을 라벨 우측으로 이동시켜 공간 절약 */}
             {expanded[key] && options.length > 5 && (
               <TouchableOpacity
                 onPress={(e) => {
@@ -301,7 +280,6 @@ export default function HomeScreen() {
           {!!item.tags.style && <Text style={styles.cardTag}>{item.tags.style}</Text>}
           {!!item.tags.tpo && <Text style={[styles.cardTag, styles.tpoTag]}>{item.tags.tpo}</Text>}
         </View>
-        {/* 안내 문구를 삭제하여 더욱 깔끔한 디자인 확보 */}
       </View>
     </TouchableOpacity>
   );
@@ -314,26 +292,16 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
-        {/* ✨ 중복되던 헤더 영역을 하나로 깔끔하게 통합했습니다 */}
+        {/* ✨ 수정된 헤더 영역 (버튼 삭제 및 한 줄 정렬) */}
         <View style={styles.headerRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, flex: 1 }}>
-            <TouchableOpacity onPress={() => router.back()} hitSlop={10} style={{ marginTop: 2 }}>
-              <Ionicons name="arrow-back" size={28} color="#111" />
-            </TouchableOpacity>
-            
-            <View style={styles.headerTextBox}>
-              <Text style={styles.title}>내 옷장</Text>
-              <Text style={styles.subtitle}>등록한 옷을 확인하고 관리해보세요.</Text>
-            </View>
-          </View>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={10} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={28} color="#111" />
+          </TouchableOpacity>
           
-          <View style={styles.headerActionBox}>
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <Text style={styles.logoutText}>로그아웃</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.moveRecommendBtn} onPress={() => router.push('/(tabs)/recommend')}>
-              <Text style={styles.moveRecommendText}>추천</Text>
-            </TouchableOpacity>
+          <View style={styles.headerTextBox}>
+            <Text style={styles.title}>내 옷장</Text>
+            {/* numberOfLines={1} 적용으로 문구 줄바꿈 방지 */}
+            <Text style={styles.subtitle} numberOfLines={1}>등록한 옷을 확인하고 관리해보세요.</Text>
           </View>
         </View>
 
@@ -443,16 +411,13 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 16 : 16, backgroundColor: '#fff' },
   scrollContent: { paddingBottom: 28 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 10 },
-  headerTextBox: { flex: 1, paddingRight: 8 },
-  title: { fontSize: 28, fontWeight: '800', marginBottom: 6, color: '#111' },
-  subtitle: { fontSize: 14, color: '#6b6b6b', lineHeight: 20 },
   
-  headerActionBox: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  logoutBtn: { backgroundColor: '#fff', paddingVertical: 9, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: '#ffcccc' },
-  logoutText: { color: '#d11a2a', fontSize: 13, fontWeight: '700' },
-  moveRecommendBtn: { backgroundColor: '#f3f3f3', paddingVertical: 9, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e4e4e4' },
-  moveRecommendText: { color: '#222', fontSize: 13, fontWeight: '700' },
+  // ✨ 다듬어진 헤더 영역 스타일
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  backButton: { marginRight: 12 },
+  headerTextBox: { flex: 1 },
+  title: { fontSize: 26, fontWeight: '800', marginBottom: 2, color: '#111' },
+  subtitle: { fontSize: 14, color: '#6b6b6b' },
   
   actionRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 },
   primaryActionBtn: { backgroundColor: '#111', paddingVertical: 11, paddingHorizontal: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center' },
@@ -472,7 +437,6 @@ const styles = StyleSheet.create({
   filterSectionCard: { backgroundColor: '#fafafa', borderWidth: 1, borderColor: '#ededed', borderRadius: 18, padding: 14 },
   filterSectionTitle: { fontSize: 15, fontWeight: '800', color: '#111', marginBottom: 10 },
   
-  /* ✨ 필터 아이템 디자인 슬림하게 최적화 (다이어트 UI 적용) */
   filterItemBlock: { marginBottom: 10 },
   filterItemHeader: { minHeight: 38, borderRadius: 10, backgroundColor: '#f8f8f8', paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#e4e4e4', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   filterItemHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
@@ -492,11 +456,25 @@ const styles = StyleSheet.create({
   resultCount: { fontSize: 13, color: '#666', fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   
-  /* ✨ 카드 다이어트 및 폰트 크기 조정 적용 */
-  card: { width: '48.2%', backgroundColor: '#fff', borderRadius: 16, marginBottom: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#ededed' },
-  cardImageWrap: { width: '100%', height: 155, backgroundColor: '#f9fafb', justifyContent: 'center', alignItems: 'center' }, 
+  // ✨ 옷 박스 도형 및 비율을 딱 떨어지게 다듬음
+  card: { 
+    width: '48%', 
+    backgroundColor: '#fff', 
+    borderRadius: 16, 
+    marginBottom: 16, 
+    overflow: 'hidden', 
+    borderWidth: 1, 
+    borderColor: '#f1f5f9' 
+  },
+  cardImageWrap: { 
+    width: '100%', 
+    height: 160, 
+    backgroundColor: '#f8fafc', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
   cardImage: { width: '100%', height: '100%' },
-  cardBody: { padding: 10 }, 
+  cardBody: { padding: 12 }, 
   cardTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 }, 
   cardTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   cardTag: { fontSize: 11, color: '#4b5563', backgroundColor: '#f3f4f6', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, fontWeight: '500' },
