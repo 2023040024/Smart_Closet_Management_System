@@ -11,7 +11,7 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(false);
   const [overloadData, setOverloadData] = useState<any>(null);
   const [disposalData, setDisposalData] = useState<any>(null);
-  const [reportData, setReportData] = useState<any>(null); // ✨ 추가: 월간 리포트 데이터 상태
+  const [reportData, setReportData] = useState<any>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -19,7 +19,6 @@ export default function DashboardScreen() {
       const fetchDashboardStats = async () => {
         setLoading(true);
         try {
-          // ✨ API 3개 동시 호출 (진단 화면에 구현된 monthly-report 활용)
           const [overloadRes, disposalRes, reportRes] = await Promise.all([
             api.get('/stats/overload').catch(() => ({ data: null })),
             api.get('/stats/dispose').catch(() => ({ data: null })),
@@ -62,6 +61,12 @@ export default function DashboardScreen() {
     ]);
   };
 
+  // 경고(과부하 또는 처분)가 있는지 여부
+  const hasWarnings = (overloadData?.total_warnings > 0) || (disposalData?.items && disposalData.items.length > 0);
+  
+  // 활용률 점수
+  const activityRate = reportData?.ecosystem?.activity_rate ?? 0;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <StatusBar barStyle="dark-content" />
@@ -71,7 +76,7 @@ export default function DashboardScreen() {
         <View>
           <Text style={styles.systemText}>SMART CLOSET MANAGEMENT</Text>
           <Text style={styles.title}>
-            Re<Text style={styles.accentColor}>:</Text>fit 브리핑
+            Re<Text style={styles.accentColor}>:</Text>fit
           </Text>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} hitSlop={10}>
@@ -131,7 +136,7 @@ export default function DashboardScreen() {
           <ActivityIndicator size="small" color="#2563EB" style={{ marginVertical: 20 }} />
         ) : (
           <>
-            {/* ✨ 아이디어 1: 활용률 미니 프로그레스 바 적용 */}
+            {/* ✨ 개선 3번: 타이틀과 숫자의 세로 정렬(alignItems: flex-end) 완벽 교정 */}
             {reportData && reportData.ecosystem && (
               <View style={styles.ecosystemCard}>
                 <View style={styles.ecoHeaderRow}>
@@ -181,11 +186,19 @@ export default function DashboardScreen() {
               </View>
             ) : null}
 
-            {(!overloadData?.total_warnings && (!disposalData?.items || disposalData.items.length === 0)) && (
-              <View style={styles.statBox}>
-                <Ionicons name="checkmark-circle" size={20} color="#059669" />
-                <Text style={styles.statText}>현재 옷장이 낭비 없이 아주 효율적으로 관리되고 있습니다!</Text>
-              </View>
+            {/* ✨ 개선 1, 2번: 활용률 60% 이상일 때만 칭찬, 미만이면 격려 메시지 노출 및 위쪽 여백(margin) 확보 */}
+            {!hasWarnings && (
+              activityRate >= 60 ? (
+                <View style={[styles.statBox, styles.statBoxSuccess]}>
+                  <Ionicons name="checkmark-circle" size={20} color="#059669" />
+                  <Text style={[styles.statText, { color: '#065F46' }]}>현재 옷장이 낭비 없이 아주 효율적으로 관리되고 있습니다!</Text>
+                </View>
+              ) : (
+                <View style={[styles.statBox, styles.statBoxEncourage]}>
+                  <Ionicons name="information-circle" size={20} color="#2563EB" />
+                  <Text style={[styles.statText, { color: '#1E40AF' }]}>아직 입지 않은 옷이 많아요. 오늘의 코디 추천을 받아볼까요?</Text>
+                </View>
+              )
             )}
           </>
         )}
@@ -223,24 +236,28 @@ const styles = StyleSheet.create({
   insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   moreLink: { fontSize: 13, color: '#2563EB', fontWeight: '600', marginBottom: 16 },
 
-  // ✨ 옷장 생태계 (활용률) 카드 스타일
-  ecosystemCard: { backgroundColor: '#F8FAFC', padding: 20, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
-  ecoHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
+  // ✨ 개선 3번: 타이틀과 숫자의 밑선을 맞추기 위한 alignItems 설정
+  ecosystemCard: { backgroundColor: '#F8FAFC', padding: 20, borderRadius: 16, marginBottom: 8, borderWidth: 1, borderColor: '#F1F5F9' },
+  ecoHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 },
   ecoTitle: { fontSize: 15, fontWeight: '700', color: '#334155' },
-  ecoRateText: { fontSize: 24, fontWeight: '800', color: '#111827' },
+  ecoRateText: { fontSize: 26, fontWeight: '800', color: '#111827' },
+  
   progressBarBg: { height: 10, backgroundColor: '#E2E8F0', borderRadius: 5, overflow: 'hidden', marginBottom: 16 },
   progressBarFill: { height: '100%', backgroundColor: '#2563EB', borderRadius: 5 },
   ecoLegendRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
   ecoLegendText: { fontSize: 13, color: '#64748B' },
   ecoBoldText: { fontWeight: '700', color: '#334155' },
   
-  statBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', padding: 16, borderRadius: 12, gap: 10, borderWidth: 1, borderColor: '#DCFCE7' },
-  statText: { fontSize: 13, color: '#065F46', fontWeight: '600', flex: 1, lineHeight: 20 },
+  // ✨ 개선 2번: 안내 박스 상단에 약간의 여백(marginTop: 8) 추가하여 답답함 해소
+  statBox: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, gap: 10, borderWidth: 1, marginTop: 8 },
+  statBoxSuccess: { backgroundColor: '#F0FDF4', borderColor: '#DCFCE7' },
+  statBoxEncourage: { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' },
+  statText: { fontSize: 13, fontWeight: '600', flex: 1, lineHeight: 20 },
 
-  alertBoxOverload: { backgroundColor: '#FEF2F2', padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#FEE2E2' },
+  alertBoxOverload: { backgroundColor: '#FEF2F2', padding: 16, borderRadius: 16, marginTop: 8, marginBottom: 4, borderWidth: 1, borderColor: '#FEE2E2' },
   alertTitleOverload: { fontSize: 15, fontWeight: '800', color: '#DC2626' },
   
-  alertBoxDispose: { backgroundColor: '#FFFBEB', padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#FEF3C7' },
+  alertBoxDispose: { backgroundColor: '#FFFBEB', padding: 16, borderRadius: 16, marginTop: 8, marginBottom: 4, borderWidth: 1, borderColor: '#FEF3C7' },
   alertTitleDispose: { fontSize: 15, fontWeight: '800', color: '#D97706' },
 
   alertHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
