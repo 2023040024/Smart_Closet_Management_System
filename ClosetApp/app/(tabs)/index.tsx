@@ -1,12 +1,44 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import api from '../_api';
 
 export default function DashboardScreen() {
   const router = useRouter();
+  
+  const [loading, setLoading] = useState(false);
+  const [overloadData, setOverloadData] = useState<any>(null);
+  const [disposalData, setDisposalData] = useState<any>(null);
 
-  // ✨ 옷장에서 이사 온 로그아웃 함수
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      const fetchDashboardStats = async () => {
+        setLoading(true);
+        try {
+          const [overloadRes, disposalRes] = await Promise.all([
+            api.get('/stats/overload').catch(() => ({ data: null })),
+            api.get('/stats/dispose').catch(() => ({ data: null }))
+          ]);
+
+          if (isMounted) {
+            setOverloadData(overloadRes.data);
+            setDisposalData(disposalRes.data);
+          }
+        } catch (error) {
+          console.error('대시보드 통계 로드 실패:', error);
+        } finally {
+          if (isMounted) setLoading(false);
+        }
+      };
+
+      fetchDashboardStats();
+      return () => { isMounted = false; };
+    }, [])
+  );
+
   const handleLogout = () => {
     Alert.alert('로그아웃', '정말 로그아웃 하시겠습니까?', [
       { text: '취소', style: 'cancel' },
@@ -28,79 +60,109 @@ export default function DashboardScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <StatusBar barStyle="dark-content" />
       
       {/* 1. 상단 환영 헤더 및 로그아웃 버튼 */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>안녕하세요! ☀️</Text>
-          <Text style={styles.title}>오늘의 옷장 브리핑</Text>
+          <Text style={styles.systemText}>SMART CLOSET MANAGEMENT</Text>
+          <Text style={styles.title}>
+            Re<Text style={styles.accentColor}>:</Text>fit
+          </Text>
         </View>
-        
-        {/* ✨ 우측 상단 로그아웃 버튼 */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} hitSlop={10}>
           <Ionicons name="log-out-outline" size={24} color="#64748B" />
         </TouchableOpacity>
       </View>
 
-      {/* 2. AI 코디 추천 요약 카드 */}
+      {/* 2. AI 코디 추천 요약 카드 (문구 및 가독성 개선) */}
       <View style={styles.aiCard}>
         <View style={styles.aiHeader}>
-          <Ionicons name="sparkles" size={18} color="#4F46E5" />
+          <Ionicons name="sparkles" size={18} color="#2563EB" />
           <Text style={styles.aiTitle}>오늘의 AI 추천 코디</Text>
         </View>
+        {/* ✨ 줄바꿈을 명시적으로 추가하여 글이 더 잘 읽히도록 수정 */}
         <Text style={styles.aiDesc}>
-          오늘은 일교차가 큽니다. 가벼운 아우터와 셔츠 조합으로 쾌적한 하루를 보내보세요!
+          오늘 날씨와 TPO에 딱 맞는 맞춤형 스타일링을 준비했어요.{'\n'}옷장 속 아이템들의 새로운 조합을 지금 확인해 보세요!
         </Text>
         <TouchableOpacity style={styles.aiBtn} onPress={() => router.push('/(tabs)/recommend')} activeOpacity={0.8}>
-          <Text style={styles.aiBtnText}>추천 코디 자세히 보기</Text>
+          <Text style={styles.aiBtnText}>오늘의 추천 코디 확인하기</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 3. 빠른 액션 (대시보드 메뉴) */}
-      <Text style={styles.sectionTitle}>빠른 이동</Text>
+      {/* 3. 빠른 이동 (메뉴) */}
+      {/* ✨ '빠른 이동' -> '바로가기' 로 더 간결하게 수정 */}
+      <Text style={styles.sectionTitle}>바로가기</Text>
       <View style={styles.actionGrid}>
-        
-        {/* 새 옷 등록 (기존 탭에서 빠진 기능을 강조 버튼으로 배치) */}
-        <TouchableOpacity style={[styles.actionCard, { backgroundColor: '#EEF2FF' }]} onPress={() => router.push('/(tabs)/register')} activeOpacity={0.8}>
-          <View style={[styles.iconBox, { backgroundColor: '#fff' }]}>
-            <Ionicons name="add" size={24} color="#4F46E5" />
+        <TouchableOpacity style={[styles.actionCard, { backgroundColor: '#F0F9FF', borderColor: '#E0F2FE' }]} onPress={() => router.push('/(tabs)/register')} activeOpacity={0.8}>
+          <View style={[styles.iconBox, { backgroundColor: '#FFFFFF' }]}>
+            <Ionicons name="add" size={24} color="#0284C7" />
           </View>
-          <Text style={[styles.actionLabel, { color: '#4F46E5' }]}>새 옷 등록</Text>
+          <Text style={[styles.actionLabel, { color: '#0284C7' }]}>새 옷 등록</Text>
         </TouchableOpacity>
 
-        {/* 내 옷장 */}
         <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/closet')} activeOpacity={0.8}>
-          <View style={styles.iconBox}>
-            <Ionicons name="shirt" size={24} color="#334155" />
-          </View>
+          <View style={styles.iconBox}><Ionicons name="shirt" size={24} color="#334155" /></View>
           <Text style={styles.actionLabel}>내 옷장</Text>
         </TouchableOpacity>
 
-        {/* 착용 기록 */}
         <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/history')} activeOpacity={0.8}>
-          <View style={styles.iconBox}>
-            <Ionicons name="time" size={24} color="#334155" />
-          </View>
+          <View style={styles.iconBox}><Ionicons name="time" size={24} color="#334155" /></View>
           <Text style={styles.actionLabel}>착용 기록</Text>
         </TouchableOpacity>
 
-        {/* 옷장 진단 */}
         <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/analysis')} activeOpacity={0.8}>
-          <View style={styles.iconBox}>
-            <Ionicons name="analytics" size={24} color="#334155" />
-          </View>
+          <View style={styles.iconBox}><Ionicons name="analytics" size={24} color="#334155" /></View>
           <Text style={styles.actionLabel}>옷장 진단</Text>
         </TouchableOpacity>
-
       </View>
 
-      {/* 4. 옷장 인사이트 (차후 API 연동 필요) */}
+      {/* 4. 옷장 인사이트 */}
       <View style={styles.statsContainer}>
-         <Text style={styles.sectionTitle}>내 옷장 요약</Text>
-         <View style={styles.statBox}>
-            <Ionicons name="information-circle" size={20} color="#64748B" />
-            <Text style={styles.statText}>등록된 옷을 분석하여 맞춤 통계를 준비 중입니다.</Text>
-         </View>
+        <View style={styles.insightHeader}>
+          {/* ✨ '내 옷장 요약' -> '나의 옷장 리포트' 로 전문성 강조 */}
+          <Text style={styles.sectionTitle}>나의 옷장 리포트</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/analysis')} hitSlop={10}>
+            <Text style={styles.moreLink}>자세히 보기</Text>
+          </TouchableOpacity>
+        </View>
+         
+        {loading ? (
+          <ActivityIndicator size="small" color="#2563EB" style={{ marginVertical: 20 }} />
+        ) : (
+          <>
+            {overloadData && overloadData.total_warnings > 0 ? (
+              <View style={styles.alertBoxOverload}>
+                <View style={styles.alertHeader}>
+                  <Ionicons name="warning" size={20} color="#DC2626" />
+                  <Text style={styles.alertTitleOverload}>충동 소비 주의보</Text>
+                </View>
+                <Text style={styles.alertDesc}>
+                  비슷한 색상과 디자인의 옷이 많아요. 새로운 구매 전 옷장을 먼저 확인해 보세요!
+                </Text>
+              </View>
+            ) : null}
+
+            {disposalData && disposalData.items && disposalData.items.length > 0 ? (
+              <View style={styles.alertBoxDispose}>
+                <View style={styles.alertHeader}>
+                  <Ionicons name="cube-outline" size={20} color="#D97706" />
+                  <Text style={styles.alertTitleDispose}>정리가 필요한 옷 발견</Text>
+                </View>
+                <Text style={styles.alertDesc}>
+                  90일 이상 한 번도 입지 않은 옷이 {disposalData.items.length}벌 있습니다. 나눔이나 처분을 고민해 볼까요?
+                </Text>
+              </View>
+            ) : null}
+
+            {(!overloadData?.total_warnings && (!disposalData?.items || disposalData.items.length === 0)) && (
+              <View style={styles.statBox}>
+                <Ionicons name="checkmark-circle" size={20} color="#059669" />
+                <Text style={styles.statText}>현재 옷장이 낭비 없이 아주 효율적으로 관리되고 있습니다!</Text>
+              </View>
+            )}
+          </>
+        )}
       </View>
       
     </ScrollView>
@@ -108,40 +170,43 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
   content: { padding: 20, paddingBottom: 40, paddingTop: 60 },
   
-  // ✨ 헤더 레이아웃 조정 (로그아웃 버튼 우측 정렬)
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'flex-start', 
-    marginBottom: 24 
-  },
-  greeting: { fontSize: 16, color: '#64748B', fontWeight: '600', marginBottom: 4 },
-  title: { fontSize: 26, fontWeight: '800', color: '#111827' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 30 },
+  systemText: { fontSize: 11, color: '#2563EB', fontWeight: '800', letterSpacing: 1.2, marginBottom: 4 },
+  title: { fontSize: 32, fontWeight: '900', color: '#111827', letterSpacing: -0.5 },
+  accentColor: { color: '#2563EB' },
+  logoutBtn: { padding: 8, backgroundColor: '#F1F5F9', borderRadius: 12 },
   
-  logoutBtn: {
-    padding: 8,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-  },
-  
-  aiCard: { backgroundColor: '#F8FAFC', borderRadius: 20, padding: 20, marginBottom: 32, borderWidth: 1, borderColor: '#E2E8F0' },
+  aiCard: { backgroundColor: '#EEF2FF', borderRadius: 20, padding: 20, marginBottom: 32, borderWidth: 1, borderColor: '#E0E7FF' },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  aiTitle: { fontSize: 16, fontWeight: '800', color: '#1E293B' },
-  aiDesc: { fontSize: 14, color: '#475569', lineHeight: 22, marginBottom: 16 },
-  aiBtn: { backgroundColor: '#4F46E5', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  aiBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  aiTitle: { fontSize: 16, fontWeight: '800', color: '#1E3A8A' },
+  // ✨ 가독성을 위해 줄간격(lineHeight)을 24로 늘리고 마진을 살짝 더 주었습니다.
+  aiDesc: { fontSize: 14, color: '#475569', lineHeight: 24, marginBottom: 18, letterSpacing: -0.2 },
+  aiBtn: { backgroundColor: '#2563EB', paddingVertical: 14, borderRadius: 12, alignItems: 'center' }, // ✨ 버튼 상하 여백(14)을 늘려 터치감 개선
+  aiBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' }, 
   
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 16 },
   
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, marginBottom: 32 },
   actionCard: { width: '48%', backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F1F5F9' },
-  iconBox: { width: 48, height: 48, backgroundColor: '#fff', borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  iconBox: { width: 48, height: 48, backgroundColor: '#FFFFFF', borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   actionLabel: { fontSize: 14, fontWeight: '700', color: '#334155' },
   
   statsContainer: { marginBottom: 20 },
-  statBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', padding: 16, borderRadius: 12, gap: 10 },
-  statText: { fontSize: 13, color: '#475569', fontWeight: '500', flex: 1, lineHeight: 20 },
+  insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  moreLink: { fontSize: 13, color: '#2563EB', fontWeight: '600', marginBottom: 16 },
+  
+  statBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', padding: 16, borderRadius: 12, gap: 10, borderWidth: 1, borderColor: '#DCFCE7' },
+  statText: { fontSize: 13, color: '#065F46', fontWeight: '600', flex: 1, lineHeight: 20 },
+
+  alertBoxOverload: { backgroundColor: '#FEF2F2', padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#FEE2E2' },
+  alertTitleOverload: { fontSize: 15, fontWeight: '800', color: '#DC2626' },
+  
+  alertBoxDispose: { backgroundColor: '#FFFBEB', padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#FEF3C7' },
+  alertTitleDispose: { fontSize: 15, fontWeight: '800', color: '#D97706' },
+
+  alertHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  alertDesc: { fontSize: 13, color: '#4B5563', lineHeight: 20, fontWeight: '500' }
 });
