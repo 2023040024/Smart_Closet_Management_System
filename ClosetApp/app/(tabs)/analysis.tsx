@@ -2,18 +2,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Image,
+  LayoutAnimation,
   Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
 import api from '../_api';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -72,6 +77,8 @@ export default function AnalysisScreen() {
         api.get('/stats/monthly-report')
       ]);
 
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
       setOverloadData(overloadRes.data);
       setDisposalData({
         items: disposalRes.data.items || [],
@@ -95,7 +102,7 @@ export default function AnalysisScreen() {
   const handleQuickDispose = (clothesId: number) => {
     Alert.alert(
       '옷 처분하기',
-      '이 옷을 옷장에서 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
+      '이 옷을 옷장에서 삭제하시겠습니까?',
       [
         { text: '취소', style: 'cancel' },
         {
@@ -104,7 +111,6 @@ export default function AnalysisScreen() {
           onPress: async () => {
             try {
               await api.delete(`/clothes/${clothesId}`);
-              Alert.alert('완료', '옷이 성공적으로 처분(삭제)되었습니다.');
               loadAnalysisData();
             } catch (err) {
               Alert.alert('오류', '처리에 실패했습니다. 다시 시도해주세요.');
@@ -193,9 +199,15 @@ export default function AnalysisScreen() {
 
   if (loading && !overloadData && !reportData) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
-        <Text style={{marginTop: 12, color: '#64748B', fontWeight: '600'}}>옷장 데이터를 정밀 분석 중입니다...</Text>
+      <View style={styles.container}>
+        <View style={styles.headerRow}>
+          <View style={{ width: 140, height: 32, backgroundColor: '#F1F5F9', borderRadius: 8, marginBottom: 8 }} />
+          <View style={{ width: 250, height: 16, backgroundColor: '#F1F5F9', borderRadius: 8 }} />
+        </View>
+        <View style={[styles.dashboardCard, { height: 230, backgroundColor: '#F8FAFC', borderColor: '#F1F5F9' }]} />
+        <View style={{ width: 120, height: 24, backgroundColor: '#F1F5F9', borderRadius: 8, marginVertical: 16 }} />
+        <View style={[styles.groupCard, { height: 180, backgroundColor: '#F8FAFC', borderColor: '#F1F5F9', marginBottom: 16 }]} />
+        <View style={[styles.groupCard, { height: 180, backgroundColor: '#F8FAFC', borderColor: '#F1F5F9' }]} />
       </View>
     );
   }
