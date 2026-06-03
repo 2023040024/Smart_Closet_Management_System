@@ -13,6 +13,15 @@ export default function DashboardScreen() {
   const [disposalData, setDisposalData] = useState<any>(null);
   const [reportData, setReportData] = useState<any>(null);
 
+  // 추가: 현재 월(Month)을 기준으로 계절을 동적으로 계산하는 함수
+  function getCurrentSeason(): string {
+    const month = new Date().getMonth() + 1;
+    if (month >= 3 && month <= 5) return '봄';
+    if (month >= 6 && month <= 8) return '여름';
+    if (month >= 9 && month <= 11) return '가을';
+    return '겨울';
+  }
+
   useFocusEffect(
     useCallback(() => {
       let isMounted = true;
@@ -21,7 +30,8 @@ export default function DashboardScreen() {
         try {
           const [overloadRes, disposalRes, reportRes] = await Promise.all([
             api.get('/stats/overload').catch(() => ({ data: null })),
-            api.get('/stats/dispose').catch(() => ({ data: null })),
+            // 수정: current_season 파라미터를 동적으로 추가하여 422 에러 해결
+            api.get('/stats/dispose', { params: { current_season: getCurrentSeason() } }).catch(() => ({ data: null })),
             api.get('/stats/monthly-report').catch(() => ({ data: null }))
           ]);
 
@@ -61,17 +71,13 @@ export default function DashboardScreen() {
     ]);
   };
 
-  // 경고(과부하 또는 처분)가 있는지 여부
   const hasWarnings = (overloadData?.total_warnings > 0) || (disposalData?.items && disposalData.items.length > 0);
-  
-  // 활용률 점수
   const activityRate = reportData?.ecosystem?.activity_rate ?? 0;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <StatusBar barStyle="dark-content" />
       
-      {/* 1. 상단 환영 헤더 및 로그아웃 버튼 */}
       <View style={styles.header}>
         <View>
           <Text style={styles.systemText}>SMART CLOSET MANAGEMENT</Text>
@@ -84,7 +90,6 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 2. AI 코디 추천 요약 카드 */}
       <View style={styles.aiCard}>
         <View style={styles.aiHeader}>
           <Ionicons name="sparkles" size={18} color="#2563EB" />
@@ -98,7 +103,6 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 3. 액션 버튼 그리드 (문구 없음) */}
       <View style={styles.actionGrid}>
         <TouchableOpacity style={[styles.actionCard, { backgroundColor: '#F0F9FF', borderColor: '#E0F2FE' }]} onPress={() => router.push('/(tabs)/register')} activeOpacity={0.8}>
           <View style={[styles.iconBox, { backgroundColor: '#FFFFFF' }]}>
@@ -123,7 +127,6 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 4. 옷장 인사이트 (리포트) */}
       <View style={styles.statsContainer}>
         <View style={styles.insightHeader}>
           <Text style={styles.sectionTitle}>나의 옷장 리포트</Text>
@@ -136,7 +139,6 @@ export default function DashboardScreen() {
           <ActivityIndicator size="small" color="#2563EB" style={{ marginVertical: 20 }} />
         ) : (
           <>
-            {/* ✨ 개선 3번: 타이틀과 숫자의 세로 정렬(alignItems: flex-end) 완벽 교정 */}
             {reportData && reportData.ecosystem && (
               <View style={styles.ecosystemCard}>
                 <View style={styles.ecoHeaderRow}>
@@ -145,48 +147,36 @@ export default function DashboardScreen() {
                 </View>
                 
                 <View style={styles.progressBarBg}>
-                  <View style={[
-                    styles.progressBarFill, 
-                    { width: `${Math.min(Math.max(reportData.ecosystem.activity_rate, 0), 100)}%` }
-                  ]} />
+                  <View style={[styles.progressBarFill, { width: `${Math.min(Math.max(reportData.ecosystem.activity_rate, 0), 100)}%` }]} />
                 </View>
                 
                 <View style={styles.ecoLegendRow}>
-                  <Text style={styles.ecoLegendText}>
-                    🔥 활성 <Text style={styles.ecoBoldText}>{reportData.ecosystem.active_clothes}</Text>벌
-                  </Text>
-                  <Text style={styles.ecoLegendText}>
-                    💤 방치 <Text style={styles.ecoBoldText}>{reportData.ecosystem.inactive_clothes}</Text>벌
-                  </Text>
+                  <Text style={styles.ecoLegendText}>🔥 활성 <Text style={styles.ecoBoldText}>{reportData.ecosystem.active_clothes}</Text>벌</Text>
+                  <Text style={styles.ecoLegendText}>💤 방치 <Text style={styles.ecoBoldText}>{reportData.ecosystem.inactive_clothes}</Text>벌</Text>
                 </View>
               </View>
             )}
 
-            {overloadData && overloadData.total_warnings > 0 ? (
+            {overloadData?.total_warnings > 0 && (
               <View style={styles.alertBoxOverload}>
                 <View style={styles.alertHeader}>
                   <Ionicons name="warning" size={20} color="#DC2626" />
                   <Text style={styles.alertTitleOverload}>충동 소비 주의보</Text>
                 </View>
-                <Text style={styles.alertDesc}>
-                  비슷한 색상과 디자인의 옷이 많아요. 새로운 구매 전 옷장을 먼저 확인해 보세요!
-                </Text>
+                <Text style={styles.alertDesc}>비슷한 색상과 디자인의 옷이 많아요. 새로운 구매 전 옷장을 먼저 확인해 보세요!</Text>
               </View>
-            ) : null}
+            )}
 
-            {disposalData && disposalData.items && disposalData.items.length > 0 ? (
+            {disposalData?.items?.length > 0 && (
               <View style={styles.alertBoxDispose}>
                 <View style={styles.alertHeader}>
                   <Ionicons name="cube-outline" size={20} color="#D97706" />
                   <Text style={styles.alertTitleDispose}>정리가 필요한 옷 발견</Text>
                 </View>
-                <Text style={styles.alertDesc}>
-                  90일 이상 한 번도 입지 않은 옷이 {disposalData.items.length}벌 있습니다. 나눔이나 처분을 고민해 볼까요?
-                </Text>
+                <Text style={styles.alertDesc}>90일 이상 한 번도 입지 않은 옷이 {disposalData.items.length}벌 있습니다. 나눔이나 처분을 고민해 볼까요?</Text>
               </View>
-            ) : null}
+            )}
 
-            {/* ✨ 개선 1, 2번: 활용률 60% 이상일 때만 칭찬, 미만이면 격려 메시지 노출 및 위쪽 여백(margin) 확보 */}
             {!hasWarnings && (
               activityRate >= 60 ? (
                 <View style={[styles.statBox, styles.statBoxSuccess]}>
@@ -203,14 +193,13 @@ export default function DashboardScreen() {
           </>
         )}
       </View>
-      
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  content: { padding: 20, paddingBottom: 40, paddingTop: 60 },
+  content: { padding: 20, paddingBottom: 100, paddingTop: 60 },
   
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 30 },
   systemText: { fontSize: 11, color: '#2563EB', fontWeight: '800', letterSpacing: 1.2, marginBottom: 4 },
@@ -236,19 +225,16 @@ const styles = StyleSheet.create({
   insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   moreLink: { fontSize: 13, color: '#2563EB', fontWeight: '600', marginBottom: 16 },
 
-  // ✨ 개선 3번: 타이틀과 숫자의 밑선을 맞추기 위한 alignItems 설정
   ecosystemCard: { backgroundColor: '#F8FAFC', padding: 20, borderRadius: 16, marginBottom: 8, borderWidth: 1, borderColor: '#F1F5F9' },
   ecoHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 },
   ecoTitle: { fontSize: 15, fontWeight: '700', color: '#334155' },
   ecoRateText: { fontSize: 26, fontWeight: '800', color: '#111827' },
-  
   progressBarBg: { height: 10, backgroundColor: '#E2E8F0', borderRadius: 5, overflow: 'hidden', marginBottom: 16 },
   progressBarFill: { height: '100%', backgroundColor: '#2563EB', borderRadius: 5 },
   ecoLegendRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
   ecoLegendText: { fontSize: 13, color: '#64748B' },
   ecoBoldText: { fontWeight: '700', color: '#334155' },
   
-  // ✨ 개선 2번: 안내 박스 상단에 약간의 여백(marginTop: 8) 추가하여 답답함 해소
   statBox: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, gap: 10, borderWidth: 1, marginTop: 8 },
   statBoxSuccess: { backgroundColor: '#F0FDF4', borderColor: '#DCFCE7' },
   statBoxEncourage: { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' },
