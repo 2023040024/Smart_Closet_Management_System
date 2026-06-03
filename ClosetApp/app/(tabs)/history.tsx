@@ -11,6 +11,7 @@ import {
   Pressable,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   View
@@ -185,7 +186,10 @@ export default function HistoryScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Pressable onPress={() => router.back()} hitSlop={10}>
+            <Ionicons name="arrow-back" size={28} color="#111" />
+          </Pressable>
           <Text style={styles.title}>착용 기록</Text>
           {filterDate && (
             <View style={styles.activeDateBadge}>
@@ -288,9 +292,21 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16 },
-  header: { marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  title: { fontSize: 28, fontWeight: '800', color: '#111' },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#fff', 
+    paddingHorizontal: 16, 
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 16 : 16 
+  },
+
+  header: { 
+    marginBottom: 16, 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'flex-start' // 또는 'center'
+  },
+
+  title: { fontSize: 26, fontWeight: '800', color: '#111' },
   calendarButton: { padding: 4 },
   activeDateBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 6, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#C7D2FE' },
   activeDateText: { fontSize: 13, fontWeight: '700', color: '#4F46E5' },

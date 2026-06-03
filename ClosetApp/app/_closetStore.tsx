@@ -166,3 +166,7 @@ export function useCloset() {
   if (!context) throw new Error('useCloset must be used within a ClosetProvider');
   return context;
 }
+
+export default function ClosetStorePlaceholder() {
+  return null;
+}

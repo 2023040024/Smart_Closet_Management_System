@@ -4,7 +4,9 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -176,9 +178,13 @@ export default function AnalysisScreen() {
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
-        {/* 대제목 헤더 */}
         <View style={styles.headerRow}>
-          <Text style={styles.title}>옷장 진단</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
+              <Ionicons name="arrow-back" size={28} color="#111" />
+            </TouchableOpacity>
+            <Text style={[styles.title, { marginBottom: 0 }]}>옷장 진단</Text>
+          </View>
           <Text style={styles.subtitle}>AI가 내 옷장을 분석하여 스마트한 다이어트를 도와줍니다.</Text>
         </View>
 
@@ -253,7 +259,13 @@ export default function AnalysisScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16, paddingTop: 16, backgroundColor: '#f9fafb' }, // 배경색 파스텔 톤으로 살짝 변경
+  container: { 
+    flex: 1, 
+    paddingHorizontal: 16, 
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 16 : 16, 
+    backgroundColor: '#f9fafb' 
+  },
+  
   scrollContent: { paddingBottom: 28 },
   loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
   

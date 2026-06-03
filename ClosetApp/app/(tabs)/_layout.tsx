@@ -1,58 +1,15 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Stack } from 'expo-router';
 
-export default function TabLayout() {
+export default function Layout() {
+  
   return (
-    <Tabs>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: '홈',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="register"
-        options={{
-          title: '등록',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle" size={size} color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="recommend"
-        options={{
-          title: '추천',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="shirt" size={size} color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: '기록',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time" size={size} color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="analysis"
-        options={{
-          title: '진단',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="analytics" size={size} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="closet" />
+      <Stack.Screen name="recommend" />
+      <Stack.Screen name="history" />
+      <Stack.Screen name="analysis" />
+      <Stack.Screen name="register" />
+    </Stack>
   );
 }

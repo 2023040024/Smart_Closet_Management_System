@@ -1,10 +1,13 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Alert,
   Image,
+  Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -27,6 +30,7 @@ function Chip({
   return (
     <TouchableOpacity
       onPress={onPress}
+      activeOpacity={0.7}
       style={[styles.chip, selected && styles.chipSelected]}
     >
       <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
@@ -68,7 +72,7 @@ function stringifyErrorDetail(responseData: any, status: number) {
 }
 
 export default function RegisterScreen() {
-  const { fetchClothes } = useCloset(); // ✅ 등록 후 목록 갱신용
+  const { fetchClothes } = useCloset(); 
   const [image, setImage] = useState<string | null>(null);
   const [selected, setSelected] = useState<ClothesTags>(EMPTY_TAGS);
   const [price, setPrice] = useState<string>('');
@@ -128,10 +132,7 @@ export default function RegisterScreen() {
     formData.append('material', selected.material || '');
     formData.append('thickness', selected.thickness || '');
     formData.append('point', selected.point || '');
-    
-    // ⭐ 백엔드 명세에 맞춰 TPO를 'situation' 필드로 확실하게 전송
     formData.append('situation', selected.tpo || ''); 
-    
     formData.append('price', price || '0');
 
     formData.append('image', {
@@ -159,8 +160,6 @@ export default function RegisterScreen() {
     try {
       setLoading(true);
       await saveClothesToApi();
-      
-      // ✅ 서버에 등록 후 전역 상태 갱신 (index.tsx와 동기화됨)
       await fetchClothes();
 
       Alert.alert('등록 완료', '옷이 서버에 등록되었습니다.', [
@@ -185,28 +184,48 @@ export default function RegisterScreen() {
     }
   };
 
+  // ✨ 수정 포인트: 가로 스크롤 뷰를 적용하여 세로 길이를 대폭 단축!
   const renderChips = <K extends keyof ClothesTags>(items: readonly string[], key: K) => (
-    <View style={styles.chipWrap}>
-      {items.map((item) => (
-        <Chip
-          key={`${String(key)}-${item}`}
-          label={item}
-          selected={selected[key] === item}
-          onPress={() => toggleTag(key, item as ClothesTags[K])}
-        />
-      ))}
+    <View style={styles.chipRowWrapper}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScrollContent}>
+        {items.map((item) => (
+          <Chip
+            key={`${String(key)}-${item}`}
+            label={item}
+            selected={selected[key] === item}
+            onPress={() => toggleTag(key, item as ClothesTags[K])}
+          />
+        ))}
+      </ScrollView>
     </View>
   );
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>옷 등록</Text>
-      <TouchableOpacity style={styles.imageBox} onPress={pickImage}>
-        {/* ✅ 수정 포인트: resizeMode를 contain으로 수정하여 이미지 상/하단 짤림 해결 */}
-        {image ? <Image source={{ uri: image }} style={styles.image} resizeMode="contain" /> : <Text style={styles.imagePlaceholder}>+ 사진 추가</Text>}
+      <StatusBar barStyle="dark-content" />
+      
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
+          <Ionicons name="arrow-back" size={28} color="#111827" />
+        </TouchableOpacity>
+        <Text style={[styles.title, { marginBottom: 0 }]}>옷 등록</Text>
+      </View>
+
+      {/* ✨ 수정 포인트: 높이를 220 -> 160으로 줄이고 점선 테두리로 세련되게 변경 */}
+      <TouchableOpacity style={styles.imageBox} onPress={pickImage} activeOpacity={0.8}>
+        {image ? (
+          <Image source={{ uri: image }} style={styles.image} resizeMode="contain" />
+        ) : (
+          <View style={styles.placeholderWrap}>
+            <Ionicons name="camera-outline" size={32} color="#94A3B8" />
+            <Text style={styles.imagePlaceholder}>사진을 선택해 주세요</Text>
+          </View>
+        )}
       </TouchableOpacity>
+
       <Text style={styles.sectionTitle}>카테고리</Text>
       {renderChips(TAG_OPTIONS.category, 'category')}
+      
       {fitOptions.length > 0 && (
         <>
           <Text style={styles.sectionTitle}>{fitLabel}</Text>
@@ -214,48 +233,114 @@ export default function RegisterScreen() {
           {selected.category === '하의' && renderChips(TAG_OPTIONS.bottomFit, 'bottomFit')}
         </>
       )}
+      
       <Text style={styles.sectionTitle}>색</Text>
       {renderChips(TAG_OPTIONS.color, 'color')}
+      
       <Text style={styles.sectionTitle}>계절</Text>
       {renderChips(TAG_OPTIONS.season, 'season')}
+      
       <Text style={styles.sectionTitle}>톤</Text>
       {renderChips(TAG_OPTIONS.tone, 'tone')}
+      
       <Text style={styles.sectionTitle}>스타일</Text>
       {renderChips(TAG_OPTIONS.style, 'style')}
+      
       <Text style={styles.sectionTitle}>분위기</Text>
       {renderChips(TAG_OPTIONS.mood, 'mood')}
+      
       <Text style={styles.sectionTitle}>소재</Text>
       {renderChips(TAG_OPTIONS.material, 'material')}
+      
       <Text style={styles.sectionTitle}>두께</Text>
       {renderChips(TAG_OPTIONS.thickness, 'thickness')}
+      
       <Text style={styles.sectionTitle}>포인트</Text>
       {renderChips(TAG_OPTIONS.point, 'point')}
+      
       <Text style={styles.sectionTitle}>TPO</Text>
       {renderChips(TAG_OPTIONS.tpo, 'tpo')}
+      
       <Text style={styles.sectionTitle}>구매가</Text>
-      <TextInput style={styles.priceInput} value={price} onChangeText={setPrice} placeholder="가격을 입력해주세요" keyboardType="numeric" placeholderTextColor="#9ca3af" />
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
-        <Text style={styles.saveButtonText}>{loading ? '등록 중...' : '등록하기'}</Text>
+      <TextInput 
+        style={styles.priceInput} 
+        value={price} 
+        onChangeText={setPrice} 
+        placeholder="가격을 입력해주세요 (선택)" 
+        keyboardType="numeric" 
+        placeholderTextColor="#9ca3af" 
+      />
+      
+      <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading} activeOpacity={0.8}>
+        <Text style={styles.saveButtonText}>{loading ? '등록 중...' : '옷장에 등록하기'}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 16, paddingBottom: 32 },
-  title: { fontSize: 26, fontWeight: '700', marginBottom: 16 },
-  imageBox: { height: 220, borderRadius: 16, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginBottom: 20 },
-  // ✅ 배경색을 한 번 더 선언하여 원본 비율 매핑 시 좌우 여백을 자연스럽게 처리
-  image: { width: '100%', height: '100%', backgroundColor: '#f3f4f6' },
-  imagePlaceholder: { color: '#6b7280', fontSize: 16, fontWeight: '600' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginTop: 10, marginBottom: 8 },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6 },
-  chip: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999, backgroundColor: '#f3f4f6', marginRight: 8, marginBottom: 8 },
-  chipSelected: { backgroundColor: '#111827' },
-  chipText: { color: '#111827' },
-  chipTextSelected: { color: '#fff' },
-  priceInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, fontSize: 16, backgroundColor: '#f9fafb', color: '#111827', marginBottom: 16 },
-  saveButton: { marginTop: 12, paddingVertical: 16, borderRadius: 12, backgroundColor: '#111827', alignItems: 'center' },
-  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  content: { 
+    padding: 20, 
+    paddingBottom: 40, 
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 16 : 16 
+  },
+  
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
+  title: { fontSize: 26, fontWeight: '800', color: '#111827' }, 
+  
+  // ✨ 이미지 업로드 박스 디자인 및 크기 다이어트
+  imageBox: { 
+    height: 160, 
+    borderRadius: 16, 
+    backgroundColor: '#F8FAFC', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    overflow: 'hidden', 
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed'
+  },
+  placeholderWrap: { alignItems: 'center', gap: 8 },
+  image: { width: '100%', height: '100%', backgroundColor: '#F8FAFC' },
+  imagePlaceholder: { color: '#64748B', fontSize: 14, fontWeight: '600' },
+  
+  // ✨ 태그(Chip) 관련 타이틀 및 스타일 세련되게 변경
+  sectionTitle: { fontSize: 14, fontWeight: '800', color: '#475569', marginTop: 16, marginBottom: 10, marginLeft: 2 },
+  
+  chipRowWrapper: { marginBottom: 6 },
+  chipScrollContent: { paddingRight: 20 },
+  chip: { 
+    paddingVertical: 10, 
+    paddingHorizontal: 16, 
+    borderRadius: 20, 
+    backgroundColor: '#F8FAFC', 
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0'
+  },
+  chipSelected: { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
+  chipText: { color: '#64748B', fontSize: 13, fontWeight: '600' },
+  chipTextSelected: { color: '#2563EB', fontWeight: '800' },
+  
+  priceInput: { 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0', 
+    borderRadius: 12, 
+    padding: 14, 
+    fontSize: 15, 
+    backgroundColor: '#F8FAFC', 
+    color: '#111827', 
+    marginBottom: 24,
+    marginTop: 8
+  },
+  saveButton: { 
+    marginTop: 8, 
+    paddingVertical: 16, 
+    borderRadius: 12, 
+    backgroundColor: '#2563EB', // 라이트 테마 블루 포인트 색상 적용
+    alignItems: 'center' 
+  },
+  saveButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
 });
