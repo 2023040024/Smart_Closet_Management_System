@@ -24,3 +24,15 @@ class TestStats:
         assert res.status_code == 200
         assert "best_efficiency" in res.json()
         assert "worst_efficiency" in res.json()
+
+    def test_옷장_과부하_분석(self, client, auth_headers, sample_clothes):
+        res = client.get("/stats/overload", headers=auth_headers)
+        assert res.status_code == 200
+        assert "total_warnings" in res.json()
+
+    def test_월간_리포트_통합_조회(self, client, auth_headers, sample_clothes):
+        res = client.get("/stats/monthly-report", headers=auth_headers)
+        assert res.status_code == 200
+        data = res.json()
+        assert "ecosystem" in data
+        assert "overload" in data
