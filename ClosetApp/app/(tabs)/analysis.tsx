@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Platform,
   ScrollView,
@@ -53,42 +54,6 @@ export default function AnalysisScreen() {
   const [disposalData, setDisposalData] = useState<{ items: BackendClothesItem[]; ai_advice: string; } | null>(null);
   const [reportData, setReportData] = useState<any>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
-      const loadAnalysisData = async () => {
-        if (!isMounted) return;
-        setLoading(true);
-        try {
-          setError(null);
-          
-          const [overloadRes, disposalRes, reportRes] = await Promise.all([
-            api.get('/stats/overload'),
-            api.get('/stats/dispose', { params: { current_season: getCurrentSeason() } }),
-            api.get('/stats/monthly-report')
-          ]);
-
-          if (isMounted) {
-            setOverloadData(overloadRes.data);
-            setDisposalData({
-              items: disposalRes.data.items || [],
-              ai_advice: disposalRes.data.ai_advice || '최근 90일 이상 입지 않은 옷들입니다. 처분이나 나눔을 고민해 보세요!',
-            });
-            setReportData(reportRes.data);
-          }
-        } catch (error) {
-          console.error('분석 데이터 로드 실패:', error);
-          setError('데이터를 불러오는 중 문제가 발생했습니다.');
-        } finally {
-          if (isMounted) setLoading(false);
-        }
-      };
-
-      loadAnalysisData();
-      return () => { isMounted = false; };
-    }, [])
-  );
-
   const getCurrentSeason = (): string => {
     const month = new Date().getMonth() + 1;
     if (month >= 3 && month <= 5) return '봄';
@@ -96,6 +61,59 @@ export default function AnalysisScreen() {
     if (month >= 9 && month <= 11) return '가을';
     return '겨울';
   }
+
+  const loadAnalysisData = async () => {
+    setLoading(true);
+    try {
+      setError(null);
+      const [overloadRes, disposalRes, reportRes] = await Promise.all([
+        api.get('/stats/overload'),
+        api.get('/stats/dispose', { params: { current_season: getCurrentSeason() } }),
+        api.get('/stats/monthly-report')
+      ]);
+
+      setOverloadData(overloadRes.data);
+      setDisposalData({
+        items: disposalRes.data.items || [],
+        ai_advice: disposalRes.data.ai_advice || '최근 90일 이상 입지 않은 옷들입니다. 처분이나 나눔을 고민해 보세요!',
+      });
+      setReportData(reportRes.data);
+    } catch (error) {
+      console.error('분석 데이터 로드 실패:', error);
+      setError('데이터를 불러오는 중 문제가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAnalysisData();
+    }, [])
+  );
+
+  const handleQuickDispose = (clothesId: number) => {
+    Alert.alert(
+      '옷 처분하기',
+      '이 옷을 옷장에서 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '처분하기',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/clothes/${clothesId}`);
+              Alert.alert('완료', '옷이 성공적으로 처분(삭제)되었습니다.');
+              loadAnalysisData();
+            } catch (err) {
+              Alert.alert('오류', '처리에 실패했습니다. 다시 시도해주세요.');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const getBadgeStyles = (colorStr: string) => {
     switch(colorStr) {
@@ -106,7 +124,6 @@ export default function AnalysisScreen() {
     }
   };
 
-  // ✨ 그룹화된 중복 의류 렌더링 함수
   const renderOverloadGroup = (group: OverloadGroup, index: number) => {
     return (
       <View key={`overload-${index}`} style={styles.groupCard}>
@@ -134,6 +151,13 @@ export default function AnalysisScreen() {
                 <View style={styles.thumbnailOverlay}>
                   <Text style={styles.thumbnailWearText}>{item.wear_count}회 착용</Text>
                 </View>
+                <TouchableOpacity 
+                  style={styles.quickDeleteBtn} 
+                  onPress={() => handleQuickDispose(item.clothes_id)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="trash" size={14} color="#FFFFFF" />
+                </TouchableOpacity>
               </TouchableOpacity>
             );
           })}
@@ -142,19 +166,28 @@ export default function AnalysisScreen() {
     );
   };
 
-  // 방치된 의류(개별)를 위한 미니 카드 렌더링 함수
   const renderDisposeCard = (item: any) => {
     const imageUri = resolveImageUri(item.image ?? item.image_url) || 'https://via.placeholder.com/150';
     return (
-      <TouchableOpacity
-        key={item.clothes_id}
-        style={styles.disposeCard}
-        activeOpacity={0.9}
-        onPress={() => router.push({ pathname: '/detail', params: { id: item.clothes_id.toString() } })}
-      >
-        <Image source={{ uri: imageUri }} style={styles.disposeImage} resizeMode="contain" />
-        <View style={styles.disposeBadge}><Text style={styles.disposeBadgeText}>장기 방치</Text></View>
-      </TouchableOpacity>
+      <View key={item.clothes_id} style={styles.disposeCardContainer}>
+        <TouchableOpacity
+          style={styles.disposeCard}
+          activeOpacity={0.9}
+          onPress={() => router.push({ pathname: '/detail', params: { id: item.clothes_id.toString() } })}
+        >
+          <Image source={{ uri: imageUri }} style={styles.disposeImage} resizeMode="contain" />
+          <View style={styles.disposeBadge}><Text style={styles.disposeBadgeText}>장기 방치</Text></View>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.disposeActionBtn} 
+          onPress={() => handleQuickDispose(item.clothes_id)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="cube-outline" size={14} color="#DC2626" />
+          <Text style={styles.disposeActionText}>처분하기</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -218,7 +251,6 @@ export default function AnalysisScreen() {
 
         <View style={styles.divider} />
 
-        {/* ✨ 2. 진단 대상 (그룹화 및 리스트) */}
         <View style={styles.resultHeader}>
           <Text style={styles.resultTitle}>진단 상세 내역</Text>
           <Text style={styles.resultCount}>총 {totalOverloadCount + totalDisposeCount}건 발견</Text>
@@ -227,14 +259,12 @@ export default function AnalysisScreen() {
         {!hasAnyItems ? (
           <View style={styles.emptyGridPlaceholder}>
             <Ionicons name="sparkles" size={40} color="#059669" />
-            <Text style={styles.placeholderText}>유사한 아이템이나 방치된 옷이 없습니다.{'\n'}아주 완벽하게 관리되고 있네요!</Text>
+            <Text style={styles.placeholderText}>유사한 아이템이나 방치된 옷이 없습니다.{"\n"}아주 완벽하게 관리되고 있네요!</Text>
           </View>
         ) : (
           <View style={styles.listContainer}>
-            {/* 중복 의류 그룹화 렌더링 */}
             {overloadData?.items?.map((group, index) => renderOverloadGroup(group, index))}
 
-            {/* 방치 의류 가로 스크롤 렌더링 */}
             {totalDisposeCount > 0 && (
               <View style={styles.disposeSection}>
                  <View style={styles.disposeHeader}>
@@ -262,7 +292,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '900', marginBottom: 6, color: '#111827', letterSpacing: -0.5 },
   subtitle: { fontSize: 14, color: '#64748B', lineHeight: 22, fontWeight: '500' },
   
-  // ✨ 대시보드 리파인드
   dashboardCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 24, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2 },
   dashboardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
   dashboardTitle: { fontSize: 16, fontWeight: '800', color: '#1E3A8A' },
@@ -286,7 +315,6 @@ const styles = StyleSheet.create({
 
   listContainer: { gap: 16 },
 
-  // ✨ 그룹화된 카드 스타일
   groupCard: { backgroundColor: '#FFFFFF', borderRadius: 18, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 1 },
   groupHeader: { padding: 18, paddingBottom: 12, backgroundColor: '#F8FAFC', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   groupTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
@@ -298,17 +326,21 @@ const styles = StyleSheet.create({
   thumbnailImage: { width: '100%', height: '100%' },
   thumbnailOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(255, 255, 255, 0.85)', paddingVertical: 4, alignItems: 'center' },
   thumbnailWearText: { fontSize: 11, fontWeight: '800', color: '#111827' },
+  quickDeleteBtn: { position: 'absolute', top: 4, right: 4, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'center', alignItems: 'center' },
 
-  // ✨ 방치 의류 섹션 스타일
   disposeSection: { marginTop: 10, backgroundColor: '#FFFFFF', borderRadius: 18, borderWidth: 1, borderColor: '#E2E8F0', paddingVertical: 18, overflow: 'hidden' },
   disposeHeader: { paddingHorizontal: 18, marginBottom: 12 },
   disposeTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
   disposeSub: { fontSize: 13, color: '#64748B', marginTop: 4, fontWeight: '500' },
   disposeScroll: { paddingHorizontal: 18, gap: 12 },
+  
+  disposeCardContainer: { width: 120, gap: 8 },
   disposeCard: { width: 120, height: 120, borderRadius: 12, backgroundColor: '#F8FAFC', overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0' },
   disposeImage: { width: '100%', height: '100%' },
   disposeBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: '#FDE68A' },
   disposeBadgeText: { fontSize: 10, fontWeight: '800', color: '#D97706' },
+  disposeActionBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4, backgroundColor: '#FEF2F2', paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#FEE2E2' },
+  disposeActionText: { fontSize: 13, fontWeight: '800', color: '#DC2626' },
 
   emptyGridPlaceholder: { height: 180, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center', gap: 12, paddingHorizontal: 30 },
   placeholderText: { fontSize: 14, color: '#475569', fontWeight: '600', textAlign: 'center', lineHeight: 22 },
