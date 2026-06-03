@@ -11,14 +11,9 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  UIManager,
-  View,
+  View
 } from 'react-native';
 import api from '../_api';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
