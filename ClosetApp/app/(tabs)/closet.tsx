@@ -2,21 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Modal,
-    NativeScrollEvent,
-    NativeSyntheticEvent,
-    Platform,
-    Pressable,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-    useWindowDimensions,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
 } from 'react-native';
 import api from '../_api';
 import { Category, ClothesItem, TAG_OPTIONS, useCloset } from '../_closetStore';
@@ -274,21 +274,50 @@ export default function ClosetScreen() {
     );
   };
 
-  // ✨ 옷 카드의 렌더링 부분에서 불필요한 카테고리 텍스트 타이틀을 제거했습니다.
-  const renderCard = (item: ClothesItem) => (
-    <TouchableOpacity key={item.id} style={styles.card} activeOpacity={0.9} onLongPress={() => openMenu(item)} onPress={() => router.push({ pathname: '/detail', params: { id: item.id } })} delayLongPress={250}>
-      <View style={styles.cardImageWrap}>
-        <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="contain" />
-      </View>
-      <View style={styles.cardBody}>
-        <View style={styles.cardTagRow}>
-          {!!item.tags.color && <Text style={styles.cardTag}>{item.tags.color}</Text>}
-          {!!item.tags.style && <Text style={styles.cardTag}>{item.tags.style}</Text>}
-          {!!item.tags.tpo && <Text style={[styles.cardTag, styles.tpoTag]}>{item.tags.tpo}</Text>}
+  // 옷 카드의 가독성 강화를 위한 렌더링 리팩토링
+  const renderCard = (item: ClothesItem) => {
+    
+    const tags = [
+      { value: item.tags.color, isTpo: false },
+      { value: item.tags.style, isTpo: false },
+      { value: item.tags.tpo, isTpo: true }
+    ].filter(t => t.value).slice(0, 3);
+
+    const itemName = (item as any).name || `${item.tags.category || '기본'} 아이템`;
+
+    return (
+      <TouchableOpacity key={item.id} style={styles.card} activeOpacity={0.9} onLongPress={() => openMenu(item)} onPress={() => router.push({ pathname: '/detail', params: { id: item.id } })} delayLongPress={250}>
+        <View style={styles.cardImageWrap}>
+          <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="contain" />
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle} numberOfLines={1}>{itemName}</Text>
+          
+          <View style={styles.cardTagRow}>
+            {tags.map((tag, idx) => (
+              <View 
+                key={idx} 
+                style={[
+                  styles.cardTagBadge, 
+                  tag.isTpo && styles.cardTagBadgeTpo // TPO일 때만 포인트 배경색 적용
+                ]}
+              >
+                <Text 
+                  style={[
+                    styles.cardTagText, 
+                    tag.isTpo && styles.cardTagTextTpo // TPO일 때만 포인트 텍스트 색상 적용
+                  ]} 
+                  numberOfLines={1}
+                >
+                  {tag.value}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading && clothes.length === 0) {
     return <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#111" /></View>;
@@ -470,15 +499,51 @@ const styles = StyleSheet.create({
   resultTitle: { fontSize: 17, fontWeight: '800', color: '#111' },
   resultCount: { fontSize: 13, color: '#666', fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+
+  card: { 
+    width: '48%', 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 16, 
+    marginBottom: 16, 
+    overflow: 'hidden', 
+    borderWidth: 1, 
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2
+  },
+  cardImageWrap: { width: '100%', height: 160, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' },
   
-  card: { width: '48%', backgroundColor: '#fff', borderRadius: 16, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#f1f5f9' },
-  cardImageWrap: { width: '100%', height: 160, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center' },
-  cardImage: { width: '100%', height: '100%' },
-  // ✨ cardTitle(카테고리 텍스트) 스타일 삭제 및 cardBody 패딩 조정
+  cardImage: { width: '90%', height: '90%' },
+  
   cardBody: { padding: 12 }, 
-  cardTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, alignItems: 'center' },
-  cardTag: { fontSize: 11, color: '#4b5563', backgroundColor: '#f3f4f6', paddingHorizontal: 8, height: 24, lineHeight: 24, borderRadius: 6, fontWeight: '500', textAlign: 'center', overflow: 'hidden' },
-  tpoTag: { backgroundColor: '#eef2ff', color: '#4f46e5' },
+  
+  cardTitle: { 
+    fontSize: 14, 
+    fontWeight: '700', 
+    color: '#334155', 
+    marginBottom: 8 
+  },
+  
+  cardTagRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' },
+
+  cardTagBadge: { 
+    backgroundColor: '#F1F5F9', 
+    paddingHorizontal: 8, 
+    paddingVertical: 4, 
+    borderRadius: 6 
+  },
+
+  cardTagText: { 
+    fontSize: 11, 
+    color: '#475569', 
+    fontWeight: '600' 
+  },
+  
+  cardTagBadgeTpo: { backgroundColor: '#EEF2FF' },
+  cardTagTextTpo: { color: '#4F46E5' },
   
   loadingContainer: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
   
