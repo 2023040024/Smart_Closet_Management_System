@@ -333,8 +333,11 @@ export default function ClosetScreen() {
           </TouchableOpacity>
           
           <View style={styles.headerTextBox}>
-            <Text style={styles.title}>내 옷장</Text>
-            <Text style={styles.subtitle} numberOfLines={1}>등록한 옷을 확인하고 관리해보세요.</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.title}>내 옷장</Text>
+              <Ionicons name="sparkles" size={22} color="#2563EB" /> 
+            </View>
+            <Text style={styles.subtitle} numberOfLines={1}>나만의 스마트한 옷장을 가꾸어 보세요.</Text>
           </View>
         </View>
 
@@ -523,7 +526,7 @@ const styles = StyleSheet.create({
   cardTitle: { 
     fontSize: 14, 
     fontWeight: '700', 
-    color: '#334155', 
+    color: '#111827', 
     marginBottom: 8 
   },
   
