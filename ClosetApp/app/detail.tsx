@@ -33,6 +33,22 @@ function resolveImageUri(image?: string | null) {
   return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
 }
 
+// ✨ 강력한 날짜 포맷 함수 (시간이 섞여 있어도 무조건 날짜만 추출)
+function formatDate(dateString?: string | null) {
+  if (!dateString) return '';
+  try {
+    // "2026-05-31T00:00:00" 같은 형태에서 "2026-05-31"만 잘라내기
+    const cleanDate = dateString.split('T')[0].split(' ')[0]; 
+    const parts = cleanDate.split('-');
+    if (parts.length === 3) {
+      return `${parts[0]}년 ${parseInt(parts[1], 10)}월 ${parseInt(parts[2], 10)}일`;
+    }
+  } catch (e) {
+    // 파싱 오류 발생 시 원본 반환
+  }
+  return dateString;
+}
+
 type HighlightType = 'none' | 'normal_cost' | 'warning';
 
 export default function DetailScreen() {
@@ -95,11 +111,9 @@ export default function DetailScreen() {
     if (rawPrice != null && Number(rawPrice) > 0) {
       showCost = true;
       if (wearCount === 0) {
-        // 미착용 시 빨간색 경고 표시
         costPerWearStr = '미착용 (계산 불가)';
         costHighlight = 'warning';
       } else {
-        // 착용 기록이 있으면 무조건 기존 사진의 연보라색 스타일 적용
         const costValue = Math.floor(Number(rawPrice) / wearCount);
         costPerWearStr = `₩${costValue.toLocaleString()} / 회`;
         costHighlight = 'normal_cost';
@@ -107,15 +121,23 @@ export default function DetailScreen() {
     }
 
     const tagsArray = [
-      { label: '이름', value: item.name }, { label: '카테고리', value: s.category ?? item.category },
-      { label: '색상', value: s.color ?? item.color }, { label: '계절', value: s.season ?? item.season },
-      { label: '톤', value: s.tone }, { label: '스타일', value: s.style ?? item.style },
-      { label: '분위기', value: s.mood }, { label: '핏', value: fitValue },
-      { label: '소재', value: s.material ?? item.material }, { label: '두께', value: s.thickness },
-      { label: '포인트', value: s.point }, { label: 'TPO', value: tpoValue },
-      { label: '누적 착용', value: `${wearCount}회` }, { label: '구매가', value: priceValue },
+      // 💡 옷 이름은 위로 단독 배치했으므로 여기서 뺐습니다!
+      { label: '카테고리', value: s.category ?? item.category },
+      { label: '색상', value: s.color ?? item.color }, 
+      { label: '계절', value: s.season ?? item.season },
+      { label: '톤', value: s.tone }, 
+      { label: '스타일', value: s.style ?? item.style },
+      { label: '분위기', value: s.mood }, 
+      { label: '핏', value: fitValue },
+      { label: '소재', value: s.material ?? item.material }, 
+      { label: '두께', value: s.thickness },
+      { label: '포인트', value: s.point }, 
+      { label: 'TPO', value: tpoValue },
+      { label: '누적 착용', value: `${wearCount}회` }, 
+      { label: '구매가', value: priceValue },
       ...(showCost ? [{ label: '가성비', value: costPerWearStr, highlight: costHighlight }] : []),
-      { label: '마지막 착용일', value: item.last_worn_date },
+      // ✨ 변환 함수 적용 완료!
+      { label: '마지막 착용일', value: formatDate(item.last_worn_date) },
     ];
     return tagsArray.filter((t) => t.value != null && String(t.value).trim() !== '');
   }, [item]);
@@ -143,6 +165,11 @@ export default function DetailScreen() {
         ) : (
           <View style={styles.imageFallback}><Text style={styles.imageFallbackText}>이미지가 없습니다.</Text></View>
         )}
+
+        {/* ✨ 새롭게 추가된 옷 이름 단독 노출 영역 */}
+        <View style={styles.titleContainer}>
+          <Text style={styles.mainItemName}>{item.name || '이름 없는 옷'}</Text>
+        </View>
 
         <Text style={styles.sectionTitle}>선택된 태그</Text>
 
@@ -206,14 +233,17 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
   title: { fontSize: 26, fontWeight: '800', color: '#111827' },
   
-  image: { width: '100%', height: 260, borderRadius: 16, marginBottom: 24, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
-  imageFallback: { width: '100%', height: 260, borderRadius: 16, marginBottom: 24, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+  image: { width: '100%', height: 260, borderRadius: 16, marginBottom: 16, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  imageFallback: { width: '100%', height: 260, borderRadius: 16, marginBottom: 16, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
   imageFallbackText: { color: '#94A3B8', fontSize: 15, fontWeight: '600' },
   
+  // ✨ 옷 이름 타이틀 스타일 (새로 추가됨)
+  titleContainer: { marginBottom: 24, paddingHorizontal: 4 },
+  mainItemName: { fontSize: 24, fontWeight: '900', color: '#111827', letterSpacing: -0.5 },
+
   sectionTitle: { fontSize: 18, fontWeight: '800', marginBottom: 16, color: '#111827' },
   emptyTagText: { color: '#64748B', marginBottom: 20 },
   
-  // ✨ 태그 리스트 디자인 복구 (둥근 알약 형태 및 사이즈 조정)
   tagList: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 24 },
   tagRow: { minWidth: '48%', flexDirection: 'column', alignItems: 'flex-start', marginBottom: 18, paddingRight: 8 },
   tagLabel: { fontSize: 13, color: '#64748B', marginBottom: 6, fontWeight: '600', marginLeft: 4 },
@@ -221,10 +251,9 @@ const styles = StyleSheet.create({
   tagPill: { backgroundColor: '#F3F4F6', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 16 },
   tagText: { color: '#374151', fontSize: 14, fontWeight: '700' },
 
-  // ✨ 가성비 태그 로직 색상 복구
-  normalCostPill: { backgroundColor: '#E0E7FF' }, // 기존 사진의 연보라/파랑 배경
+  normalCostPill: { backgroundColor: '#E0E7FF' }, 
   normalCostText: { color: '#3730A3', fontWeight: '800' }, 
-  warningCostPill: { backgroundColor: '#FEF2F2' }, // 미착용 시 빨간 경고
+  warningCostPill: { backgroundColor: '#FEF2F2' }, 
   warningCostText: { color: '#DC2626', fontWeight: '800' },
 
   tipContainer: { backgroundColor: '#F8FAFC', padding: 20, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
