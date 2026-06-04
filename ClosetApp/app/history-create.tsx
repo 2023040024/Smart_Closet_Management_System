@@ -9,11 +9,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -198,23 +199,30 @@ export default function HistoryCreateScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isEditMode ? '착용 기록 수정' : '착용 기록 추가' }} />
-      <SafeAreaView style={styles.container}>
-        {/* ✨ 키보드 회피 뷰 적용 */}
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" />
         <KeyboardAvoidingView 
           style={{ flex: 1 }} 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
         >
           {loadingClothes ? (
-            <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#111" /><Text style={styles.loadingText}>옷 목록 불러오는 중...</Text></View>
+            <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#111827" /><Text style={styles.loadingText}>옷 목록 불러오는 중...</Text></View>
           ) : (
             <ScrollView 
               contentContainerStyle={styles.content} 
               showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled" // ✨ 키보드 열린 상태에서도 버튼 탭 유지
+              keyboardShouldPersistTaps="handled"
             >
               
+              <View style={styles.customHeaderRow}>
+                <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
+                  <Ionicons name="arrow-back" size={28} color="#111827" />
+                </TouchableOpacity>
+                <Text style={styles.customHeaderTitle}>{isEditMode ? '착용 기록 수정' : '착용 기록 추가'}</Text>
+              </View>
+
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>날짜</Text>
                 <Pressable style={styles.dateBox} onPress={() => setShowDatePicker(true)}>
@@ -270,14 +278,18 @@ export default function HistoryCreateScreen() {
             </ScrollView>
           )}
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 16, paddingBottom: 60 },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  content: { padding: 20, paddingBottom: 60, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 16 : 16 },
+  
+  customHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
+  customHeaderTitle: { fontSize: 26, fontWeight: '800', color: '#111827', marginBottom: 0 },
+
   section: { marginBottom: 32 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 14 },
   dateBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, gap: 10, borderWidth: 1, borderColor: '#E2E8F0' },
@@ -296,13 +308,13 @@ const styles = StyleSheet.create({
   clothNameSelected: { color: '#4F46E5', fontWeight: '700' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0' },
-  chipSelected: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
+  chipSelected: { backgroundColor: '#111827', borderColor: '#111827' },
   chipText: { fontSize: 13, color: '#64748B', fontWeight: '600' },
   chipTextSelected: { color: '#FFFFFF' },
   input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 16, minHeight: 120, textAlignVertical: 'top', fontSize: 15, color: '#334155', lineHeight: 22 },
-  saveButton: { marginTop: 10, backgroundColor: '#111', paddingVertical: 16, borderRadius: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
+  saveButton: { marginTop: 10, backgroundColor: '#2563EB', paddingVertical: 16, borderRadius: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
   saveButtonDisabled: { opacity: 0.5 },
-  saveText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  saveText: { color: '#ffffff', fontSize: 17, fontWeight: '800' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 14, color: '#64748B' },
   mockWarningText: { fontSize: 13, color: '#EF4444', marginBottom: 12, fontWeight: '600' },
