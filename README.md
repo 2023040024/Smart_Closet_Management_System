@@ -15,7 +15,7 @@
 
 ## 🛠 기술 스택
 Backend: Python + FastAPI
-Frontend: JavaScript, React Native + Expo
+Frontend: TypeScript, React Native + Expo
 Database: SQLite
 AI: Google Gemini 1.5 Flash API
 
@@ -24,7 +24,7 @@ AI: Google Gemini 1.5 Flash API
 Python 3.11+
 Node.js 18+
 pip 24+
-이 외 requrements.txt 명시
+이 외 requirements.txt 명시
 ```
 
 ## 💾 설치 방법
@@ -35,6 +35,11 @@ GEMINI_API_KEY=발급받은키입력
 WEATHER_SERVICE_KEY=발급받은키입력
 DATABASE_URL=sqlite:///./closet.db
 SECRET_KEY=mysecretkey123
+```
+
+ClosetApp 폴더에 .env 파일 생성 후 아래 내용 입력(에뮬레이터는 localhost, 실기기는 본인 IP 입력)
+```
+EXPO_PUBLIC_API_URL=http://localhost:8000
 ```
 
 2. 백엔드(FastAPI)
