@@ -125,7 +125,8 @@ class TestWeatherAPI:
         파일 최상단의 `if not SERVICE_KEY: print(...)` 라인을 커버하기 위한 테스트.
         모듈을 강제로 리로드하여 확인합니다.
         """
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("dotenv.load_dotenv", return_value=False):
             captured_output = StringIO()
             sys.stdout = captured_output
 

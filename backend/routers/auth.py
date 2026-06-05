@@ -3,7 +3,6 @@ import os, bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from dotenv import load_dotenv
 
@@ -21,7 +20,6 @@ SECRET_KEY  = os.getenv("SECRET_KEY", "your-default-secret-key")
 ALGORITHM   = "HS256"
 TOKEN_EXPIRE_HOURS = 24
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
