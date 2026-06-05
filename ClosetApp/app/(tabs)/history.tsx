@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     marginBottom: 16, 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
-    alignItems: 'flex-start' // 또는 'center'
+    alignItems: 'flex-start'
   },
 
   title: { fontSize: 26, fontWeight: '800', color: '#111' },

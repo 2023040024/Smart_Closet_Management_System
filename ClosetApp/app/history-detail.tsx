@@ -101,7 +101,6 @@ export default function HistoryDetailScreen() {
                   <View style={styles.clothInfo}>
                     <Text style={styles.clothName} numberOfLines={1}>{cloth.name}</Text>
                     
-                    {/* ✨ 카테고리, 색상, 그리고 TPO 태그까지 나란히 렌더링! */}
                     <View style={styles.tagRow}>
                       <Text style={styles.tagBadge}>{cloth.category}</Text>
                       
@@ -157,26 +156,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'center', 
     backgroundColor: '#FFFFFF', 
-    borderRadius: 16, 
-    padding: 18, 
+    borderRadius: 20, 
+    padding: 22, 
     marginBottom: 16, 
     borderWidth: 1, 
     borderColor: '#E2E8F0',
     shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.03, 
-    shadowRadius: 8, 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 10, 
     elevation: 2 
   },
   clothThumbnail: { 
-    width: 96, 
-    height: 96, 
-    borderRadius: 12, 
+    width: 110, 
+    height: 110, 
+    borderRadius: 16, 
     backgroundColor: '#F8FAFC', 
-    marginRight: 16 
+    marginRight: 20 
   },
   clothInfo: { flex: 1, justifyContent: 'center' },
-  clothName: { fontSize: 17, fontWeight: '800', color: '#111827', marginBottom: 10 },
+  clothName: { fontSize: 16, fontWeight: '800', color: '#111827', marginBottom: 12 },
   
   tagRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   tagBadge: { 
