@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-  Alert,
   Image,
   LayoutAnimation,
   Platform,
@@ -11,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  UIManager,
   View
 } from 'react-native';
 import api from '../_api';
@@ -49,6 +49,7 @@ export default function AnalysisScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [overloadData, setOverloadData] = useState<{ total_warnings: number; ai_advice: string; items: OverloadGroup[]; } | null>(null);
   const [disposalData, setDisposalData] = useState<{ items: BackendClothesItem[]; ai_advice: string; } | null>(null);
@@ -90,31 +91,30 @@ export default function AnalysisScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadAnalysisData();
+      let isMounted = true;
+      const run = async () => {
+        if (!isMounted) return;
+        await loadAnalysisData();
+      };
+      run();
+      return () => { isMounted = false; };
     }, [])
   );
 
-  const handleQuickDispose = (clothesId: number) => {
-    Alert.alert(
-      '옷 처분하기',
-      '이 옷을 옷장에서 삭제하시겠습니까?',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '처분하기',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.delete(`/clothes/${clothesId}`);
-              loadAnalysisData();
-            } catch (err) {
-              Alert.alert('오류', '처리에 실패했습니다. 다시 시도해주세요.');
-            }
-          }
-        }
-      ]
-    );
-  };
+  const handleQuickDispose = async (clothesId: number) => {
+  // 이미 삭제 중인 아이템이면 함수 종료 (중복 클릭 방지)
+  if (deletingId === clothesId) return;
+
+  setDeletingId(clothesId);
+  try {
+    await api.delete(`/clothes/${clothesId}`);
+    await loadAnalysisData(); // 삭제 후 데이터 갱신
+  } catch (error) {
+    console.error('삭제 실패:', error);
+  } finally {
+    setDeletingId(null); // 삭제 완료 또는 실패 시 상태 초기화
+  }
+};
 
   const getBadgeStyles = (colorStr: string) => {
     switch(colorStr) {
@@ -156,6 +156,7 @@ export default function AnalysisScreen() {
                   style={styles.quickDeleteBtn} 
                   onPress={() => handleQuickDispose(item.clothes_id)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  disabled={deletingId === item.clothes_id}
                 >
                   <Ionicons name="trash" size={14} color="#FFFFFF" />
                 </TouchableOpacity>
@@ -167,8 +168,8 @@ export default function AnalysisScreen() {
     );
   };
 
-  const renderDisposeCard = (item: any) => {
-    const imageUri = resolveImageUri(item.image ?? item.image_url) || 'https://via.placeholder.com/150';
+  const renderDisposeCard = (item: BackendClothesItem) => {
+    const imageUri = resolveImageUri(item.image ?? item.image_url) || Image.resolveAssetSource(require('../../assets/images/no-image.png')).uri
     return (
       <View key={item.clothes_id} style={styles.disposeCardContainer}>
         <TouchableOpacity
@@ -184,9 +185,12 @@ export default function AnalysisScreen() {
           style={styles.disposeActionBtn} 
           onPress={() => handleQuickDispose(item.clothes_id)}
           activeOpacity={0.7}
+          disabled={deletingId === item.clothes_id}
         >
           <Ionicons name="cube-outline" size={14} color="#DC2626" />
-          <Text style={styles.disposeActionText}>처분하기</Text>
+          <Text style={styles.disposeActionText}>
+            {deletingId === item.clothes_id ? '처분 중...' : '처분하기'}
+          </Text>
         </TouchableOpacity>
       </View>
     );
