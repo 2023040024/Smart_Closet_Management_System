@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, Stack } from 'expo-router'; // ✨ Stack 추가
+import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -25,7 +25,6 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
-  // ✨ 키보드 활성화 상태 감지 로직
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow',
@@ -75,7 +74,6 @@ export default function SignupScreen() {
 
   return (
     <>
-      {/* ✨ 상단 'signup' 기본 헤더 바 숨김 처리 */}
       <Stack.Screen options={{ headerShown: false }} />
       
       <SafeAreaView style={styles.safeArea}>
@@ -83,7 +81,6 @@ export default function SignupScreen() {
           style={styles.container} 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          {/* ✨ 스크롤 뷰를 적용하여 키보드가 올라와도 아래로 스크롤 가능하게 처리 */}
           <ScrollView 
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -160,7 +157,6 @@ export default function SignupScreen() {
             </View>
           </ScrollView>
 
-          {/* ✨ 키보드가 활성화되었을 때는 푸터 숨김 */}
           {!isKeyboardVisible && (
             <View style={styles.footer}>
                 <Text style={styles.footerText}>Secure System Registration</Text>
@@ -186,7 +182,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     justifyContent: 'center',
     paddingTop: 40,
-    paddingBottom: 100, // ✨ 여유 공간을 주어 스크롤 시 버튼이 넉넉하게 보이도록 함
+    paddingBottom: 100,
   },
   heroSection: {
     marginBottom: 48, 

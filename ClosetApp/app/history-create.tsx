@@ -179,16 +179,20 @@ export default function HistoryCreateScreen() {
       if (isEditMode) {
         const originalDate = params.editDate;
         if (originalDate && submitDate !== originalDate) {
-          await api.post('/history', payload);
           if (params.editHistoryIds) {
             const oldIds = JSON.parse(params.editHistoryIds);
-            for (const id of oldIds) await api.delete(`/history/${Number(id)}`);
+            for (const id of oldIds) {
+              await api.delete(`/history/${Number(id)}`);
           }
-        } else {
+        }
+        await api.post('/history', payload);
+      } else {
           await api.put(`/history`, payload); 
         }
         Alert.alert('수정 완료', '착용 기록이 수정되었습니다.', [{ text: '확인', onPress: () => router.replace('/(tabs)/history') }]);
-      } else {
+      }
+      
+      else {
         await api.post('/history', payload);
         Alert.alert('저장 완료', '착용 기록이 저장되었습니다.', [{ text: '확인', onPress: () => router.replace('/(tabs)/history') }]);
       }

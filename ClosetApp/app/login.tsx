@@ -22,9 +22,8 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isKeyboardVisible, setKeyboardVisible] = useState(false); // ✨ 키보드 상태 추가
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
-  // ✨ 키보드가 올라오고 내려가는 이벤트를 감지하는 로직
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow',
@@ -136,7 +135,6 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* ✨ 키보드가 안 보일 때만 푸터 렌더링 */}
             {!isKeyboardVisible && (
               <View style={styles.footer}>
                   <Text style={styles.footerText}>Powered by Gemini AI & FastAPI</Text>

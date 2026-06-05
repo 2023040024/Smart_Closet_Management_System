@@ -41,7 +41,6 @@ export default function HistoryDetailScreen() {
 
   return (
     <>
-      {/* ✨ 까만 기본 헤더 숨기기 */}
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.container}>

@@ -33,7 +33,6 @@ function resolveImageUri(image?: string | null) {
   return image.startsWith('/') ? `${API_BASE_URL}${image}` : `${API_BASE_URL}/${image}`;
 }
 
-// ✨ 강력한 날짜 포맷 함수 (시간이 섞여 있어도 무조건 날짜만 추출)
 function formatDate(dateString?: string | null) {
   if (!dateString) return '';
   try {
@@ -121,7 +120,6 @@ export default function DetailScreen() {
     }
 
     const tagsArray = [
-      // 💡 옷 이름은 위로 단독 배치했으므로 여기서 뺐습니다!
       { label: '카테고리', value: s.category ?? item.category },
       { label: '색상', value: s.color ?? item.color }, 
       { label: '계절', value: s.season ?? item.season },
@@ -136,7 +134,6 @@ export default function DetailScreen() {
       { label: '누적 착용', value: `${wearCount}회` }, 
       { label: '구매가', value: priceValue },
       ...(showCost ? [{ label: '가성비', value: costPerWearStr, highlight: costHighlight }] : []),
-      // ✨ 변환 함수 적용 완료!
       { label: '마지막 착용일', value: formatDate(item.last_worn_date) },
     ];
     return tagsArray.filter((t) => t.value != null && String(t.value).trim() !== '');
@@ -166,7 +163,6 @@ export default function DetailScreen() {
           <View style={styles.imageFallback}><Text style={styles.imageFallbackText}>이미지가 없습니다.</Text></View>
         )}
 
-        {/* ✨ 새롭게 추가된 옷 이름 단독 노출 영역 */}
         <View style={styles.titleContainer}>
           <Text style={styles.mainItemName}>{item.name || '이름 없는 옷'}</Text>
         </View>
@@ -237,7 +233,6 @@ const styles = StyleSheet.create({
   imageFallback: { width: '100%', height: 260, borderRadius: 16, marginBottom: 16, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
   imageFallbackText: { color: '#94A3B8', fontSize: 15, fontWeight: '600' },
   
-  // ✨ 옷 이름 타이틀 스타일 (새로 추가됨)
   titleContainer: { marginBottom: 24, paddingHorizontal: 4 },
   mainItemName: { fontSize: 24, fontWeight: '900', color: '#111827', letterSpacing: -0.5 },
 

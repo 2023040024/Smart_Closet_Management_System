@@ -1,4 +1,4 @@
-import { router } from 'expo-router'; // 라우터 추가
+import { router } from 'expo-router';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ClothesItem } from '../../app/_closetStore';
 import { TagChip } from './TagChip';
@@ -29,7 +29,6 @@ export function OutfitItemCard({ label, item }: { label: string; item?: ClothesI
   };
 
   return (
-    // ✨ Commit 3: 상세 보기 연결 (TouchableOpacity 추가)
     <TouchableOpacity activeOpacity={0.7} onPress={handlePress}>
       <View style={styles.itemCard}>
         <View style={styles.itemHeaderRow}>
@@ -38,7 +37,6 @@ export function OutfitItemCard({ label, item }: { label: string; item?: ClothesI
 
         {item.image ? (
           <View style={styles.itemImageContainer}>
-            {/* ✨ Commit 1: 이미지 비율 조정 (contain 유지) */}
             <Image 
               source={{ uri: resolveImageUri(item.image) }} 
               style={styles.itemImage} 
