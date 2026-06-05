@@ -140,7 +140,6 @@ export default function RecommendScreen() {
           <Ionicons name="arrow-back" size={28} color="#111827" />
         </TouchableOpacity>
         <Text style={[styles.title, { marginBottom: 0 }]}>코디 추천</Text>
-        {/* ✨ 스크린샷과 동일하게 👕 이모지 반영 */}
         <Text style={{ fontSize: 26 }}>👕</Text>
       </View>
 
@@ -149,7 +148,6 @@ export default function RecommendScreen() {
       {!apiRecommendations && (
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
-            {/* ✨ ⛅ 이모지로 디자인 원복 */}
             <Text style={{ fontSize: 22 }}>⛅</Text>
             <Text style={styles.sectionTitle}>오늘의 날씨 기반 추천</Text>
           </View>
@@ -159,7 +157,6 @@ export default function RecommendScreen() {
           </View>
           
           <View style={styles.quickKeywordRow}>
-            {/* ✨ 추천 키워드 스크린샷과 동일하게 변경 */}
             {['데일리', '비즈니스', '데이트', '운동', '미팅'].map(keyword => (
               <TouchableOpacity key={keyword} style={styles.quickKeywordChip} onPress={() => setSituation(keyword)}>
                 <Text style={styles.quickKeywordText}>{keyword}</Text>
@@ -171,7 +168,6 @@ export default function RecommendScreen() {
             <Text style={styles.actionButtonText}>{apiLoading ? '불러오는 중...' : '코디 추천받기'}</Text>
           </TouchableOpacity>
 
-          {/* ✨ 삭제되었던 'AI 코디네이터 대기 중' 상태 완벽 복구 */}
           {apiLoading ? (
             <SkeletonLoader />
           ) : (
@@ -291,8 +287,6 @@ const styles = StyleSheet.create({
     lineHeight: 26, 
     fontWeight: '500'
   },
-  
-  // ✨ AI 대기 중 상태 박스 스타일 추가
   emptyStateBox: {
     alignItems: 'center',
     marginTop: 40,

@@ -3,7 +3,7 @@ import axios from 'axios';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
-// 백엔드 API 기본 주소 (기존과 동일)
+// 백엔드 API 기본 주소
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const api = axios.create({

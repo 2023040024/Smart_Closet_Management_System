@@ -9,13 +9,13 @@ import {
   Image,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import api from '../_api';
 
@@ -226,7 +226,7 @@ export default function HistoryScreen() {
             return (order[a.category] || 99) - (order[b.category] || 99);
           });
           
-          // ✨ 개별 태그 배열 생성
+          // 개별 태그 배열 생성
           const tags = [item.tpo, item.tpoSuitability, item.mood].filter((v) => v && v.trim() !== '');
           
           let displayDate = item.date;
@@ -240,7 +240,6 @@ export default function HistoryScreen() {
               <View style={styles.cardHeader}>
                 <Text style={styles.date}>{displayDate}</Text>
                 
-                {/* ✨ 쪼개진 태그 렌더링 */}
                 <View style={styles.tagWrapper}>
                   {tags.length > 0 ? (
                     tags.map((tag, index) => (
@@ -268,7 +267,6 @@ export default function HistoryScreen() {
                 ) : (<View style={styles.clothBox}><Text style={styles.clothName}>옷 정보 없음</Text></View>)}
               </ScrollView>
 
-              {/* ✨ 인용구 스타일의 메모 영역 */}
               {item.memo && item.memo.trim() !== '' && (
                 <View style={styles.memoBox}>
                   <Ionicons name="pencil" size={14} color="#4F46E5" style={{ marginTop: 2 }} />
@@ -323,7 +321,6 @@ const styles = StyleSheet.create({
   
   card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
   
-  // ✨ 카드 헤더 및 쪼개진 태그 스타일
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   date: { fontSize: 16, fontWeight: '800', color: '#1E293B' },
   tagWrapper: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end', marginLeft: 12 },
@@ -338,7 +335,6 @@ const styles = StyleSheet.create({
   clothName: { fontSize: 13, fontWeight: '700', color: '#334155', textAlign: 'center' },
   clothBox: { minHeight: 72, backgroundColor: '#fff', borderRadius: 10, padding: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#eee' },
   
-  // ✨ 왼쪽 띠를 적용한 감성적인 메모 박스 스타일
   memoBox: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#F8FAFC', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, gap: 8, marginTop: 8, borderLeftWidth: 3, borderLeftColor: '#4F46E5' },
   memoText: { fontSize: 13, color: '#334155', fontWeight: '500', lineHeight: 20, flex: 1 },
   

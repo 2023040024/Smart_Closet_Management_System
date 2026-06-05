@@ -1,20 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, Stack } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import api from './_api';
 
@@ -23,6 +23,23 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow',
+      () => setKeyboardVisible(true)
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide',
+      () => setKeyboardVisible(false)
+    );
+
+    return () => {
+      keyboardDidHideListener.remove();
+      keyboardDidShowListener.remove();
+    };
+  }, []);
 
   const handleSignup = async () => {
     Keyboard.dismiss();
@@ -56,15 +73,19 @@ export default function SignupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView 
           style={styles.container} 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={styles.content}>
-            
-            {/* ✨ 브랜드 히어로 섹션 (Login 화면과 통일) */}
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.heroSection}>
               <Text style={styles.projectType}>Smart Closet Management System</Text>
               <View style={styles.brandRow}>
@@ -76,13 +97,12 @@ export default function SignupScreen() {
               <Text style={styles.heroSubtitle}>새로운 사용자를 위한 시스템 계정 등록</Text>
             </View>
 
-            {/* 회원가입 폼 섹션 */}
             <View style={styles.formCard}>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
                   placeholder="Email Address"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#94A3B8"
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
@@ -94,7 +114,7 @@ export default function SignupScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Password"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#94A3B8"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
@@ -105,7 +125,7 @@ export default function SignupScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Confirm Password"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#94A3B8"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
@@ -119,7 +139,7 @@ export default function SignupScreen() {
                 activeOpacity={0.8}
               >
                 {loading ? (
-                  <ActivityIndicator color="#ffffff" />
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <Text style={styles.signupButtonText}>계정 생성</Text>
                 )}
@@ -135,39 +155,43 @@ export default function SignupScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+          </ScrollView>
 
-            {/* 푸터 섹션 */}
+          {!isKeyboardVisible && (
             <View style={styles.footer}>
                 <Text style={styles.footerText}>Secure System Registration</Text>
             </View>
-          </View>
+          )}
+
         </KeyboardAvoidingView>
-      </TouchableWithoutFeedback>
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0f172a', // PPT 배경 색상
+    backgroundColor: '#FFFFFF',
   },
   container: { 
     flex: 1, 
   },
-  content: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 32,
     justifyContent: 'center',
+    paddingTop: 40,
+    paddingBottom: 100,
   },
   heroSection: {
-    marginBottom: 48, // 입력창이 3개라 로그인보다는 조금 줄임
+    marginBottom: 48, 
   },
   projectType: {
-    fontSize: 14,
-    color: '#38bdf8',
-    fontWeight: '700',
-    letterSpacing: 1.5,
+    fontSize: 13,
+    color: '#2563EB',
+    fontWeight: '800',
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
     marginBottom: 8,
   },
@@ -176,69 +200,69 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   brandName: {
-    fontSize: 56, // 입력창 공간 확보를 위해 약간 줄임
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontSize: 56, 
+    fontWeight: '900',
+    color: '#111827',
     letterSpacing: -1,
   },
   brandColon: {
     fontSize: 56,
-    fontWeight: '800',
-    color: '#38bdf8',
+    fontWeight: '900',
+    color: '#2563EB',
   },
   brandAccent: {
     fontSize: 56,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: '900',
+    color: '#111827',
     letterSpacing: -1,
   },
   decoLine: {
     width: 60,
     height: 4,
-    backgroundColor: '#38bdf8',
+    backgroundColor: '#2563EB',
     marginTop: 12,
     borderRadius: 2,
   },
   heroSubtitle: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: '#64748B',
     marginTop: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   formCard: {
     gap: 14,
   },
   inputContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#F8FAFC',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#E2E8F0',
     overflow: 'hidden',
   },
   input: {
     paddingHorizontal: 20,
     paddingVertical: 18,
     fontSize: 16,
-    color: '#FFFFFF',
+    color: '#111827',
   },
   signupButton: {
-    backgroundColor: '#38bdf8',
+    backgroundColor: '#2563EB',
     borderRadius: 16,
     paddingVertical: 20,
     alignItems: 'center',
     marginTop: 12,
-    shadowColor: '#38bdf8',
+    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 4,
   },
   signupButtonDisabled: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#94A3B8',
     shadowOpacity: 0,
   },
   signupButtonText: {
-    color: '#0f172a',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 1,
@@ -249,12 +273,12 @@ const styles = StyleSheet.create({
   },
   loginLinkText: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#64748B',
+    fontWeight: '500',
   },
   loginLinkTextBold: {
-    color: '#38bdf8',
-    fontWeight: '700',
-    textDecorationLine: 'underline',
+    color: '#2563EB',
+    fontWeight: '800',
   },
   footer: {
     position: 'absolute',
@@ -265,7 +289,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
-    color: '#334155',
+    color: '#94A3B8',
     fontWeight: '600',
     letterSpacing: 1,
     textTransform: 'uppercase',

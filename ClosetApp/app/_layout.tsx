@@ -50,7 +50,6 @@ export default function RootLayout() {
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          {/* 🔐 새로 추가된 로그인 화면 (헤더 숨김) */}
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="detail" options={{ title: '옷 상세' }} />
           <Stack.Screen name="edit" options={{ title: '옷 수정' }} />

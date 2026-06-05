@@ -184,7 +184,6 @@ export default function RegisterScreen() {
     }
   };
 
-  // ✨ 수정 포인트: 가로 스크롤 뷰를 적용하여 세로 길이를 대폭 단축!
   const renderChips = <K extends keyof ClothesTags>(items: readonly string[], key: K) => (
     <View style={styles.chipRowWrapper}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScrollContent}>
@@ -211,7 +210,6 @@ export default function RegisterScreen() {
         <Text style={[styles.title, { marginBottom: 0 }]}>옷 등록</Text>
       </View>
 
-      {/* ✨ 수정 포인트: 높이를 220 -> 160으로 줄이고 점선 테두리로 세련되게 변경 */}
       <TouchableOpacity style={styles.imageBox} onPress={pickImage} activeOpacity={0.8}>
         {image ? (
           <Image source={{ uri: image }} style={styles.image} resizeMode="contain" />
@@ -289,7 +287,6 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
   title: { fontSize: 26, fontWeight: '800', color: '#111827' }, 
   
-  // ✨ 이미지 업로드 박스 디자인 및 크기 다이어트
   imageBox: { 
     height: 160, 
     borderRadius: 16, 
@@ -305,8 +302,7 @@ const styles = StyleSheet.create({
   placeholderWrap: { alignItems: 'center', gap: 8 },
   image: { width: '100%', height: '100%', backgroundColor: '#F8FAFC' },
   imagePlaceholder: { color: '#64748B', fontSize: 14, fontWeight: '600' },
-  
-  // ✨ 태그(Chip) 관련 타이틀 및 스타일 세련되게 변경
+
   sectionTitle: { fontSize: 14, fontWeight: '800', color: '#475569', marginTop: 16, marginBottom: 10, marginLeft: 2 },
   
   chipRowWrapper: { marginBottom: 6 },

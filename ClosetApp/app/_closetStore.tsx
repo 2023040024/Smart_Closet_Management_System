@@ -102,7 +102,7 @@ function normalizeClothesItem(raw: any): ClothesItem | null {
   return {
     id,
     name: raw.name || '이름 없음',
-    image: resolveImageUri(image), // ✅ 이미지 경로 정상화
+    image: resolveImageUri(image), // 이미지 경로 정상화
     createdAt: raw.created_at || raw.createdAt || new Date().toISOString(),
     tags: tags,
   };
