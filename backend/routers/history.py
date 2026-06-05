@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session, joinedload
-from datetime import date  
+from datetime import date
+from typing import Optional
 
 from database import get_db
 from models import Clothes, WearHistory, User
@@ -94,8 +95,8 @@ def create_wear_history(
 def get_wear_histories(
     skip: int = 0, 
     limit: int = 100,
-    start_date: date = None,
-    end_date: date = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> list[WearHistoryResponse]: # 반환 타입 힌트
