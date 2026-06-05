@@ -2,7 +2,17 @@ import sys, os, jose.jwt, pytest
 from sqlalchemy.orm import Session
 from unittest.mock import patch, MagicMock
 from database import get_db
+from fastapi.testclient import TestClient
+from main import app
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+client = TestClient(app)
+
+def test_root():
+    # 루트 경로("/")로 GET 요청
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Closet App API 실행 중", "docs": "/docs"}
 
 class TestSignup:
     def test_정상_가입(self, client):
