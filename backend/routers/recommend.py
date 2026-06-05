@@ -230,7 +230,7 @@ def build_prompt(clothes_list: list[Clothes], situation: str, temperature: float
 {clothes_text}
 [추천 규칙]
 1. 반드시 보유한 옷 ID만 사용하세요 (목록에 없는 ID 절대 사용 금지)
-2. 코디는 상의 1개 + 하의 1개 조합이 기본이며, 체감온도 {outer_threshold}°C 이하면 아우터 추가
+2. 코디는 상의 1개 + 하의 1개 + 신발 1개 조합이 기본이며, 체감온도 {outer_threshold}°C 이하면 아우터 추가
 3. 미착용 기간이 긴 옷을 우선 포함하세요
 4. 색 조합이 자연스러워야 합니다 (무채색 베이스 선호)
 5. {situation_kr} 상황과 사용자 선호 스타일({preferred_style})에 맞게 선택하세요
@@ -431,7 +431,7 @@ def recommend_weekly(
 - 상황: {situation_kr}
 [추천 규칙]
 1. 반드시 보유한 옷 ID만 사용하세요
-2. 코디는 상의 1개 + 하의 1개 조합이 기본이며, 기온 14°C 이하면 아우터 추가
+2. 코디는 상의 1개 + 하의 1개 + 신발 1개 조합이 기본이며, 기온 14°C 이하면 아우터 추가
 3. items 배열이 절대 비어있으면 안 됩니다
 4. reason은 반드시 한국어 2~3문장으로 작성하세요
 [보유 옷]
