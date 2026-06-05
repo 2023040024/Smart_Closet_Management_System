@@ -1,17 +1,12 @@
+from dotenv import load_dotenv
+load_dotenv()  # .env 파일 자동 로드
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from routers import (
-    stats,
-    history,
-    feedback
-)
-
-load_dotenv()  # .env 파일 자동 로드
 
 from database import engine, Base
-from routers import auth, clothes, recommend, weather, vision
+from routers import auth, clothes, recommend, weather, vision, stats, history, feedback
 
 Base.metadata.create_all(bind=engine)
 
