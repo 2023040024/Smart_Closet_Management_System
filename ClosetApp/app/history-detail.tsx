@@ -8,6 +8,8 @@ type ClothingItem = {
   category: string;
   color: string;
   imageUrl?: string;
+  style?: string;
+  tpo?: string;
 };
 
 export default function HistoryDetailScreen() {
@@ -85,7 +87,12 @@ export default function HistoryDetailScreen() {
 
             {clothes.length > 0 ? (
               clothes.map((cloth) => (
-                <View key={cloth.id} style={styles.clothCard}>
+                <TouchableOpacity 
+                  key={cloth.id} 
+                  style={styles.clothCard}
+                  activeOpacity={0.7}
+                  onPress={() => router.push({ pathname: '/detail', params: { id: cloth.id } })}
+                >
                   <Image 
                     source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/150x150?text=No+Img' }} 
                     style={styles.clothThumbnail}
@@ -93,12 +100,21 @@ export default function HistoryDetailScreen() {
                   />
                   <View style={styles.clothInfo}>
                     <Text style={styles.clothName} numberOfLines={1}>{cloth.name}</Text>
+                    
                     <View style={styles.tagRow}>
                       <Text style={styles.tagBadge}>{cloth.category}</Text>
-                      <Text style={styles.tagBadge}>{cloth.color || '색상 미상'}</Text>
+                      
+                      {cloth.color && cloth.color !== '색상 미상' && cloth.color !== '색상 정보 없음' && (
+                        <Text style={styles.tagBadge}>{cloth.color}</Text>
+                      )}
+                      
+                      {cloth.tpo ? (
+                        <Text style={[styles.tagBadge, styles.tagBadgeTpo]}>{cloth.tpo}</Text>
+                      ) : null}
                     </View>
+
                   </View>
-                </View>
+                </TouchableOpacity>
               ))
             ) : (
               <Text style={styles.emptyText}>표시할 옷 정보가 없습니다.</Text>
@@ -112,7 +128,11 @@ export default function HistoryDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  content: { padding: 20, paddingBottom: 40, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 16 : 16 },
+  content: { 
+    paddingHorizontal: 12,
+    paddingBottom: 40, 
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 16 : 16 
+  },
   
   customHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
   customHeaderTitle: { fontSize: 26, fontWeight: '800', color: '#111827', marginBottom: 0 },
@@ -131,11 +151,45 @@ const styles = StyleSheet.create({
 
   section: { marginBottom: 12 }, 
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 16, paddingHorizontal: 4 },
-  
-  clothCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
-  clothThumbnail: { width: 105, height: 105, borderRadius: 12, backgroundColor: '#F8FAFC', marginRight: 18 },
+
+  clothCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 20, 
+    padding: 22, 
+    marginBottom: 16, 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0',
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 10, 
+    elevation: 2 
+  },
+  clothThumbnail: { 
+    width: 110, 
+    height: 110, 
+    borderRadius: 16, 
+    backgroundColor: '#F8FAFC', 
+    marginRight: 20 
+  },
   clothInfo: { flex: 1, justifyContent: 'center' },
-  clothName: { fontSize: 17, fontWeight: '800', color: '#1E293B', marginBottom: 10 },
-  tagRow: { flexDirection: 'row', gap: 6 },
-  tagBadge: { backgroundColor: '#F1F5F9', color: '#475569', fontSize: 13, fontWeight: '700', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
+  clothName: { fontSize: 16, fontWeight: '800', color: '#111827', marginBottom: 12 },
+  
+  tagRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  tagBadge: { 
+    backgroundColor: '#F1F5F9', 
+    color: '#475569', 
+    fontSize: 12, 
+    fontWeight: '700', 
+    paddingVertical: 5, 
+    paddingHorizontal: 10, 
+    borderRadius: 6,
+    overflow: 'hidden'
+  },
+  tagBadgeTpo: { 
+    backgroundColor: '#EEF2FF', 
+    color: '#4F46E5' 
+  },
 });

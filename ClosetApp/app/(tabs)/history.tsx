@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import api from '../_api';
 
-type ClothingItem = { id: string; name: string; category: string; color?: string; imageUrl?: string; };
+type ClothingItem = { id: string; name: string; category: string; color?: string; imageUrl?: string; style?: string; tpo?: string; };
 type WearHistoryItem = { id: string; date: string; clothesIds: string[]; tpoSuitability?: string; mood?: string; tpo?: string; memo?: string; };
 type HistoryApiItem = { history_id: number; clothes_id?: number; worn_date?: string; style?: string; mood?: string; tpo?: string; memo?: string; feedback_fit?: string; feedback_temperature?: string; feedback_tpo?: string; clothes?: { clothes_id?: number; name?: string; category?: string; color?: string; image_url?: string; tags?: { category?: string; color?: string; [key: string]: any; }; }; };
 type GroupedWearHistoryItem = { id: string; date: string; clothesIds: string[]; historyIds: string[]; tpoSuitability?: string; mood?: string; tpo?: string; memo?: string; };
@@ -81,6 +81,8 @@ export default function HistoryScreen() {
           category: item.clothes?.category ?? item.clothes?.tags?.category ?? '미분류',
           color: item.clothes?.color ?? item.clothes?.tags?.color ?? '색상 정보 없음',
           imageUrl: fullImageUrl,
+          style: item.clothes?.tags?.style || '',
+          tpo: item.clothes?.tags?.situation || item.clothes?.tags?.tpo || '',
         };
       });
 
@@ -258,11 +260,15 @@ export default function HistoryScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clothesScroll}>
                 {clothes.length > 0 ? (
                   clothes.map((cloth) => (
-                    <View key={cloth.id} style={styles.clothThumbnailBox}>
+                    <Pressable 
+                      key={cloth.id} 
+                      style={styles.clothThumbnailBox}
+                      onPress={() => router.push({ pathname: '/detail', params: { id: cloth.id } })}
+                    >
                       <Text style={styles.clothCategory}>{cloth.category}</Text>
                       <View style={styles.imageWrapper}><Image source={{ uri: cloth.imageUrl || 'https://via.placeholder.com/100?text=No+Img' }} style={styles.clothThumbnailImage} resizeMode="contain" /></View>
                       <Text style={styles.clothName} numberOfLines={1}>{cloth.name}</Text>
-                    </View>
+                    </Pressable>
                   ))
                 ) : (<View style={styles.clothBox}><Text style={styles.clothName}>옷 정보 없음</Text></View>)}
               </ScrollView>
@@ -301,7 +307,7 @@ const styles = StyleSheet.create({
     marginBottom: 16, 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
-    alignItems: 'flex-start' // 또는 'center'
+    alignItems: 'flex-start'
   },
 
   title: { fontSize: 26, fontWeight: '800', color: '#111' },
