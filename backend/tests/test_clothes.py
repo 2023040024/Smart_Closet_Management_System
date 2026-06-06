@@ -1,4 +1,5 @@
-import sys, os, io
+import sys, os, io, pytest
+from models import Clothes
 from unittest.mock import patch, mock_open
 from routers.clothes import get_material_tip, MATERIAL_TIPS
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -142,3 +143,20 @@ class TestClothes:
         res = client.get("/clothes", headers=auth_headers)
         assert res.status_code == 200
         assert res.json() == []
+
+class TestCostPerWear:
+    # 가성비 계산(cost_per_wear) 처리
+    def test_cost_per_wear_price_is_none(self):
+        # price가 None인 경우
+        clothes = Clothes(price=None, wear_count=5)
+        assert clothes.cost_per_wear is None
+
+    def test_cost_per_wear_count_is_zero(self):
+        # wear_count가 0인 경우
+        clothes = Clothes(price=50000, wear_count=0)
+        assert clothes.cost_per_wear is None
+
+    def test_cost_per_wear_normal_calculation(self):
+        # 정상적으로 계산되는 경우
+        clothes = Clothes(price=50000, wear_count=3)
+        assert clothes.cost_per_wear == 16667.0

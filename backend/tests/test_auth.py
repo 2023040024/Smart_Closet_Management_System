@@ -1,6 +1,18 @@
-import sys, os, jose.jwt
+import sys, os, jose.jwt, pytest
 from sqlalchemy.orm import Session
+from unittest.mock import patch, MagicMock
+from database import get_db
+from fastapi.testclient import TestClient
+from main import app
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+client = TestClient(app)
+
+def test_root():
+    # 루트 경로("/")로 GET 요청
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Closet App API 실행 중", "docs": "/docs"}
 
 class TestSignup:
     def test_정상_가입(self, client):
@@ -90,3 +102,26 @@ class TestStyleUpdate:
         
         assert res.status_code == 200
         assert res.json()["preferred_style"] == "캐주얼"
+
+def test_get_db():
+    # SessionLocal을 Mocking하여 실제 DB에 연결하지 않고 가짜 세션 생성
+    with patch("database.SessionLocal") as mock_session_local:
+        mock_db_session = MagicMock()
+        mock_session_local.return_value = mock_db_session
+
+        # 제너레이터 객체 생성
+        db_generator = get_db()
+
+        # try 블록 검증: next()를 호출하여 yield된 세션이 mock 객체인지 확인
+        db = next(db_generator)
+        assert db == mock_db_session
+        
+        # 아직 제너레이터가 끝나지 않았으므로 close()는 호출되지 않아야 함
+        mock_db_session.close.assert_not_called()
+
+        # finally 블록 검증: 한 번 더 next()를 호출하여 제너레이터를 종료시킴
+        with pytest.raises(StopIteration):
+            next(db_generator)
+
+        # 제너레이터가 종료되면서 finally 블록의 db.close()가 호출되었는지 확인
+        mock_db_session.close.assert_called_once()

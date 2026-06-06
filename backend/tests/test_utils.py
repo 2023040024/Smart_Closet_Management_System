@@ -113,7 +113,7 @@ class TestGetBaseTime:
 
 
 class TestGetWeatherData:
-    """4. 기상청 단기예보 통신 및 날씨 분기 테스트 (전면 동기 구조로 변경)"""
+    """4. 기상청 단기예보 통신 및 날씨 분기 테스트 (동기 함수)"""
 
     @patch('utils.requests.get')
     def test_invalid_address(self, mock_requests_get):
@@ -212,4 +212,35 @@ class TestGetWeatherData:
         mock_requests_get.side_effect = [mock_geo_resp, mock_weather_resp]
         
         res = get_weather_data("서울")
+        assert res == {"temperature": 20.0, "condition": "sunny"}
+
+    @patch('utils.requests.get')
+    def test_weather_api_exception_second_call(self, mock_requests_get):
+        # 주소 변환은 정상 데이터 반환
+        mock_geo_resp = MagicMock()
+        mock_geo_resp.json.return_value = [{'lat': '37.5', 'lon': '126.9'}]
+        
+        # 날씨 API에서 Exception 발생하도록 지정
+        mock_requests_get.side_effect = [mock_geo_resp, Exception("Weather API Timeout")]
+        
+        res = get_weather_data("서울")
+        
+        # 예외가 발생해도 시스템이 멈추지 않고 기본값을 반환하는지 검증
+        assert res == {"temperature": 20.0, "condition": "sunny"}
+
+    @patch('utils.requests.get')
+    def test_weather_data_parsing_keyerror(self, mock_requests_get):
+        # 주소 변환 정상
+        mock_geo_resp = MagicMock()
+        mock_geo_resp.json.return_value = [{'lat': '37.5', 'lon': '126.9'}]
+        
+        # 날씨 API 호출은 성공했으나, 정상 구조(response -> body -> items)가 없는 데이터 반환
+        mock_weather_resp = MagicMock()
+        mock_weather_resp.json.return_value = {"unexpected_data_structure": "error"}
+        
+        mock_requests_get.side_effect = [mock_geo_resp, mock_weather_resp]
+        
+        res = get_weather_data("서울")
+        
+        # JSON 키 에러가 발생하면 except Exception: 블록으로 빠져나와 기본값을 반환하는지 검증
         assert res == {"temperature": 20.0, "condition": "sunny"}
