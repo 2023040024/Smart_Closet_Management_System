@@ -57,9 +57,15 @@ npm install
 
 ## 📦 실행 방법
 1. 백엔드 실행
+- 로컬 환경 테스트
 ```
 cd backend
 uvicorn main:app --reload
+```
+- 모바일 앱 연동 테스트(외부 접속 허용 필요)
+```
+cd backend
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 2. 프론트엔드 실행
